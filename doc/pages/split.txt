@@ -1,0 +1,13 @@
+:sig
+StringList split(String str, String delim = "\n")
+
+:params
+str : string to be split
+delim : delimiter (defaults to newline character)
+return value : a list of strings
+
+:desc
+Splits 'str' into multiple strings based on the given delimiter 'delim'.
+
+:see
+>string

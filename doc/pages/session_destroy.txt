@@ -1,0 +1,11 @@
+:sig
+void session_destroy(String session_name)
+
+:params
+session_name : the name of the session
+
+:desc
+Deletes the cookie specified by 'session_name' and clears the data stored under the session ID. This empties the 'context->session_id' and 'context->session' variables.
+
+:see
+>session

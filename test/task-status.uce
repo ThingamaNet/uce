@@ -1,0 +1,9 @@
+
+RENDER()
+{
+	String task_name = first(context->get["task-name"], "example-task");
+
+	print("Task Name: ", task_name, "\n");
+	print("Task ID: ", task_pid(task_name), "\n");
+	print("Task Running: ", task_pid(task_name) == 0 ? "no" : "yes", "\n");
+}

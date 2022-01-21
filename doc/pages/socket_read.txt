@@ -1,0 +1,14 @@
+:sig
+String socket_read(u64 sockfd, u32 max_length = 1024*128, u32 timeout = 1);
+
+:params
+sockfd : socket handle
+max_length : optional maximum data size, defaults to 128kBytes
+timeout : optional operation timeout, defaults to one second
+return value : string containing the data that was read
+
+:desc
+Reads data from a socket connection.
+
+:see
+>socket

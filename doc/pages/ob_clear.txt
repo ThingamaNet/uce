@@ -1,0 +1,11 @@
+:sig
+void ob_clear()
+
+:params
+(none)
+
+:desc
+Discard the current output buffer.
+
+:see
+>ob

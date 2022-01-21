@@ -1,0 +1,10 @@
+:sig
+String sha1(String s, bool as_binary = false)
+
+:params
+s : data to be hashed
+as_binary : when set to false, returns hash in hexadecimal notation (defaults to false)
+return value : the resulting hash value
+
+:desc
+Returns the sha1 hash of 's'.

@@ -1,0 +1,12 @@
+:sig
+String shell_exec(String cmd)
+
+:params
+cmd : string that contains the shell command line to be executed
+return value : output of the command execution
+
+:desc
+Executes a Linux shell command and returns the generated output
+
+:see
+>sys

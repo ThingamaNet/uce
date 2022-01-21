@@ -1,0 +1,16 @@
+:sig
+u64 generate_int(u64 from, u64 to, u64 index, u64 seed = 0)
+
+:params
+from : minimum result
+to : maximum result
+index : index position to generate number from
+seed : seed position to generate number from (defaults to 0)
+return value : noise value
+
+:desc
+Generates a noise value between 'from' and 'to', given the 'index' and 'seed' numbers.
+
+
+:see
+>noise

@@ -1,0 +1,11 @@
+:sig
+f64 microtime()
+
+:params
+return value : current Unix timestamp
+
+:desc
+Returns a 64 bit float containing the current Unix timestamp with millisecond accuracy or better.
+
+:see
+>time

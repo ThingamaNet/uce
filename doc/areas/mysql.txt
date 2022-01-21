@@ -1,0 +1,8 @@
+MySQL Functions
+
+mysql_connect
+mysql_disconnect
+mysql_error
+mysql_escape
+mysql_insert_id
+mysql_query

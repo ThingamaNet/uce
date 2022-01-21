@@ -1,0 +1,13 @@
+:sig
+u64 memcache_connect(String host = "127.0.0.1", short port = 11211)
+
+:params
+host : optional host name of the memcache server, defaults to local address 127.0.0.1
+port : optional memcache server's port, defaults to 11211
+return value : the connection handle (or -1 if an error occurred)
+
+:desc
+Connects to a memcache server instance.
+
+:see
+>memcache

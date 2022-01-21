@@ -1,0 +1,38 @@
+Library
+=================================
+- md5 / meow
+- fold StringList into DTree _OR_ make better StringList
+- make session data use DTree instead of StringList
+
+Bugs
+=================================
+- shell_escape()
+
+
+Framework
+=================================
+- Check: File Upload
+- Proxy mode
+- WebSockets
+- Resident code / Cron / Tick?
+- Automated Test Suite
+- Documentation
+
+
+Performance
+=================================
+- Arena Allocator
+- Array implementation
+
+
+Nice to Have
+=================================
+- pseudorandom
+- XML components
+- Optionally store compiled units alongside source
+
+
+Finally
+=================================
+- DO WE DO OUR OWN LANGUAGE OR DO WE KEEP USING C?!?
+

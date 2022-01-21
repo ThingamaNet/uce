@@ -1,0 +1,12 @@
+:sig
+bool file_exists(String path)
+
+:params
+path : the path name to be checked
+return value : true if the file exists
+
+:desc
+Checks whether the file or path specified by 'path' exists.
+
+:see
+>sys

@@ -1,0 +1,8 @@
+Memcache Functions
+
+memcache_command
+memcache_connect
+memcache_delete
+memcache_get
+memcache_get_multiple
+memcache_set

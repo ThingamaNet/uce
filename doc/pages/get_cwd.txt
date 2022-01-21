@@ -1,0 +1,11 @@
+:sig
+String get_cwd()
+
+:params
+return value : the current working directory
+
+:desc
+Returns the current working directory.
+
+:see
+>sys

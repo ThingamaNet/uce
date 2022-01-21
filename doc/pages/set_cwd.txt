@@ -1,0 +1,11 @@
+:sig
+void set_cwd(String path)
+
+:params
+path : the new working directory
+
+:desc
+Sets a new working directory.
+
+:see
+>sys

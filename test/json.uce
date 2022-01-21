@@ -1,0 +1,56 @@
+
+
+RENDER()
+{
+	DTree t;
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			DTree/JSON
+		</h1>
+
+		JSON:
+
+		<pre style="white-space: pre-wrap"><?
+
+		t.key("a")->set("valueA");
+		t.key("b")->set("valueB");
+		t.key("c")->key("c-dt")->set_bool(true);
+		t.key("c")->key("c-df")->set_bool(false);
+		t.key("c")->key("c-e")->set("valueCE");
+		t.key("c")->key("c-f")->set(&t);
+		t.key("g")->key("g-h")->key("h-i")->set("valueHI");
+		t["g"]["x"]["y1"] = "XYZ1";
+		t["g"]["x"]["y2"] = &t;
+		t["g"]["x"]["y3"] = time();
+		t["g"]["x"]["y4"] = "Ünicödä";
+		t["l"] = context->params;
+
+		String j;
+		print(j = json_encode(t));
+
+		?></pre>
+
+		Parsed:
+
+		<pre><?
+			print(var_dump(
+				json_decode(j)
+			));
+		?></pre>
+
+		Compare:
+
+		<pre><?
+			print(var_dump(
+				t
+			));
+		?></pre>
+
+		Params
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+
+}

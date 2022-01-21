@@ -1,0 +1,11 @@
+:sig
+void socket_close(u64 sockfd)
+
+:params
+sockfd : socket handle
+
+:desc
+Closes an existing socket connection.
+
+:see
+>socket

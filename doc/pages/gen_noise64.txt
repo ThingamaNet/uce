@@ -1,0 +1,13 @@
+:sig
+u32 noise64(u64 index, u64 seed = 0)
+
+:params
+index : index position
+seed : seed set (defaults to 0)
+return value : a noise value given the 'index' and 'seed' values.
+
+:desc
+Generates a noise value for the given 'index' and 'seed' values.
+
+:see
+>noise

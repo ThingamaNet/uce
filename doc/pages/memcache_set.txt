@@ -1,0 +1,15 @@
+:sig
+bool memcache_set(u64 connection, String key, String value, u64 expires_in = 60*60)
+
+:params
+connection : connection handle
+key : the entry's key
+value : the value to be set
+expires_in : optional expiration timeout, defaults to one hour
+return value : true if the operation was successful
+
+:desc
+Stores a 'value' on the Memcache server.
+
+:see
+>memcache

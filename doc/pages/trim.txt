@@ -1,0 +1,12 @@
+:sig
+String trim(String raw)
+
+:params
+raw : string to be trimmed
+return value : string with leading and trailing whitespace characters removed
+
+:desc
+Returns a string where leading an trailing whitespace characters have been trimmed off.
+
+:see
+>string

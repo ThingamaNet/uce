@@ -1,0 +1,7 @@
+Time and Date Functions
+
+microtime
+time
+date
+gmdate
+parse_time

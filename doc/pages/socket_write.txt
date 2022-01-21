@@ -1,0 +1,13 @@
+:sig
+bool socket_write(u64 sockfd, String data)
+
+:params
+sockfd : socket handle
+data : a string containing the data to be written to the socket
+return value : true if the write operation was successful
+
+:desc
+Writes a string of 'data' to the given socket.
+
+:see
+>socket

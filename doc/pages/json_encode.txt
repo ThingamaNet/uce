@@ -1,0 +1,10 @@
+:sig
+String json_encode(DTree t)
+
+:params
+t : DTree object to be serialized
+return value : string containing the JSON result
+
+:desc
+Serializes a DTree structure 't' into a String in JSON notation.
+

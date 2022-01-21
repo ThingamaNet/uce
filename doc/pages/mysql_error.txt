@@ -1,0 +1,12 @@
+:sig
+String mysql_error(MySQL* m)
+
+:params
+m : pointer to a MySQL connection struct
+return value : MySQL error message (if present, otherwise empty string)
+
+:desc
+Returns the last error message from a connection to a MySQL server.
+
+:see
+>mysql

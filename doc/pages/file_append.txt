@@ -1,0 +1,12 @@
+:sig
+void file_append(String file_name, ...val)
+
+:params
+file_name : file name of file that should be written to
+...val : one or more values that should be written into the file
+
+:desc
+Opens or creates a given file and appends data to it.
+
+:see
+>sys

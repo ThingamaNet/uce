@@ -1,0 +1,12 @@
+:sig
+String first(String... args)
+
+:params
+args : a variable number of String arguments
+return value : first of the 'args' that was not empty.
+
+:desc
+Given a variable number of String parameters, the first() function returns the first of these parameters that was not empty. Leading and trailing whitespace characters are not considered, resulting in a string that contains only whitespace characters being considered empty.
+
+:see
+>string

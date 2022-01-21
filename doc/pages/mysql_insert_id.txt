@@ -1,0 +1,12 @@
+:sig
+u64 mysql_insert_id(MySQL* m)
+
+:params
+m : pointer to an active MySQL connection
+return value : the last used automatic row ID
+
+:desc
+This retrieves the last row ID that was used for a column with an AUTO_INCREMENT row key.
+
+:see
+>mysql

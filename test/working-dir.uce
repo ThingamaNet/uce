@@ -1,0 +1,20 @@
+
+
+RENDER()
+{
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			Working Directory
+		</h1>
+		<pre><?
+			print("Base WD: " + get_cwd() + "\n");
+			context->invoke("test2/working-dir-test.uce");
+		?></pre>
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+
+}
+

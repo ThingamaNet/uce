@@ -1,0 +1,17 @@
+:sig
+String session_start(String session_name)
+
+:params
+return value : the session ID, defaults to "uce-session"
+
+:desc
+Starts session or connects to existing session. This function sets a cookie with the name contained in 'session_name' if it does not exist and fills that cookie with a new unique session ID. It then loads the session data for that session ID. Afterwards, the following fields are populated in the 'context' variable:
+
+context->session_id : the current session ID
+
+context->session_name : the current session cookie name
+
+context->session : the current session data. The session data is automatically saved after a request completes.
+
+:see
+>session

@@ -1,0 +1,27 @@
+
+
+
+
+
+RENDER()
+{
+	DTree t;
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			Strings
+		</h1>
+
+		<pre style="white-space: pre-wrap"><?
+
+		print(String("!") + 60*60*24);
+
+		?></pre>
+
+		Params
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+
+}

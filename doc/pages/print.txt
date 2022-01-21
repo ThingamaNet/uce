@@ -1,0 +1,10 @@
+:sig
+void print(...val)
+
+:params
+...val : one or more values that should be output
+
+:desc
+Appends data to the current request's output stream.
+
+

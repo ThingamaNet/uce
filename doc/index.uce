@@ -1,0 +1,150 @@
+
+void render_see_section(String name)
+{
+	StringList lines = split(file_get_contents("areas/"+name+".txt"), "\n");
+	s32 idx = 0;
+	for(auto line : lines)
+	{
+		if(idx == 0)
+		{
+			<><h3><?= line ?></h3><ul></>
+		}
+		else if(line != "")
+		{
+			<><li><a href="index.uce?p=<?= line ?>"><?= line ?><span style="opacity:0.5">()</span></a></li></>
+		}
+		idx += 1;
+	}
+	<></ul></>
+}
+
+
+RENDER()
+{
+
+	String page = first(context->get["p"], "index");
+
+	<><html>
+	<head>
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+	</head>
+	<body>
+		<h1>
+			<a href="index.uce">UCE Docs</a>:
+			<?= page ?>
+		</h1>
+		<?
+
+		if(page == "index")
+		{
+			?><div style="display:flex;"><?
+			?><div style="flex:1"><?
+			?><h3>All API Functions</h3><?
+			for(auto file_name : ls("pages/"))
+			{
+				String ft = nibble(file_name, ".");
+				if(ft[1] == '_')
+				{
+					String fn = ft;
+					String pre = nibble(fn, "_");
+					?>
+					<div><a href="?p=<?= ft ?>"><?= fn ?></a><span style="opacity:0.5"> : struct</span></div>
+					<?
+				}
+				else
+				{
+					?>
+					<div><a href="?p=<?= ft ?>"><?= ft ?><span style="opacity:0.5">()</span></a></div>
+					<?
+				}
+			}
+			?></div><?
+			?><div style="flex:1"><?
+			for(auto file_name : ls("areas/"))
+			{
+				String ft = nibble(file_name, ".");
+				render_see_section(ft);
+			}
+			?></div><?
+			?></div><?
+		}
+		else
+		{
+			auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
+			String layout_class = "text";
+			u32 line_idx = 0;
+			for(auto s : doc)
+			{
+				line_idx++;
+				if(s == "")
+				{
+
+				}
+				else if(s.substr(0, 1) == ":")
+				{
+					layout_class = s.substr(1);
+					if(line_idx > 1)
+					{
+						?></div><?
+					}
+					?><div class="<?= layout_class ?>"><?
+					if(layout_class == "params")
+					{
+						?><h3>Parameters</h3><?
+					}
+					else if(layout_class == "sig")
+					{
+						?><h3>Signature</h3><?
+					}
+					else if(layout_class == "pre")
+					{
+						layout_class = "sig";
+					}
+					else if(layout_class == "desc")
+					{
+						?><h3>Description</h3><?
+					}
+					else if(layout_class == "see")
+					{
+						/*?><h3>Related</h3><?*/
+					}
+					else
+					{
+						?><h3><?= layout_class ?></h3><?
+					}
+				}
+				else
+				{
+					if(s.substr(0, 1) == "-")
+					{
+						nibble(s, "-");
+						?><li><?= (s) ?></li><?
+					}
+					else if(layout_class == "params")
+					{
+						?><div><b><?= trim(nibble(s, ":")) ?></b> : <?= trim(s) ?></div><?
+					}
+					else if(layout_class == "see")
+					{
+						if(s[0] == '>')
+						{
+							render_see_section(s.substr(1));
+						}
+						else
+						{
+							?><div><a href="index.uce?p=<?= trim(s) ?>"><?= trim(s) ?><span style="opacity:0.5">()</span></a></div><?
+						}
+					}
+					else
+					{
+						?><div><?= (s) ?></div><?
+					}
+				}
+			}
+		}
+
+		?>
+	</body>
+	</html></>
+
+}

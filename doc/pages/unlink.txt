@@ -1,0 +1,11 @@
+:sig
+void unlink(String file_name)
+
+:params
+file_name : name of the file
+
+:desc
+Deletes the file identified by 'file_name'.
+
+:see
+>sys

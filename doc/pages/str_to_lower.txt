@@ -1,0 +1,14 @@
+:sig
+String str_to_lower(String s)
+
+:params
+s : the string to be converted
+return value : returns a version of 's' where all upper case characters have been changed into lower case
+
+:desc
+Returns a lower case version of the input string 's'.
+
+Note: this function is not yet Unicode-aware.
+
+:see
+>string

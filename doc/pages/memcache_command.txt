@@ -1,0 +1,13 @@
+:sig
+String memcache_command(u64 connection, String command)
+
+:params
+connection : connection handle
+command : string containing the Memcache command
+return value : string containing the Memcache server's response
+
+:desc
+Executes a command on an open memcache connection.
+
+:see
+>memcache

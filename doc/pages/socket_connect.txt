@@ -1,0 +1,13 @@
+:sig
+u64 socket_connect(String host, short port)
+
+:params
+host : host name
+port : port number
+return value : the socket handle
+
+:desc
+Opens a socket connection to the given 'host' and 'port'.
+
+:see
+>socket

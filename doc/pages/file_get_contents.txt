@@ -1,0 +1,12 @@
+:sig
+String file_get_contents(String file_name)
+
+:params
+file_name : file name of file that should be read
+return value : String containing the file's contents
+
+:desc
+Reads the file identified by 'file_name' and returns it as a String. If the file cannot be read, this function will return an empty string.
+
+:see
+>sys

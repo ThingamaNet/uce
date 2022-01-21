@@ -1,0 +1,11 @@
+:sig
+void mysql_disconnect(MySQL* m)
+
+:params
+m : pointer to an existing MySQL connection struct
+
+:desc
+Closes a connection to a MySQL server.
+
+:see
+>mysql

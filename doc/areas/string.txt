@@ -1,0 +1,10 @@
+String Functions
+
+filter
+first
+join
+nibble
+split
+str_to_lower
+str_to_upper
+trim

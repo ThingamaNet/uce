@@ -1,0 +1,12 @@
+:sig
+String expand_path(String path)
+
+:params
+path : a relative path
+return value : expanded version of the 'path'
+
+:desc
+Converts a relative path name into an absolute path, using the current working directory as a base.
+
+:see
+>sys

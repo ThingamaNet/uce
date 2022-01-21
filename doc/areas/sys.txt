@@ -1,0 +1,17 @@
+File System Functions
+
+basename
+dirname
+expand_path
+file_append
+file_exists
+file_get_contents
+file_mtime
+file_put_contents
+get_cwd
+ls
+mkdir
+set_cwd
+shell_escape
+shell_exec
+unlink

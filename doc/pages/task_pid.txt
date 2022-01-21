@@ -1,0 +1,12 @@
+:sig
+pid_t task_pid(String key)
+
+:params
+key : string uniquely identifying the task
+return value : the process ID of the task
+
+:desc
+Checks whether a process with the given 'key' is running and returns its PID if it is. Returns 0 otherwise.
+
+:see
+>task

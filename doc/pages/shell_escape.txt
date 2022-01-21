@@ -1,0 +1,12 @@
+:sig
+String shell_escape(String raw)
+
+:params
+raw : string that should be escaped
+return value : escaped version of 'raw'
+
+:desc
+Escapes a parameter for shell_exec
+
+:see
+>sys

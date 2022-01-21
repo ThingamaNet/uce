@@ -1,0 +1,11 @@
+:sig
+void ob_start()
+
+:params
+(none)
+
+:desc
+Starts a new output buffer. All subsequent output will be directed into this buffer.
+
+:see
+>ob

@@ -1,0 +1,13 @@
+:sig
+pid_t task(String key, std::function<void()> exec_func)
+
+:params
+key : string uniquely identifying the task
+exec_func : function to execute
+return value : the process ID of the started (or still running) task
+
+:desc
+task() starts the 'exec_func' in a new process and returns that process' ID. If a process with the same 'key' is already running, task will not start a new process but instead just return the PID of the process that is already running.
+
+:see
+>task

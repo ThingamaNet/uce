@@ -1,0 +1,11 @@
+:sig
+String make_session_id()
+
+:params
+return value : a new session ID
+
+:desc
+Creates a session ID
+
+:see
+>session

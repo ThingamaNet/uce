@@ -1,0 +1,12 @@
+:sig
+String dirname(String fn)
+
+:params
+fn : raw filename
+return value : the directory's name
+
+:desc
+Isolates the directory name component from a path/file name.
+
+:see
+>sys

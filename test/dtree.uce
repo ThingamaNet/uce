@@ -1,0 +1,54 @@
+
+
+RENDER()
+{
+	DTree t;
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			DTree
+		</h1>
+
+		Value Types:
+
+		<pre><?
+
+		t.set("String test");
+		print(String("String test: ") + t.to_string()+"\n");
+
+		t.set(true);
+		print(String("bool test: ") + t.to_string()+"\n");
+
+		t.set(1234.5678);
+		print(String("float test: ") + t.to_string()+"\n");
+
+		t.set(&t);
+		print(String("pointer test: ") + t.to_string()+"\n");
+
+		?></pre>
+
+		Tree:
+
+		<pre><?
+
+		t.key("a")->set("valueA");
+		t.key("b")->set("valueB");
+		t.key("c")->key("c-d")->set("valueCD");
+		t.key("c")->key("c-e")->set("valueCE");
+		t.key("c")->key("c-f")->set(&t);
+		t.key("g")->key("g-h")->key("h-i")->set("valueHI");
+		t["g"]["x"]["y1"] = "XYZ1";
+		t["g"]["x"]["y2"] = &t;
+		t["g"]["x"]["y3"] = time();
+		t["g"]["x"]["y4"] = "Ünicödä";
+		print(var_dump(t));
+
+		?></pre>
+
+		Params
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+
+}

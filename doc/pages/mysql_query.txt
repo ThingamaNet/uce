@@ -1,0 +1,17 @@
+:sig
+DTree mysql_query(MySQL* m, String q, StringMap params)
+
+:params
+m : pointer to an active MySQL connection struct
+q : a string containing a MySQL query
+params : optional, a list of query parameter keys and values
+return value : a list of rows returned from executing the query
+
+:desc
+Executes a MySQL query and returns the resulting data (if any).
+
+:Examples
+(tbd)
+
+:see
+>mysql

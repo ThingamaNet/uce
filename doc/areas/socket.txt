@@ -1,0 +1,6 @@
+Socket Functions
+
+socket_close
+socket_connect
+socket_read
+socket_write

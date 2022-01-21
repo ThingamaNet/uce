@@ -1,0 +1,12 @@
+:sig
+bool mkdir(String path)
+
+:params
+path : the path name to be created
+return value : returns true if the directory was successfully created
+
+:desc
+Creates a directory stated by 'path'
+
+:see
+>sys

@@ -1,0 +1,63 @@
+:sig
+Request* context;
+
+:ServerState* server
+Contains the current server state
+
+:StringMap params
+All FastCGI server parameters
+
+:StringMap get
+The current request's GET variables
+
+:StringMap post
+The current request's POST variables
+
+:StringMap cookies
+Cookies that have been transmitted by the browser
+
+:StringMap session
+The current session
+
+:String session_id
+ID of the session cookie
+
+String session_name
+Name of the session cookie
+
+:DTree var
+Variable user-defined data
+
+:std::vector<UploadedFile> uploaded_files
+Files that have been uploaded in the current request
+
+:StringMap header
+Headers to be sent back to the browser
+
+:StringList set_cookies;
+Cookies that should be sent back to the browser
+
+:u64 random_seed
+The current request's "random" noise generator seed
+
+:u64 random_index
+The current request's "random" noise generator index position
+
+:MemoryArena* mem
+Contains the current request's memory arena
+
+:bool flags.log_request
+Whether the request should be logged
+
+:Stats
+	u32 stats.bytes_written
+	f64 stats.time_init
+	f64 stats.time_start
+	f64 stats.time_end
+
+:invoke(String file_name, [DTree& call_param])
+Invokes the UCE file 'file_name'
+
+
+
+

@@ -1,0 +1,14 @@
+:sig
+StringList filter(StringList items, function<bool (String)> f)
+vector<T> filter(vector<T> items, function<bool (T)> f)
+
+:params
+items : list of items to be filtered
+f : a function that decides which items should be in the new list
+return value : a new list
+
+:desc
+Returns a list containing the members of 'items' for which 'f' returned boolean true.
+
+:see
+>string

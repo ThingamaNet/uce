@@ -1,0 +1,12 @@
+:sig
+StringMap parse_query(String q)
+
+:params
+q : string containing URL parameters
+return value : a StringMap containing the parameters
+
+:desc
+Decodes a string of the format 'a=b&c=d' into a StringMap containing keyed entries.
+
+:see
+>uri

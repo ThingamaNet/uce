@@ -1,0 +1,12 @@
+:sig
+u64 parse_time(String time_string)
+
+:params
+time_string : a string containing a date and/or time in text form
+return value : the interpreted 'time_string' as a Unix timestamp
+
+:desc
+Attempts to parse the given 'time_string' into a Unix timestamp.
+
+:see
+>time

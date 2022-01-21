@@ -1,0 +1,14 @@
+:sig
+String str_to_upper(String s)
+
+:params
+s : the string to be converted
+return value : returns a version of 's' where all lower case characters have been changed into upper case
+
+:desc
+Returns a upper case version of the input string 's'.
+
+Note: this function is not yet Unicode-aware.
+
+:see
+>string

@@ -1,0 +1,12 @@
+:sig
+StringList ls(String path)
+
+:params
+path : a filesystem path
+return value : list of directory entries
+
+:desc
+Returns a list of files and subdirectories within the given 'path'.
+
+:see
+>sys

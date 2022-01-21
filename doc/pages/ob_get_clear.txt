@@ -1,0 +1,11 @@
+:sig
+String ob_get_clear()
+
+:params
+return value : content of the current output buffer
+
+:desc
+Returns the contents of the current output buffer and then discards the buffer.
+
+:see
+>ob

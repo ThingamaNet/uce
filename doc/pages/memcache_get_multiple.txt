@@ -1,0 +1,13 @@
+:sig
+StringMap memcache_get_multiple(u64 connection, StringList keys)
+
+:params
+connection : connection handle
+keys : a list of strings containing the keys to be retrieved
+return value : a StringMap with the retrieved entries
+
+:desc
+Retrieves a bunch of entries all at once.
+
+:see
+>memcache

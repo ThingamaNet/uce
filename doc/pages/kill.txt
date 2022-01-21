@@ -1,0 +1,15 @@
+:sig
+s64 kill(pid_t pid, s64 sig)
+
+:params
+pid : PID of the process
+sig : signal number
+return value : 0 if signal was sent, -1 otherwise
+
+:desc
+This is the standard POSIX kill() function, provided here for reference.
+
+Possible signal numbers are: SIGABND, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGPOLL, SIGPROF, SIGQUIT, SIGSEGV, SIGSYS, SIGTERM, SIGTRAP, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGXCPU, SIGXFSZ, SIGCHLD, SIGIO, SIGIOERR, SIGWINCH, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGCONT.
+
+:see
+>task

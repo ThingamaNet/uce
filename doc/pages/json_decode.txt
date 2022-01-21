@@ -1,0 +1,10 @@
+:sig
+DTree json_decode(String s)
+
+:params
+s : string containing JSON data
+return value : a DTree object containing the deserialized JSON data
+
+:desc
+Deserializes 's' into a DTree structure.
+

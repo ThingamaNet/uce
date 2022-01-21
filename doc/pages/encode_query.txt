@@ -1,0 +1,12 @@
+:sig
+String encode_query(StringMap map)
+
+:params
+q : StringMap containing URL parameters to be encoded
+return value : a string with the encoded parameters
+
+:desc
+Encodes a StringMap containing URL parameters into a single String.
+
+:see
+>uri

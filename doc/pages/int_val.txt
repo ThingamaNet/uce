@@ -1,0 +1,11 @@
+:sig
+u64 int_val(String s, u32 base = 10)
+
+:params
+s : string to be converted
+base : number system base (default 10)
+return value : a u64 containing the number (0 if no number could be identified).
+
+:desc
+Extracts an integer from a String.
+

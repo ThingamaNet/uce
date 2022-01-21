@@ -1,0 +1,14 @@
+:sig
+String memcache_get(u64 connection, String key, String default_value = "")
+
+:params
+connection : connection handle
+key : key string
+default_value : optional default value
+return value : value that was returned by the Memcache server
+
+:desc
+Retrieves a value from an existing connection to a Memcache server.
+
+:see
+>memcache

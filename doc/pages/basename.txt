@@ -1,0 +1,12 @@
+:sig
+String basename(String fn)
+
+:params
+fn : raw filename
+return value : the file's name
+
+:desc
+Isolates the file name component from a path/file name.
+
+:see
+>sys

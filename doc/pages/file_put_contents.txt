@@ -1,0 +1,13 @@
+:sig
+bool file_put_contents(String file_name, String content)
+
+:params
+file_name : file name of file that should be written
+content : content that should be written
+return value : true if write was successful
+
+:desc
+Writes the String 'content' into a file identified by 'file_name'. Any pre-existing content of the file will be overwritten.
+
+:see
+>sys

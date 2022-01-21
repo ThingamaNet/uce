@@ -1,0 +1,13 @@
+:sig
+String html_escape(String s)
+
+:params
+s : string to be escaped
+return value : an HTML-safe escaped version of 's'
+
+:desc
+Returns a version of the input string where the following characters have been replace by HTML entities:
+- & → &amp
+- < → lt;
+- > → &gt;
+- " → &quot;

@@ -1,0 +1,12 @@
+:sig
+String var_dump(StringMap t, String prefix = "", String postfix = "\n")
+String var_dump(StringList t, String prefix = "", String postfix = "\n")
+String var_dump(DTree t, String prefix = "", String postfix = "\n")
+
+:params
+t : object to be dumped into a string
+return value : string containing a human-friendly representation of 't'
+
+:desc
+Returns a string representation of 't' intended for debugging.
+

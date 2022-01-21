@@ -1,0 +1,11 @@
+:sig
+u64 time()
+
+:params
+return value : second-accurate current Unix timestamp
+
+:desc
+Returns a 64 bit integer containing the current Unix timestamp.
+
+:see
+>time

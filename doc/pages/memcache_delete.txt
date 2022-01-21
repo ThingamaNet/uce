@@ -1,0 +1,13 @@
+:sig
+bool memcache_delete(u64 connection, String key)
+
+:params
+connection : connection handle
+key : key string
+return value : true if the operation was successful
+
+:desc
+Deletes entry specified by the 'key'.
+
+:see
+>memcache

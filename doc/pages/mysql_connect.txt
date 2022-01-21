@@ -1,0 +1,14 @@
+:sig
+MySQL* mysql_connect(String host = "localhost", String username = "root", String password = "")
+
+:params
+host : host name of the MySQL server
+username : user name
+password : password
+return value : pointer to the MySQL connection struct
+
+:desc
+Establishes a connection to a MySQL server.
+
+:see
+>mysql

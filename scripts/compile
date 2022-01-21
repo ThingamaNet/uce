@@ -1,0 +1,41 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+cd ..
+
+SRC_DIR="$1"
+DEST_DIR="$2"
+
+SRC_FN="$3"
+PP_FN="$4"
+SO_FN="$5"
+
+#echo "Source Dir: $SRC_DIR"
+#echo "Dest Dir: $DEST_DIR"
+#echo "Source File: $SRC_FN"
+#echo "Preprocessed File: $PP_FN"
+#echo "Dest File: $SO_FN"
+
+mkdir -p "$DEST_DIR" > /dev/null 2>&1
+
+export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}$SRC_DIR"
+
+BUILDMODE="debug"
+OPT_FLAG="O0"
+
+COMPILER="clang++"
+#COMPILER="g++"
+FLAGS="-shared -g -rdynamic -w -Wall -$OPT_FLAG -std=c++17 -fpermissive -ffast-math -fPIC"
+
+LIBS="-ldl -lm -lpthread "
+SRCFLAGS="-D PLATFORM_NAME=\"linux\""
+
+# echo "Compliling executable..."
+$COMPILER "$DEST_DIR/$PP_FN" $SRCFLAGS $FLAGS $LIBS -o "$DEST_DIR/$SO_FN"
+
+if [ $? -eq 0 ]
+then
+	# ls -lh "$DEST_DIR"
+	exit 0
+else
+	exit 1
+fi
