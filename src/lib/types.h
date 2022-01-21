@@ -149,6 +149,7 @@ struct ServerSettings {
 
 	String BIN_DIRECTORY = "/tmp/uce/work";
 	String COMPILE_SCRIPT = "scripts/compile";
+	String SETUP_TEMPLATE = "scripts/setup.h.template";
 	String LIT_ESC = "3d5b5_1";
 	String CONTENT_TYPE = "text/html; charset=utf-8";
 	String SOCKET_PATH = "/run/uce.sock";
@@ -166,6 +167,10 @@ struct SharedUnit {
 
 	String file_name;
 	String so_name;
+	String api_file_name;
+	String setup_file_name;
+	StringList api_declarations;
+	std::map<String, void*> api_functions;
 
 	String src_path;
 	String bin_path;
@@ -181,6 +186,8 @@ struct SharedUnit {
 
 	String compiler_messages;
 	time_t last_compiled;
+
+	bool opt_so_optional = false;
 
 	~SharedUnit();
 };

@@ -5,6 +5,7 @@ first
 join
 nibble
 split
-str_to_lower
-str_to_upper
+replace
+to_lower
+to_upper
 trim

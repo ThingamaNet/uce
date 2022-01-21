@@ -1,9 +1,11 @@
 :sig
-StringList split(String str, String delim = "\n")
+StringList split(String str, String delim)
+StringList split(String str)
+
 
 :params
 str : string to be split
-delim : delimiter (defaults to newline character)
+delim : optional, delimiter (if omitted, any sequence of whitespace characters will count as a delimiter)
 return value : a list of strings
 
 :desc

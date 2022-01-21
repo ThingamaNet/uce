@@ -22,7 +22,7 @@ String get_cwd();
 void set_cwd(String path);
 time_t file_mtime(String file_name);
 void unlink(String file_name);
-String expand_path(String path);
+String expand_path(String path, String relative_to_path = "");
 StringList ls(String dir);
 
 f64 microtime();

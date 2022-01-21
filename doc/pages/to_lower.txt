@@ -1,5 +1,5 @@
 :sig
-String str_to_lower(String s)
+String to_lower(String s)
 
 :params
 s : the string to be converted

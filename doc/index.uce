@@ -43,18 +43,26 @@ RENDER()
 			for(auto file_name : ls("pages/"))
 			{
 				String ft = nibble(file_name, ".");
-				if(ft[1] == '_')
+				if(ft.substr(0, 2) == "0_")
 				{
 					String fn = ft;
 					String pre = nibble(fn, "_");
 					?>
-					<div><a href="?p=<?= ft ?>"><?= fn ?></a><span style="opacity:0.5"> : struct</span></div>
+					<div><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?></a><span style="opacity:0.5"> : struct</span></div>
+					<?
+				}
+				else if(ft.substr(0, 2) == "1_")
+				{
+					String fn = ft;
+					String pre = nibble(fn, "_");
+					?>
+					<div><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?></a><span style="opacity:0.5"> : directive</span></div>
 					<?
 				}
 				else
 				{
 					?>
-					<div><a href="?p=<?= ft ?>"><?= ft ?><span style="opacity:0.5">()</span></a></div>
+					<div><a href="?p=<?= uri_encode(ft) ?>"><?= ft ?><span style="opacity:0.5">()</span></a></div>
 					<?
 				}
 			}

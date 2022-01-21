@@ -2,11 +2,13 @@
 u8 char_to_u8(char input);
 u8 hex_to_u8(String src);
 u64 int_val(String s, u32 base = 10);
-String str_to_lower(String s);
-String str_to_upper(String s);
+String to_lower(String s);
+String to_upper(String s);
+String replace(String s, String search, String replace_with);
 
 String trim(String raw);
-StringList split(String str, String delim = "\n");
+StringList split(String str);
+StringList split(String str, String delim);
 String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);

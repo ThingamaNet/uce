@@ -1,0 +1,9 @@
+#load "lib.uce"
+
+RENDER()
+{
+	<>
+	Hello world2
+	<?= bla("!x") ?>
+	</>
+}

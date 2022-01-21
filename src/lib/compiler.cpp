@@ -87,18 +87,19 @@ String process_html_literal(Request* context, SharedUnit* su, String content)
 	return(HT_START + pc + HT_END);
 }
 
-String preprocess_shared_unit(Request* context, SharedUnit* su)
+String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String content)
 {
-	String content = file_get_contents(su->file_name);
-	printf("(c) compiling with root dir %s\n", context->server->config.COMPILER_SYS_PATH.c_str());
-	String pc = ("#include \"")+context->server->config.COMPILER_SYS_PATH +"/src/lib/uce_lib.h\" \n";
+	String pc = "#include \"" + su->src_file_name + ".setup.h" + "\"\n";
 	String token = "";
 	String html_buffer = "";
 	u8 mode = 0;
 	bool inside_quote = false;
-	for(u32 i = 0; i < content.length(); i++)
+	u32 source_length = content.length();
+	String current_line = "";
+	for(u32 i = 0; i < source_length; i++)
 	{
 		char c = content[i];
+		current_line.append(1, c);
 		if(mode == 2)
 		{
 			auto end_pos = content.find(String("</")+token+">", i);
@@ -142,12 +143,52 @@ String preprocess_shared_unit(Request* context, SharedUnit* su)
 			inside_quote = !inside_quote;
 			pc.append(1, c);
 		}
-		else
+		else // we're in C++ code here
 		{
 			pc.append(1, c);
+			if(c == 10 && current_line.substr(0, 6) == "#load ")
+			{
+				//printf("#load directive\n");
+				pc.resize(pc.length() - current_line.length());
+				nibble(current_line, "\"");
+				String unit_name = nibble(current_line, "\"");
+				SharedUnit* sub_su = compiler_load_shared_unit(context, unit_name, su->src_path, true);
+				if(sub_su)
+				{
+					pc.append("#include \"" + sub_su->pre_file_name + "\"");
+				}
+			}
+			else if(current_line.length() == 4 && current_line.substr(0, 4) == "API ")
+			{
+				auto end_declaration_pos = content.find("{", i);
+				if(end_declaration_pos != std::string::npos)
+				{
+					// remove string "API " from output
+					pc.resize(pc.length() - 4);
+					String declaration = trim(content.substr(i, end_declaration_pos - i));
+					String return_type_and_name = nibble(declaration, "(");
+					StringList rtn_list = split(return_type_and_name);
+					String fn_name = rtn_list.back(); rtn_list.pop_back();
+					su->api_declarations.push_back(fn_name + ":" + join(rtn_list, " ") + ":(" + declaration + "\n");
+					printf("declaration found: %s\n", declaration.c_str());
+				}
+			}
 		}
+		if(c == 10)
+			current_line = "";
 	}
 	return(pc);
+}
+
+String preprocess_shared_unit(Request* context, SharedUnit* su)
+{
+	return(
+		preprocess_shared_unit_char_wise(
+			context,
+			su,
+			file_get_contents(su->file_name)
+		)
+	);
 }
 
 void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
@@ -166,6 +207,8 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 	su->pre_file_name = su->src_file_name + ".cpp";
 
 	su->so_name = su->bin_path + "/" + su->bin_file_name;
+	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".api.txt";
+	su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
 }
 
 void load_shared_unit(Request* context, SharedUnit* su, String file_name)
@@ -178,6 +221,8 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 
 	if(!file_exists(su->so_name))
 	{
+		if(su->opt_so_optional)
+			return;
 		printf("(i) unit file not found: %s\n", su->so_name.c_str());
 		su->compiler_messages = "unit file not found";
 		return;
@@ -201,6 +246,22 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	}
 }
 
+String compile_setup_file(Request* context, SharedUnit* su)
+{
+	String result =
+		String("#ifndef UCE_LIB_INCLUDED\n") +
+		"#define UCE_LIB_INCLUDED\n" +
+		("#include \"")+context->server->config.COMPILER_SYS_PATH +"/src/lib/uce_lib.h\" \n"+
+		file_get_contents(context->server->config.SETUP_TEMPLATE) +
+		"#endif \n";
+	StringList declarations;
+	StringList load_units;
+
+	result = replace(result, "/*load_declarations*/", join(declarations, "\n"));
+	result = replace(result, "/*load_units*/", join(load_units, "\n"));
+	return(result);
+}
+
 void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 {
 	//setup_unit_paths(context, su, file_name);
@@ -213,16 +274,19 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 
 	shell_exec("mkdir -p " + shell_escape(su->pre_path));
 	file_put_contents(su->pre_path + "/" + su->pre_file_name, preprocess_shared_unit(context, su));
+	file_put_contents(su->setup_file_name, compile_setup_file(context, su));
+	file_put_contents(su->api_file_name, join(su->api_declarations, "\n"));
 
-	printf("Config.COMPILE_SCRIPT %s\n", String(su->pre_path + "/" + su->pre_file_name).c_str());
+	//printf("Config.COMPILE_SCRIPT %s\n", String(su->pre_path + "/" + su->pre_file_name).c_str());
 
-	su->compiler_messages = trim(shell_exec(context->server->config.COMPILE_SCRIPT+" "+
-		shell_escape(su->src_path)+" "+
-		shell_escape(su->bin_path)+" "+
-		shell_escape(su->file_name)+" "+
-		shell_escape(su->pre_file_name)+" "+
-		shell_escape(su->bin_file_name)
-	));
+	if(!su->opt_so_optional)
+		su->compiler_messages = trim(shell_exec(context->server->config.COMPILE_SCRIPT+" "+
+			shell_escape(su->src_path)+" "+
+			shell_escape(su->bin_path)+" "+
+			shell_escape(su->file_name)+" "+
+			shell_escape(su->pre_file_name)+" "+
+			shell_escape(su->bin_file_name)
+		));
 
 	if(su->compiler_messages.length() > 0)
 	{
@@ -235,27 +299,35 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 	}
 }
 
-SharedUnit* get_shared_unit(Request* context, String file_name)
+SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_optional)
 {
 	SharedUnit* su = context->server->units[file_name];
 	auto mod_time = file_mtime(file_name);
+	auto compiled_time = su ? file_mtime(su->so_name) : 0;
 	bool do_recompile = false;
-	if(su && (su->last_compiled < mod_time || mod_time == 0))
+	if(su && (compiled_time < mod_time || mod_time == 0))
 	{
 		delete su;
 		su = 0;
 		do_recompile = true;
 	}
+	else if(su && (su->last_compiled < mod_time))
+	{
+		delete su;
+		su = 0;
+		do_recompile = false;
+	}
 	if(!su)
 	{
 		su = new SharedUnit();
 		setup_unit_paths(context, su, file_name);
-		if(!do_recompile)
+		su->opt_so_optional = opt_so_optional;
+		if(compiled_time != 0)
 		{
 			// if we didn't decide to force recompile yet, we need to check
 			// (this case should only happen if the SU cache for that entry is cold
 			//  but the SO itself exists _AND_ is stale)
-			su->last_compiled = file_mtime(su->so_name);
+			su->last_compiled = compiled_time;
 			if(su->last_compiled < mod_time || mod_time == 0)
 				do_recompile = true;
 		}
@@ -301,25 +373,53 @@ void compiler_invoke(Request* context, String file_name, DTree& call_param)
 		printf("Error loading unit %s\n", file_name.c_str());
 		print("Error loading unit: "+file_name);
 	}
+	else if(su->compiler_messages.length() > 0)
+	{
+		context->header["Content-Type"] = "text/plain";
+		print(su->compiler_messages);
+	}
 	else if(!su->on_render)
 	{
 		context->header["Content-Type"] = "text/plain";
-		print("Compiler error: "+su->compiler_messages);
+		print("no RENDER() entry point");
 	}
 	else
 	{
-		if(su->compiler_messages.length() > 0)
-			print(su->compiler_messages);
-		else
-		{
-			String prev_wd = get_cwd();
-			set_cwd(su->src_path);
-			su->on_setup(context);
-			su->on_render(call_param);
-			set_cwd(prev_wd);
-		}
+		String prev_wd = get_cwd();
+		set_cwd(su->src_path);
+		su->on_setup(context);
+		su->on_render(call_param);
+		set_cwd(prev_wd);
 	}
 }
 
+SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path, bool opt_so_optional)
+{
 
+	if(file_name[0] != '/')
+	{
+		file_name = expand_path(file_name, current_path);
+	}
+
+	switch_to_system_alloc();
+	auto su = get_shared_unit(context, file_name, opt_so_optional);
+	switch_to_arena(context->mem);
+	if(!su)
+	{
+		printf("Error loading unit %s\n", file_name.c_str());
+		print("Error loading unit: "+file_name);
+		return(0);
+	}
+	else if(su->compiler_messages.length() > 0)
+	{
+		context->header["Content-Type"] = "text/plain";
+		print(su->compiler_messages);
+		return(0);
+	}
+	else
+	{
+		return(su);
+	}
+
+}
 

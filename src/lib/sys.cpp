@@ -32,7 +32,19 @@ String shell_exec(String cmd)
 String shell_escape(String raw)
 {
 	// FIXME
-	return("\"" + raw + "\"");
+	String result = "";
+	for(auto c : raw)
+	{
+		if(c == '\'')
+		{
+			result.append("'\\''");
+		}
+		else
+		{
+			result.append(1, c);
+		}
+	}
+	return("\'" + result + "\'");
 	/*
 	`	U+0060 (Grave Accent)	Backtick	Command substitution
 ~	U+007E	Tilde	Tilde expansion
@@ -164,11 +176,14 @@ void unlink(String file_name)
 	remove(file_name.c_str());
 }
 
-String expand_path(String path)
+String expand_path(String path, String relative_to_path)
 {
 	String result;
 
-	auto base_path = split(get_cwd(), "/");
+	if(relative_to_path == "")
+		relative_to_path = get_cwd();
+
+	auto base_path = split(relative_to_path, "/");
 	auto rel_path = split(path, "/");
 
 	for(auto& s : rel_path)

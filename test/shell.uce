@@ -1,0 +1,32 @@
+
+
+RENDER()
+{
+
+	<><html>
+		<link rel="stylesheet" href='style.css?v=1'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			Shell Stuff
+		</h1>
+
+		<div>shell_exec()</div>
+
+		<pre><?
+
+			print(shell_exec("ls -l"));
+
+		?></pre>
+
+		<div>shell_escape()</div>
+
+		<pre><?
+
+			print(shell_exec("echo "+shell_escape("kasjdf 1ölkasj öflkjasdö\\lkfjsöa'ldkfj 23487692\"bla83746")));
+
+		?></pre>
+
+		<pre><?= var_dump(context->params) ?></pre>
+	</html></>
+
+}

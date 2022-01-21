@@ -40,7 +40,7 @@ u8 hex_to_u8(String src)
 	return(char_to_u8(src[0])*16 + char_to_u8(src[1]));
 }
 
-String str_to_lower(String s)
+String to_lower(String s)
 {
 	String result = "";
 	for(auto c : s)
@@ -52,7 +52,7 @@ String str_to_lower(String s)
 	return(result);
 }
 
-String str_to_upper(String s)
+String to_upper(String s)
 {
 	String result = "";
 	for(auto c : s)
@@ -61,6 +61,27 @@ String str_to_upper(String s)
 			c = toupper(c);
 		result.append(1, c);
 	}
+	return(result);
+}
+
+String replace(String s, String search, String replace_with)
+{
+	s64 last_spos = 0;
+	auto spos = s.find(search);
+	if(spos == std::string::npos)
+		return(s);
+	String result = "";
+	auto slen = search.length();
+	while(spos != std::string::npos)
+	{
+		if(spos - last_spos > 0)
+			result.append(s.substr(last_spos, spos - last_spos));
+		result.append(replace_with);
+		last_spos = spos + slen;
+		spos = s.find(search, last_spos);
+	}
+	if(last_spos < s.length())
+		result.append(s.substr(last_spos));
 	return(result);
 }
 
@@ -78,6 +99,30 @@ String trim(String raw)
 	if(end_pos < start_pos)
 		return("");
 	return(raw.substr(start_pos, 1 + end_pos - start_pos));
+}
+
+StringList split(String str)
+{
+	StringList result;
+	String current_token = "";
+	for(auto c : str)
+	{
+		if(isspace(c))
+		{
+			if(current_token != "")
+			{
+				result.push_back(current_token);
+				current_token = "";
+			}
+		}
+		else
+		{
+			current_token.append(1, c);
+		}
+	}
+	if(current_token != "")
+		result.push_back(current_token);
+	return(result);
 }
 
 StringList split(String str, String delim)
