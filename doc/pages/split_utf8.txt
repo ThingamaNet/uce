@@ -1,0 +1,15 @@
+:sig
+StringList split_utf8(String str)
+
+
+:params
+str : string to be split
+return value : a list of Unicode characters
+
+:desc
+Splits the string 'str' into its constituent Unicode code points.
+
+This currently does not honor compound characters such as flags or composite emojis.
+
+:see
+>string

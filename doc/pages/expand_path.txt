@@ -1,8 +1,9 @@
 :sig
-String expand_path(String path)
+String expand_path(String path, String relative_to_path = "")
 
 :params
 path : a relative path
+relative_to_path : optional, expand relative to this path (if not given, the current path is used)
 return value : expanded version of the 'path'
 
 :desc

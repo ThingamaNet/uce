@@ -12,6 +12,7 @@ StringList split(String str, String delim);
 String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);
+StringList split_utf8(String s);
 
 template<typename T>
 std::vector<T> filter(std::vector<T> items, std::function<bool (T)> f)
@@ -50,3 +51,4 @@ void ob_clear();
 String ob_get_clear();
 String ob_get();
 
+#define is_bit_set(var,pos) ((var) & (1<<(pos)))

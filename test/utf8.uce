@@ -1,0 +1,34 @@
+
+RENDER()
+{
+	
+	String raw = first(context->post["raw"], "■▧▲😂😆😏😱🇦🇽");
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			UTF-8
+		</h1>
+		<form action="?" method="post">
+			<div>
+				<label>split_utf8</label>
+				<input type="text" name="raw" value="<?= raw ?>"/>
+			</div>
+			<div>
+				<input type="submit" value="Submit Form"/>
+			</div>
+		</form>
+		<pre><?
+
+		u32 item_idx = 0;
+		for(auto seg : split_utf8(raw))
+		{
+			print(item_idx++, " : ", seg, "\n");
+		}
+
+		?></pre>
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+
+}

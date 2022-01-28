@@ -154,6 +154,40 @@ String join(StringList l, String delim)
 	return(result);
 }
 
+StringList split_utf8(String s)
+{
+	StringList result;
+	auto len = s.size();
+	String codepoint = "";
+	for(s64 i = 0; i < len; i++)
+	{
+		u8 c = s[i];
+		if(is_bit_set(c, 7))
+		{
+			codepoint = "";
+			codepoint.append(1, c);
+			if(is_bit_set(c, 6))
+			{
+				codepoint.append(1, s[++i]);
+				if(is_bit_set(c, 5))
+				{
+					codepoint.append(1, s[++i]);
+					if(is_bit_set(c, 4))
+					{
+						codepoint.append(1, s[++i]);
+					}
+				}
+			}
+			result.push_back(codepoint);
+		}
+		else
+		{
+			result.push_back(String().append(1, c));
+		}
+	}
+	return(result);
+}
+
 String html_escape(String s)
 {
 	String result;

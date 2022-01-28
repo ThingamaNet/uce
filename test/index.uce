@@ -30,6 +30,7 @@ RENDER()
 			<li><a href="file_append.uce">File Append</a></li>
 			<li><a href="random.uce">RNG/Noise</a></li>
 			<li><a href="task.uce">Task API</a></li>
+			<li><a href="utf8.uce">UTF-8</a></li>
 		</ul>
 		<pre><?
 			print("Worker PID: ", my_pid, "\n");
