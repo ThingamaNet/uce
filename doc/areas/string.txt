@@ -5,6 +5,7 @@ first
 join
 nibble
 split
+split_space
 split_utf8
 replace
 to_lower

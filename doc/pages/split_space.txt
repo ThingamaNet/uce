@@ -1,0 +1,12 @@
+:sig
+StringList split_space(String str)
+
+:params
+str : string to be split
+return value : a list of strings
+
+:desc
+Splits 'str' into multiple strings along any whitespace characters (multiple whitespace characters count as one).
+
+:see
+>string
