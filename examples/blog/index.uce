@@ -1,9 +1,10 @@
+#load "config/settings.uce"
 #load "lib.uce"
 
 RENDER()
 {
 	<>
-	Hello world2
+	Hello world23
 	<?= bla("!x") ?>
 	</>
 }

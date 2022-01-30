@@ -20,9 +20,17 @@ RENDER()
 
 		<div>shell_escape()</div>
 
-		<pre><?
+		<pre style="height:80px"><?
 
 			print(shell_exec("echo "+shell_escape("kasjdf 1ölkasj öflkjasdö\\lkfjsöa'ldkfj 23487692\"bla83746")));
+
+		?></pre>
+
+		<div>Git</div>
+
+		<pre><?
+
+			print(shell_exec("git show"));
 
 		?></pre>
 

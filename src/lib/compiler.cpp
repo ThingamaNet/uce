@@ -152,10 +152,11 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 				pc.resize(pc.length() - current_line.length());
 				nibble(current_line, "\"");
 				String unit_name = nibble(current_line, "\"");
+				//printf("(i) #load %s\n", unit_name.c_str());
 				SharedUnit* sub_su = compiler_load_shared_unit(context, unit_name, su->src_path, true);
 				if(sub_su)
 				{
-					pc.append("#include \"" + sub_su->pre_file_name + "\"");
+					pc.append("#include \"" + sub_su->bin_path + "/" + sub_su->pre_file_name + "\"\n");
 				}
 			}
 			else if(current_line.length() == 4 && current_line.substr(0, 4) == "API ")
