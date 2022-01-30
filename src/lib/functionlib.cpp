@@ -101,7 +101,7 @@ String trim(String raw)
 	return(raw.substr(start_pos, 1 + end_pos - start_pos));
 }
 
-StringList split(String str)
+StringList split_space(String str)
 {
 	StringList result;
 	String current_token = "";
@@ -154,7 +154,7 @@ String join(StringList l, String delim)
 	return(result);
 }
 
-StringList split_utf8(String s)
+StringList split_utf8(String s, bool compound_characters)
 {
 	StringList result;
 	auto len = s.size();
@@ -184,6 +184,50 @@ StringList split_utf8(String s)
 		{
 			result.push_back(String().append(1, c));
 		}
+	}
+	if(compound_characters)
+	{
+		StringList compound_result;
+		bool join_next = false;
+		bool last_was_regional = false;
+		for(auto& s : result)
+		{
+			if(join_next)
+			{
+				compound_result[compound_result.size()-1] += s;
+				join_next = false;
+			}
+			else if(s == "\xE2" "\x80" "\x8D") // ZWJ
+			{
+				compound_result[compound_result.size()-1] += s;
+				join_next = true;
+				last_was_regional = false;
+			}
+			else if(s[0] == '\xF0' && s[1] == '\x9F' && s[2] == '\x87' && s[3] >= '\xA6' && s[3] <= '\xBF') // Regional indicator letters
+			{
+				if(last_was_regional)
+				{
+					compound_result[compound_result.size()-1] += s;
+					last_was_regional = false;
+				}
+				else
+				{
+					compound_result.push_back(s);
+					last_was_regional = true;
+				}
+			}
+			else if(s[0] == '\xEF' && s[1] == '\xB8' && s[2] >= '\x80' && s[2] <= '\x8F') // Variation selector
+			{
+				compound_result[compound_result.size()-1] += s;
+				last_was_regional = false;
+			}
+			else
+			{
+				compound_result.push_back(s);
+				last_was_regional = false;
+			}
+		}
+		return(compound_result);
 	}
 	return(result);
 }

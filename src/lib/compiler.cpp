@@ -167,7 +167,7 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 					pc.resize(pc.length() - 4);
 					String declaration = trim(content.substr(i, end_declaration_pos - i));
 					String return_type_and_name = nibble(declaration, "(");
-					StringList rtn_list = split(return_type_and_name);
+					StringList rtn_list = split_space(return_type_and_name);
 					String fn_name = rtn_list.back(); rtn_list.pop_back();
 					su->api_declarations.push_back(fn_name + ":" + join(rtn_list, " ") + ":(" + declaration + "\n");
 					printf("declaration found: %s\n", declaration.c_str());

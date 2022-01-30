@@ -1,15 +1,20 @@
 :sig
-StringList split_utf8(String str)
+StringList split_utf8(String str, bool compound_characters = false)
 
 
 :params
 str : string to be split
+compound_characters : optional, if true tries to combine compound characters
 return value : a list of Unicode characters
 
 :desc
 Splits the string 'str' into its constituent Unicode code points.
 
-This currently does not honor compound characters such as flags or composite emojis.
+If 'compound_characters' is true, split_utf8 will attempt to combine compound characters based on very simple rules:
+<li>combine characters if they're connected by a Zero-Width Joiner (ZWJ) character</li>
+<li>combine two characters if they're both a Regional Indicator Symbol Letter</li>
+<li>if a character is a Variation Selector, append it to the previous character</li>
+<li>in all other cases, characters remain on their own</li>
 
 :see
 >string

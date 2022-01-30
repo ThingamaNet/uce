@@ -1,8 +1,18 @@
+String string_to_hex(String s)
+{
+	String result = "";
+	for(auto c : s)
+	{
+		result += to_hex(c);
+	}
+	return(result);
+}
+
 
 RENDER()
 {
-	
-	String raw = first(context->post["raw"], "■▧▲😂😆😏😱🇦🇽");
+
+	String raw = first(context->post["raw"], "■👪▧▲🏳️‍🌈😂👋🏽😆😏😱🇦🇽Udø島リZ̸̢̧̡̧̗̰̪͉̤͖͉̪̝̦͎̮̑͜a̸̧̝̱̹̲̗̪̰̦͒̃͋̿̿̃̈͑̐͑͗̚̕̚͝͠l͚̜͕̠̣ģ̸̧̘̜͇͚͈͙̓̌̅͑͊͊͋̓́͌̈́̿̈́͗͘̚ͅͅȏ̶̗̤̳͎̫̥͕̣͔̥̙̜̰̂͌̍͊͂́̅̇̒̕̕ルイ社もなく");
 
 	<>
 		<link rel="stylesheet" href='style.css'></link>
@@ -19,12 +29,29 @@ RENDER()
 				<input type="submit" value="Submit Form"/>
 			</div>
 		</form>
+		Simple Characters
 		<pre><?
 
 		u32 item_idx = 0;
 		for(auto seg : split_utf8(raw))
 		{
-			print(item_idx++, " : ", seg, "\n");
+			item_idx++;
+			print(string_to_hex(seg), " ", seg, "\t");
+			if(item_idx % 4 == 0)
+				print("\n");
+		}
+
+		?></pre>
+		Compound Characters
+		<pre><?
+
+		item_idx = 0;
+		for(auto seg : split_utf8(raw, true))
+		{
+			item_idx++;
+			print(string_to_hex(seg), " ", seg, "\t");
+			if(item_idx % 4 == 0)
+				print("\n");
 		}
 
 		?></pre>

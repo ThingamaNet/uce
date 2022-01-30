@@ -215,16 +215,6 @@ struct URI {
 
 String nibble(String div, String& haystack);
 
-template <typename ITYPE>
-String to_hex(ITYPE w, size_t hex_len = sizeof(ITYPE)<<1)
-{
-    static const char* digits = "0123456789ABCDEF";
-    String rc(hex_len,'0');
-    for (size_t i=0, j=(hex_len-1)*4 ; i<hex_len; ++i,j-=4)
-        rc[i] = digits[(w>>j) & 0x0f];
-    return(rc);
-}
-
 #include "dtree.h"
 
 void compiler_invoke(Request* context, String file_name, DTree& call_param);

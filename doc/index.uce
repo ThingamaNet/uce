@@ -145,7 +145,7 @@ RENDER()
 					}
 					else
 					{
-						?><div><?= (s) ?></div><?
+						?><div><? print(s); ?></div><?
 					}
 				}
 			}

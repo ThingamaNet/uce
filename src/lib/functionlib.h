@@ -7,12 +7,22 @@ String to_upper(String s);
 String replace(String s, String search, String replace_with);
 
 String trim(String raw);
-StringList split(String str);
+StringList split_space(String str);
 StringList split(String str, String delim);
+StringList split_utf8(String s, bool compound_characters = false);
 String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);
-StringList split_utf8(String s);
+
+template <typename ITYPE>
+String to_hex(ITYPE w, size_t hex_len = sizeof(ITYPE)<<1)
+{
+    static const char* digits = "0123456789ABCDEF";
+    String rc(hex_len,'0');
+    for (size_t i=0, j=(hex_len-1)*4 ; i<hex_len; ++i,j-=4)
+        rc[i] = digits[(w>>j) & 0x0f];
+    return(rc);
+}
 
 template<typename T>
 std::vector<T> filter(std::vector<T> items, std::function<bool (T)> f)
