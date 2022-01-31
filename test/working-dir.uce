@@ -11,7 +11,7 @@ RENDER()
 		</h1>
 		<pre><?
 			print("Base WD: " + get_cwd() + "\n");
-			context->invoke("test2/working-dir-test.uce");
+			render_file("test2/working-dir-test.uce");
 		?></pre>
 		<pre><?= var_dump(context->params) ?></pre>
 	</>

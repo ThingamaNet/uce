@@ -7,3 +7,4 @@ gen_noise32
 gen_noise64
 gen_float
 gen_int
+gen_sha1

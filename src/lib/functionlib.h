@@ -60,5 +60,6 @@ void ob_start();
 void ob_clear();
 String ob_get_clear();
 String ob_get();
+String safe_name(String raw);
 
 #define is_bit_set(var,pos) ((var) & (1<<(pos)))

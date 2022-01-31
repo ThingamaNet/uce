@@ -141,6 +141,7 @@ struct Request;
 struct DTree;
 
 typedef void (*call_handler)(DTree& call_param);
+typedef DTree* (*dtree_call_handler)(DTree* call_param);
 typedef void (*request_handler)(Request* request);
 
 String to_string(s64 v) { return(std::to_string(v)); }
@@ -156,6 +157,8 @@ struct ServerSettings {
 	String TMP_UPLOAD_PATH = "/tmp/uce/uploads";
 	String SESSION_PATH = "/tmp/uce/sessions";
 	String COMPILER_SYS_PATH = ".";
+	String PRECOMPILE_FILES_IN = ".";
+
 	u32 LISTEN_PORT = 9993;
 	u64 SESSION_TIME = 60*60*24*30;
 	u32 WORKER_COUNT = 4;
@@ -260,6 +263,7 @@ struct Request {
 		f64 time_init;
 		f64 time_start;
 		f64 time_end;
+		u32 invoke_count = 0;
 	} stats;
 
 	struct Resources {
@@ -268,8 +272,8 @@ struct Request {
 		u64 fcgi_socket = 0;
 	} resources;
 
-	void invoke(String file_name);
-	void invoke(String file_name, DTree& call_param);
+	//void invoke(String file_name);
+	//void invoke(String file_name, DTree& call_param);
 
 	void ob_start();
 

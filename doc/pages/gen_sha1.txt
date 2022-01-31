@@ -8,3 +8,6 @@ return value : the resulting hash value
 
 :desc
 Returns the sha1 hash of 's'.
+
+:see
+>noise

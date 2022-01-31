@@ -159,13 +159,14 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 					pc.append("#include \"" + sub_su->bin_path + "/" + sub_su->pre_file_name + "\"\n");
 				}
 			}
-			else if(current_line.length() == 4 && current_line.substr(0, 4) == "API ")
+			else if(false && current_line.substr(0, 6) == "EXPORT" && isspace(current_line[6]))
 			{
 				auto end_declaration_pos = content.find("{", i);
 				if(end_declaration_pos != std::string::npos)
 				{
 					// remove string "API " from output
-					pc.resize(pc.length() - 4);
+					//pc.resize(pc.length() - 7);
+					pc.append(1, '\n');
 					String declaration = trim(content.substr(i, end_declaration_pos - i));
 					String return_type_and_name = nibble(declaration, "(");
 					StringList rtn_list = split_space(return_type_and_name);
@@ -208,7 +209,7 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 	su->pre_file_name = su->src_file_name + ".cpp";
 
 	su->so_name = su->bin_path + "/" + su->bin_file_name;
-	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".api.txt";
+	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".exports.txt";
 	su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
 }
 
@@ -224,7 +225,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	{
 		if(su->opt_so_optional)
 			return;
-		printf("(i) unit file not found: %s\n", su->so_name.c_str());
+		//printf("(i) unit file not found: %s\n", su->so_name.c_str());
 		su->compiler_messages = "unit file not found";
 		return;
 	}
@@ -235,11 +236,11 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		su->last_compiled = file_mtime(su->so_name);
 		char *error;
 		su->on_setup = (request_handler)dlsym(su->so_handle, "set_current_request");
-		su->on_render = (call_handler)dlsym(su->so_handle, "render");
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
-		else
-			printf("(i) loaded unit %s\n", su->file_name.c_str());
+		su->on_render = (call_handler)dlsym(su->so_handle, "render");
+		//else
+		//	printf("(i) loaded unit %s\n", su->file_name.c_str());
 	}
 	else
 	{
@@ -253,7 +254,7 @@ String compile_setup_file(Request* context, SharedUnit* su)
 		String("#ifndef UCE_LIB_INCLUDED\n") +
 		"#define UCE_LIB_INCLUDED\n" +
 		("#include \"")+context->server->config.COMPILER_SYS_PATH +"/src/lib/uce_lib.h\" \n"+
-		file_get_contents(context->server->config.SETUP_TEMPLATE) +
+		file_get_contents(context->server->config.COMPILER_SYS_PATH + "/" + context->server->config.SETUP_TEMPLATE) +
 		"#endif \n";
 	StringList declarations;
 	StringList load_units;
@@ -296,7 +297,7 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 	else
 	{
 		load_shared_unit(context, su, file_name);
-		printf("(i) compiled unit %s\n", file_name.c_str());
+		//printf("(i) compiled unit %s\n", file_name.c_str());
 	}
 }
 
@@ -356,51 +357,17 @@ SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_opti
 	return(su);
 }
 
-void compiler_invoke(Request* context, String file_name, DTree& call_param)
-{
-
-	if(file_name[0] != '/')
-	{
-		file_name = expand_path(file_name);
-	}
-	//printf("(i) invoke %s\n", file_name.c_str());
-
-	//printf("(i) invoke(%s)\n", file_name.c_str());
-	switch_to_system_alloc();
-	auto su = get_shared_unit(context, file_name);
-	switch_to_arena(context->mem);
-	if(!su)
-	{
-		printf("Error loading unit %s\n", file_name.c_str());
-		print("Error loading unit: "+file_name);
-	}
-	else if(su->compiler_messages.length() > 0)
-	{
-		context->header["Content-Type"] = "text/plain";
-		print(su->compiler_messages);
-	}
-	else if(!su->on_render)
-	{
-		context->header["Content-Type"] = "text/plain";
-		print("no RENDER() entry point");
-	}
-	else
-	{
-		String prev_wd = get_cwd();
-		set_cwd(su->src_path);
-		su->on_setup(context);
-		su->on_render(call_param);
-		set_cwd(prev_wd);
-	}
-}
-
 SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path, bool opt_so_optional)
 {
+
+	context->stats.invoke_count++;
 
 	if(file_name[0] != '/')
 	{
 		file_name = expand_path(file_name, current_path);
 	}
+
+	//printf("(i) load '%s'\n", file_name.c_str());
 
 	switch_to_system_alloc();
 	auto su = get_shared_unit(context, file_name, opt_so_optional);
@@ -413,7 +380,8 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 	}
 	else if(su->compiler_messages.length() > 0)
 	{
-		context->header["Content-Type"] = "text/plain";
+		if(context->stats.invoke_count == 1)
+			context->header["Content-Type"] = "text/plain";
 		print(su->compiler_messages);
 		return(0);
 	}
@@ -422,5 +390,79 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 		return(su);
 	}
 
+}
+
+void compiler_invoke(Request* context, String file_name, DTree& call_param)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(su)
+	{
+		if(!su->on_setup)
+		{
+			if(context->stats.invoke_count == 1)
+				context->header["Content-Type"] = "text/plain";
+			print("internal error: set_current_request() not defined in", file_name, "\n");
+		}
+		else if(!su->on_render)
+		{
+			if(context->stats.invoke_count == 1)
+				context->header["Content-Type"] = "text/plain";
+			print("no RENDER() entry point");
+		}
+		else
+		{
+			String prev_wd = get_cwd();
+			set_cwd(su->src_path);
+			su->on_setup(context);
+			su->on_render(call_param);
+			set_cwd(prev_wd);
+		}
+	}
+}
+
+void render_file(String file_name)
+{
+	//printf("(i) render_file(%s)\n", file_name.c_str());
+	DTree call_param;
+	compiler_invoke(context, file_name, call_param);
+}
+
+void render_file(String file_name, DTree& call_param)
+{
+	compiler_invoke(context, file_name, call_param);
+}
+
+DTree* call_file_function(String file_name, String function_name, DTree* call_param)
+{
+	DTree* result;
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(su && su->so_handle)
+	{
+		if(!su->on_setup)
+		{
+			print("internal error: set_current_request() not defined in", file_name, "\n");
+		}
+		else
+		{
+			auto f = (dtree_call_handler)dlsym(su->so_handle, function_name.c_str());
+			if(!f)
+			{
+				print("Error: call_file_function() function '", function_name, "' not found");
+			}
+			else
+			{
+				String prev_wd = get_cwd();
+				set_cwd(su->src_path);
+				su->on_setup(context);
+				result = f(call_param);
+				set_cwd(prev_wd);
+			}
+		}
+	}
+	else
+	{
+		print("Error: call_file_function() could not load unit file '", file_name, "'");
+	}
+	return(result);
 }
 

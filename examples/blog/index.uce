@@ -1,10 +1,7 @@
 #load "config/settings.uce"
-#load "lib.uce"
+#load "lib/site.uce"
 
 RENDER()
 {
-	<>
-	Hello world23
-	<?= bla("!x") ?>
-	</>
+	render_file("pages/page.html.uce");
 }

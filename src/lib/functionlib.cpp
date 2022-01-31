@@ -533,3 +533,13 @@ String ob_get_close()
 	return(result);
 }
 
+String safe_name(String raw)
+{
+	String result = "";
+	for(auto c : raw)
+	{
+		if(isalnum(c) || c == '_')
+			result.append(1, c);
+	}
+	return(result);
+}

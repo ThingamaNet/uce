@@ -39,6 +39,7 @@ String nibble(String div, String& haystack)
 	}
 }
 
+/*
 void Request::invoke(String file_name)
 {
 	DTree call_param;
@@ -49,6 +50,8 @@ void Request::invoke(String file_name, DTree& call_param)
 {
 	compiler_invoke(this, file_name, call_param);
 }
+
+*/
 
 void Request::ob_start()
 {
@@ -61,3 +64,4 @@ Request::~Request()
 	for(auto& sockfd : resources.sockets)
 		close(sockfd);
 }
+

@@ -70,7 +70,7 @@ int handle_complete(FastCGIRequest& request) {
 	}
 
 	// printf("(i) request ready\n");
-    request.invoke(request.params["SCRIPT_FILENAME"]);
+    render_file(request.params["SCRIPT_FILENAME"]);
 
 	for( auto &f : request.uploaded_files)
 	{
@@ -87,6 +87,17 @@ int handle_complete(FastCGIRequest& request) {
 
 void listen_for_connections()
 {
+	if(precompile_jobs.size() > 0)
+	{
+		context = new Request();
+		context->server = &server_state;
+		for(auto s : precompile_jobs)
+		{
+			printf("- worker [%i] precompile %s\n", getpid(), s.c_str());
+			get_shared_unit(context, s, false);
+		}
+	}
+
 	signal(SIGSEGV, on_segfault);
 	server.on_request = &handle_request;
 	server.on_data = &handle_data;
@@ -106,6 +117,9 @@ void listen_for_connections()
 
 int main(int argc, char** argv)
 {
+	StringList precompile_jobs_pending;
+	u32 precompile_jobs_per_worker = 1;
+
 	printf("(P) Starting parent server PID:%i\n", getpid());
 
 	signal(SIGCHLD, on_child_exit);
@@ -143,11 +157,41 @@ int main(int argc, char** argv)
 	{
 		std::cout << e.what();
 	}*/
+	if(server_state.config.PRECOMPILE_FILES_IN != "" && server_state.config.WORKER_COUNT >= 2)
+	{
+		if(server_state.config.PRECOMPILE_FILES_IN != "/")
+			server_state.config.PRECOMPILE_FILES_IN = expand_path(server_state.config.PRECOMPILE_FILES_IN);
+		precompile_jobs_pending = split(trim(shell_exec(
+			"find " +
+			shell_escape(server_state.config.PRECOMPILE_FILES_IN) +
+			" -iname '*.uce' ")), "\n");
+		precompile_jobs_per_worker = 1 + (precompile_jobs_pending.size() / (server_state.config.WORKER_COUNT -1));
+		/*
+		*/
+	}
+
+	s32 worker_spawn_count = 0;
 
 	for(;;)
 	{
 		while(workers.size() < server_state.config.WORKER_COUNT)
 		{
+			worker_spawn_count++;
+			precompile_jobs.clear();
+			// spawn workers with precompile jobs if necessary but
+			// leave the first worker alone so it can start responding
+			// to requests right away
+			if(precompile_jobs_pending.size() > 0 && worker_spawn_count > 1)
+			{
+				for(u32 i = 0; i < precompile_jobs_per_worker; i++)
+				{
+					if(precompile_jobs_pending.size() > 0)
+					{
+						precompile_jobs.push_back(precompile_jobs_pending.back());
+						precompile_jobs_pending.pop_back();
+					}
+				}
+			}
 			spawn_subprocess(listen_for_connections);
 		}
 		sleep(1);

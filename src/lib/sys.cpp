@@ -12,7 +12,7 @@
 
 String shell_exec(String cmd)
 {
-	printf("(i) shell_exec(%s)\n", cmd.c_str());
+	//printf("(i) shell_exec(%s)\n", cmd.c_str());
 	String data;
 	FILE * stream;
 	const int max_buffer = 256;

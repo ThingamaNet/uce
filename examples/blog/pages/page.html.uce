@@ -1,0 +1,47 @@
+
+EXPORT DTree* my_custom_func(DTree* var)
+{
+	<>
+	Hello
+	</>
+	return(0);
+}
+
+RENDER()
+{
+	<><!doctype html>
+	<html class="no-js" lang="">
+
+	<head>
+	  <meta charset="utf-8">
+	  <title></title>
+	  <meta name="description" content="">
+	  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	  <meta property="og:title" content="">
+	  <meta property="og:type" content="">
+	  <meta property="og:url" content="">
+	  <meta property="og:image" content="">
+
+	  <link rel="manifest" href="site.webmanifest">
+	  <link rel="apple-touch-icon" href="icon.png">
+
+	  <link rel="stylesheet" href="css/normalize.css">
+	  <link rel="stylesheet" href="css/main.css">
+
+	  <meta name="theme-color" content="#606060">
+	</head>
+
+	<body>
+	<?
+		String view_name = safe_name(first(context->get["view"], "default")) + ".uce";
+		if(file_exists(view_name))
+			render_file(view_name);
+		else
+			print("view not found");
+	?>
+	</body>
+
+	</html>
+	</>
+}
