@@ -140,6 +140,41 @@ StringList split(String str, String delim)
     return(result);
 }
 
+StringMap split_kv(String s, char separator, bool trim_whitespace)
+{
+	StringMap result;
+	String k;
+	String v;
+	for(auto s : split(s, "\n"))
+	{
+		u8 mode = 0;
+		k = "";
+		v = "";
+		for(auto c : s)
+		{
+			if(mode == 0)
+			{
+				if(c == separator)
+					mode = 1;
+				else
+					k.append(1, c);
+			}
+			else
+			{
+				v.append(1, c);
+			}
+		}
+		if(k != "")
+		{
+			if(trim_whitespace)
+				result[trim(k)] = trim(v);
+			else
+				result[k] = v;
+		}
+	}
+	return(result);
+}
+
 String join(StringList l, String delim)
 {
 	String result;

@@ -124,7 +124,7 @@ StringMap parse_multipart(String q, String boundary, std::vector<UploadedFile>& 
 			{
 				nibble("=\"", field);
 				UploadedFile f;
-				f.tmp_name = context->server->config.TMP_UPLOAD_PATH + std::to_string(rand());
+				f.tmp_name = context->server->config["TMP_UPLOAD_PATH"] + std::to_string(rand());
 				f.file_name = nibble("\"", field);
 				String bin = field.substr(4, field.length()-6);
 				f.size = bin.length();
@@ -289,19 +289,19 @@ String make_session_id()
 
 StringMap load_session_data(String session_id)
 {
-	return(parse_query(file_get_contents(context->server->config.SESSION_PATH + "/" + session_id)));
+	return(parse_query(file_get_contents(context->server->config["SESSION_PATH"] + "/" + session_id)));
 }
 
 void save_session_data(String session_id, StringMap data)
 {
-	file_put_contents(context->server->config.SESSION_PATH + "/" + session_id, encode_query(data));
+	file_put_contents(context->server->config["SESSION_PATH"] + "/" + session_id, encode_query(data));
 }
 
 String session_start(String session_name)
 {
 	if(context->cookies[session_name].length() == 0)
 	{
-		set_cookie(session_name, make_session_id(), time() + context->server->config.SESSION_TIME);
+		set_cookie(session_name, make_session_id(), time() + int_val(context->server->config["SESSION_TIME"]));
 	}
 	context->session_id = context->cookies[session_name];
 	context->session_name = session_name;
@@ -313,7 +313,7 @@ void session_destroy(String session_name)
 {
 	if(context->cookies[session_name].length() > 0)
 	{
-		set_cookie(session_name, "", time() - context->server->config.SESSION_TIME);
+		set_cookie(session_name, "", time() - int_val(context->server->config["SESSION_TIME"]));
 		context->session.clear();
 		save_session_data(context->session_id, context->session);
 		context->session_id = "";

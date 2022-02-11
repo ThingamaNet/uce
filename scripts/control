@@ -1,0 +1,7 @@
+Package: uce
+Section: web
+Priority: optional
+Architecture: amd64
+Depends: clang (>= 1:13.0)
+Maintainer: Udo Schroeter <udo@openfu.com>
+Description: Write server-side web stuff in C++

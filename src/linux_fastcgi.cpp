@@ -1,7 +1,7 @@
 #include "lib/uce_lib.cpp"
 
 ServerState server_state;
-MemoryArena* request_arena = new MemoryArena(server_state.config.MAX_MEMORY, "request");
+MemoryArena* request_arena = 0;
 
 #include "fastcgi/src/fcgicc.cc"
 
@@ -44,7 +44,7 @@ int handle_complete(FastCGIRequest& request) {
 	server_state.request_count += 1;
 	request.server = &server_state;
 	request.stats.time_start = microtime();
-    request.header["Content-Type"] = context->server->config.CONTENT_TYPE;
+    request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
     request.get = parse_query(request.params["QUERY_STRING"]);
     request.random_index = 0;
     request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&request.stats.time_start));
@@ -115,66 +115,68 @@ void listen_for_connections()
 	}
 }
 
+void init_base_process()
+{
+	printf("(P) Starting parent server PID:%i\n", getpid());
+
+	server_state.config = make_server_settings();
+	server_state.config["COMPILER_SYS_PATH"] = get_cwd();
+	printf("Compiler base path: %s\n", server_state.config["COMPILER_SYS_PATH"].c_str());
+
+	server_state.config["COMPILE_SCRIPT"] =
+		server_state.config["COMPILER_SYS_PATH"] + "/" + server_state.config["COMPILE_SCRIPT"];
+	if(server_state.config["LISTEN_PORT"] != "")
+		server.listen(int_val(server_state.config["LISTEN_PORT"]));
+
+	printf("%s\n", var_dump(server_state.config).c_str());
+
+	if(server_state.config["SOCKET_PATH"] != "")
+	{
+		server.listen(server_state.config["SOCKET_PATH"]);
+		chmod(server_state.config["SOCKET_PATH"].c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+	}
+
+	//dirname(server_state.config.COMPILER_SYS_PATH);
+	//basename(server_state.config.COMPILER_SYS_PATH);
+
+	mkdir(server_state.config["BIN_DIRECTORY"]);
+	mkdir(server_state.config["TMP_UPLOAD_PATH"]);
+	mkdir(server_state.config["SESSION_PATH"]);
+
+	request_arena = new MemoryArena(int_val(server_state.config["MAX_MEMORY"]), "request");
+	signal(SIGCHLD, on_child_exit);
+	srand(time());
+}
+
+StringList init_precompile(u32& precompile_jobs_per_worker)
+{
+	StringList precompile_jobs_pending;
+	if(server_state.config["PRECOMPILE_FILES_IN"] != "" && int_val(server_state.config["WORKER_COUNT"]) >= 2)
+	{
+		if(server_state.config["PRECOMPILE_FILES_IN"][0] != '/')
+			server_state.config["PRECOMPILE_FILES_IN"] = expand_path(server_state.config["PRECOMPILE_FILES_IN"]);
+		precompile_jobs_pending = split(trim(shell_exec(
+			"find " +
+			shell_escape(server_state.config["PRECOMPILE_FILES_IN"]) +
+			" -iname '*.uce' ")), "\n");
+		precompile_jobs_per_worker = 1 + (precompile_jobs_pending.size() / (int_val(server_state.config["WORKER_COUNT"]) -1));
+	}
+	return(precompile_jobs_pending);
+}
+
 int main(int argc, char** argv)
 {
 	StringList precompile_jobs_pending;
 	u32 precompile_jobs_per_worker = 1;
 
-	printf("(P) Starting parent server PID:%i\n", getpid());
-
-	signal(SIGCHLD, on_child_exit);
-	srand(time());
-
-	//if(server_state.config.COMPILER_SYS_PATH == "")
-		server_state.config.COMPILER_SYS_PATH = get_cwd();
-
-	// printf("MySQL client version: %s\n", mysql_get_client_info());
-
-	printf("Compiler base path: %s\n", server_state.config.COMPILER_SYS_PATH.c_str());
-
-	server_state.config.COMPILE_SCRIPT =
-		server_state.config.COMPILER_SYS_PATH + "/" + server_state.config.COMPILE_SCRIPT;
-	if(server_state.config.LISTEN_PORT)
-		server.listen(server_state.config.LISTEN_PORT);
-	if(server_state.config.SOCKET_PATH != "")
-		server.listen(server_state.config.SOCKET_PATH);
-	chmod(server_state.config.SOCKET_PATH.c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-
-	dirname(server_state.config.COMPILER_SYS_PATH);
-	basename(server_state.config.COMPILER_SYS_PATH);
-
-	mkdir(server_state.config.BIN_DIRECTORY);
-	mkdir(server_state.config.TMP_UPLOAD_PATH);
-	mkdir(server_state.config.SESSION_PATH);
-
-	//server.process(100);
-	//server.process();
-	/*try
-	{
-		server.process_forever();
-	}
-	catch (const std::runtime_error& e)
-	{
-		std::cout << e.what();
-	}*/
-	if(server_state.config.PRECOMPILE_FILES_IN != "" && server_state.config.WORKER_COUNT >= 2)
-	{
-		if(server_state.config.PRECOMPILE_FILES_IN != "/")
-			server_state.config.PRECOMPILE_FILES_IN = expand_path(server_state.config.PRECOMPILE_FILES_IN);
-		precompile_jobs_pending = split(trim(shell_exec(
-			"find " +
-			shell_escape(server_state.config.PRECOMPILE_FILES_IN) +
-			" -iname '*.uce' ")), "\n");
-		precompile_jobs_per_worker = 1 + (precompile_jobs_pending.size() / (server_state.config.WORKER_COUNT -1));
-		/*
-		*/
-	}
+	init_base_process();
+	precompile_jobs_pending = init_precompile(precompile_jobs_per_worker);
 
 	s32 worker_spawn_count = 0;
 
 	for(;;)
 	{
-		while(workers.size() < server_state.config.WORKER_COUNT)
+		while(workers.size() < int_val(server_state.config["WORKER_COUNT"]))
 		{
 			worker_spawn_count++;
 			precompile_jobs.clear();

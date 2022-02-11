@@ -1,14 +1,10 @@
 #!/bin/bash
 cd "$(dirname "$0")"
+cd ..
 
 BUILDMODE=${2:-"debug"}
-OPT_FLAG="O2"
+OPT_FLAG="O3"
 GF="uce_fastcgi"
-
-if [ "$BUILDMODE" == "debug" ]; then
-	OPT_FLAG="O0"
-fi
-echo "Build mode: $BUILDMODE"
 
 mkdir bin > /dev/null 2>&1
 mkdir bin/tmp > /dev/null 2>&1
@@ -22,7 +18,7 @@ LIBS="-ldl -lm -lpthread `mysql_config --cflags --libs`"
 SRCFLAGS="-D EXEC_NAME=\"$GF\" -D PLATFORM_NAME=\"linux\""
 
 echo "Compliling executable..."
-time -p $COMPILER src/linux_fastcgi.cpp $SRCFLAGS $FLAGS $LIBS -o bin/$GF.$BUILDMODE.linux.bin 2>&1
+time -p $COMPILER src/linux_fastcgi.cpp $SRCFLAGS $FLAGS $LIBS -o bin/$GF.linux.bin 2>&1
 
 if [ $? -eq 0 ]
 then

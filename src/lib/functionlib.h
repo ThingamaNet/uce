@@ -10,6 +10,7 @@ String trim(String raw);
 StringList split_space(String str);
 StringList split(String str, String delim);
 StringList split_utf8(String s, bool compound_characters = false);
+StringMap split_kv(String s, char separator = '=', bool trim_whitespace = true);
 String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);

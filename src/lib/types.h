@@ -146,7 +146,7 @@ typedef void (*request_handler)(Request* request);
 
 String to_string(s64 v) { return(std::to_string(v)); }
 
-struct ServerSettings {
+/*struct ServerSettings {
 
 	String BIN_DIRECTORY = "/tmp/uce/work";
 	String COMPILE_SCRIPT = "scripts/compile";
@@ -164,7 +164,7 @@ struct ServerSettings {
 	u32 WORKER_COUNT = 4;
 	u32 MAX_MEMORY = 1024*1024*16;
 
-};
+};*/
 
 struct SharedUnit {
 
@@ -204,7 +204,7 @@ struct UploadedFile {
 struct ServerState {
 
 	std::map<String, SharedUnit*> units;
-	ServerSettings config;
+	StringMap config;
 	u32 request_count = 0;
 
 };

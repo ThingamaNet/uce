@@ -440,7 +440,7 @@ void spawn_subprocess(std::function<void()> exec_after_spawn)
 
 pid_t task_pid(String key)
 {
-	String status_file_name = context->server->config.BIN_DIRECTORY + "/task-" + key;
+	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
 	String status_file = file_get_contents(status_file_name);
 	pid_t p = 0;
 	if(status_file != "")
@@ -455,7 +455,7 @@ pid_t task_pid(String key)
 
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 {
-	String status_file_name = context->server->config.BIN_DIRECTORY + "/task-" + key;
+	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
 	String status_file = file_get_contents(status_file_name);
 	pid_t p;
 	if(status_file != "")
@@ -509,4 +509,32 @@ void on_child_exit(int sig)
 StringList ls(String dir)
 {
 	return(split(trim(shell_exec("ls -1 "+shell_escape(dir))), "\n"));
+}
+
+StringMap make_server_settings()
+{
+	StringMap cfg;
+
+	cfg["BIN_DIRECTORY"] = "/tmp/uce/work";
+	cfg["COMPILE_SCRIPT"] = "scripts/compile";
+	cfg["SETUP_TEMPLATE"] = "scripts/setup.h.template";
+	cfg["LIT_ESC"] = "3d5b5_1";
+	cfg["CONTENT_TYPE"] = "text/html; charset=utf-8";
+	cfg["SOCKET_PATH"] = "/run/uce.sock";
+	cfg["TMP_UPLOAD_PATH"] = "/tmp/uce/uploads";
+	cfg["SESSION_PATH"] = "/tmp/uce/sessions";
+	cfg["COMPILER_SYS_PATH"] = ".";
+	cfg["PRECOMPILE_FILES_IN"] = ".";
+
+	cfg["LISTEN_PORT"] = std::to_string(9993);
+	cfg["SESSION_TIME"] = std::to_string(60*60*24*30);
+	cfg["WORKER_COUNT"] = std::to_string(4);
+	cfg["MAX_MEMORY"] = std::to_string(1024*1024*16);
+
+	for(auto& it : split_kv(file_get_contents("/etc/uce/settings.cfg")))
+	{
+		cfg[it.first] = it.second;
+	}
+
+	return(cfg);
 }

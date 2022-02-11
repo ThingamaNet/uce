@@ -201,8 +201,8 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 		return;
 
 	su->src_path = dirname(file_name);
-	su->bin_path = context->server->config.BIN_DIRECTORY + su->src_path;
-	su->pre_path = context->server->config.BIN_DIRECTORY + su->src_path;
+	su->bin_path = context->server->config["BIN_DIRECTORY"] + su->src_path;
+	su->pre_path = context->server->config["BIN_DIRECTORY"] + su->src_path;
 
 	su->src_file_name = basename(file_name);
 	su->bin_file_name = su->src_file_name + ".so";
@@ -253,8 +253,8 @@ String compile_setup_file(Request* context, SharedUnit* su)
 	String result =
 		String("#ifndef UCE_LIB_INCLUDED\n") +
 		"#define UCE_LIB_INCLUDED\n" +
-		("#include \"")+context->server->config.COMPILER_SYS_PATH +"/src/lib/uce_lib.h\" \n"+
-		file_get_contents(context->server->config.COMPILER_SYS_PATH + "/" + context->server->config.SETUP_TEMPLATE) +
+		("#include \"")+context->server->config["COMPILER_SYS_PATH"] +"/src/lib/uce_lib.h\" \n"+
+		file_get_contents(context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"]) +
 		"#endif \n";
 	StringList declarations;
 	StringList load_units;
@@ -279,10 +279,8 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 	file_put_contents(su->setup_file_name, compile_setup_file(context, su));
 	file_put_contents(su->api_file_name, join(su->api_declarations, "\n"));
 
-	//printf("Config.COMPILE_SCRIPT %s\n", String(su->pre_path + "/" + su->pre_file_name).c_str());
-
 	if(!su->opt_so_optional)
-		su->compiler_messages = trim(shell_exec(context->server->config.COMPILE_SCRIPT+" "+
+		su->compiler_messages = trim(shell_exec(context->server->config["COMPILE_SCRIPT"]+" "+
 			shell_escape(su->src_path)+" "+
 			shell_escape(su->bin_path)+" "+
 			shell_escape(su->file_name)+" "+
