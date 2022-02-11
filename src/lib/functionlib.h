@@ -2,6 +2,7 @@
 u8 char_to_u8(char input);
 u8 hex_to_u8(String src);
 u64 int_val(String s, u32 base = 10);
+f64 float_val(String s);
 String to_lower(String s);
 String to_upper(String s);
 String replace(String s, String search, String replace_with);

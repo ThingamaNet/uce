@@ -150,7 +150,7 @@ StringMap split_kv(String s, char separator, bool trim_whitespace)
 		u8 mode = 0;
 		k = "";
 		v = "";
-		for(auto c : s)
+		if(s[0] != '#') for(auto c : s)
 		{
 			if(mode == 0)
 			{
@@ -309,7 +309,12 @@ String html_escape(f64 a)
 
 u64 int_val(String s, u32 base)
 {
-	return(strtoll(s.c_str(), 0, base));
+	return(strtol(s.c_str(), 0, base));
+}
+
+f64 float_val(String s)
+{
+	return(strtod(s.c_str(), 0));
 }
 
 String nibble(String& haystack, String delim)

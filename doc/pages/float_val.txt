@@ -1,0 +1,10 @@
+:sig
+f64 float_val(String s)
+
+:params
+s : string to be converted
+return value : a f64 containing the number (0 if no number could be identified).
+
+:desc
+Extracts a floating point number from a String.
+

@@ -29,11 +29,12 @@ cp scripts/control "pkg/$PKG_NAME/DEBIAN/"
 echo "Version: $VERSION" >> "pkg/$PKG_NAME/DEBIAN/control"
 echo "" >> "pkg/$PKG_NAME/DEBIAN/control"
 
-cp -r bin "pkg/$PKG_NAME/opt/"
-cp -r doc "pkg/$PKG_NAME/opt/"
-cp -r examples "pkg/$PKG_NAME/opt/"
-cp -r scripts "pkg/$PKG_NAME/opt/"
-cp -r test "pkg/$PKG_NAME/opt/"
+cp -r bin "pkg/$PKG_NAME/opt/uce/"
+cp -r doc "pkg/$PKG_NAME/opt/uce/"
+cp -r examples "pkg/$PKG_NAME/opt/uce/"
+cp -r scripts "pkg/$PKG_NAME/opt/uce/"
+cp -r test "pkg/$PKG_NAME/opt/uce/"
+cp -r etc "pkg/$PKG_NAME/"
 
 du -sh "pkg/$PKG_NAME/"*
 
