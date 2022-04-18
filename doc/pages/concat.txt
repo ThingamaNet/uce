@@ -1,0 +1,11 @@
+:sig
+String concat(...vals)
+
+:params
+...val : one or more values that should be concatenated
+
+:desc
+Returns a string with all the parameters concatenated into one.
+
+:see
+>string

@@ -10,8 +10,9 @@ SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_opti
 void compiler_invoke(Request* context, String file_name, DTree& call_param);
 SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path, bool opt_so_optional = false);
 
+SharedUnit* load_file(String file_name);
 void render_file(String file_name);
 void render_file(String file_name, DTree& call_param);
-DTree* call_file_function(String file_name, String function_name, DTree* call_param = 0);
+DTree* call_file(String file_name, String function_name, DTree* call_param = 0);
 
 StringList precompile_jobs;

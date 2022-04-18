@@ -11,7 +11,7 @@ void render_see_section(String name)
 		}
 		else if(line != "")
 		{
-			<><li><a href="index.uce?p=<?= line ?>"><?= line ?><span style="opacity:0.5">()</span></a></li></>
+			<><li><a href="index.uce?p=<?= uri_encode(line) ?>"><?= line ?><span style="opacity:0.5">()</span></a></li></>
 		}
 		idx += 1;
 	}

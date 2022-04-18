@@ -7,4 +7,5 @@ void print(...val)
 :desc
 Appends data to the current request's output stream.
 
-
+:see
+>string

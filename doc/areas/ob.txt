@@ -1,6 +1,10 @@
-Output Buffer Functions
+Output / Invocation Functions
 
+call_file
+load
 ob_clear
 ob_get
 ob_get_clear
 ob_start
+print
+render_file

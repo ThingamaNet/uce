@@ -1,0 +1,16 @@
+:sig
+void render_file(String file_name, DTree& call_param = null)
+
+:params
+file_name : UCE file to load and execute
+call_param : optional, call parameter
+
+:desc
+Calls another UCE file and executes its RENDER() function.
+
+:Example
+// call a common page template
+render_file("page-template.uce");
+
+:see
+>ob

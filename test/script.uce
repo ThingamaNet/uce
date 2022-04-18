@@ -1,4 +1,18 @@
 
+String add_token_type(String tokenstr)
+{
+	char c = tokenstr[0];
+	if(c == 34) // quote character, as number here because of HTML parser bug
+		return(String("Q") + tokenstr);
+	if(isalpha(c))
+		return(String("I") + tokenstr);
+	if(isdigit(c))
+		return(String("N") + tokenstr);
+	if(ispunct(c))
+		return(String("O") + tokenstr);
+	return(String("?") + tokenstr);
+}
+
 StringList script_tokenize(String code)
 {
 	StringList result;
@@ -17,7 +31,7 @@ StringList script_tokenize(String code)
 			else if(quote_character == c && last_character != '\\')
 			{
 				mode = 'N';
-				result.push_back(current_token);
+				result.push_back(add_token_type(current_token));
 				current_token = "";
 			}
 			else
@@ -30,7 +44,7 @@ StringList script_tokenize(String code)
 			if(isspace(c))
 			{
 				if(current_token != "")
-					result.push_back(current_token);
+					result.push_back(add_token_type(current_token));
 				current_token = "";
 			}
 			else if(c == '"' || c == '\'')
@@ -38,15 +52,15 @@ StringList script_tokenize(String code)
 				mode = 'Q';
 				quote_character = c;
 				if(current_token != "")
-					result.push_back(current_token);
+					result.push_back(add_token_type(current_token));
 				current_token = "\"";
 			}
 			else if(ispunct(c) && c != '_')
 			{
 				if(current_token != "")
-					result.push_back(current_token);
+					result.push_back(add_token_type(current_token));
 				current_token = "";
-				result.push_back(String().append(1, c));
+				result.push_back(add_token_type(String("").append(1, c)));
 			}
 			else
 			{
@@ -56,7 +70,7 @@ StringList script_tokenize(String code)
 		last_character = c;
 	}
 	if(current_token != "")
-		result.push_back(current_token);
+		result.push_back(add_token_type(current_token));
 	return(result);
 }
 
@@ -64,40 +78,37 @@ struct ASTNode
 {
 	String identifier = "";
 	String type_name = "";
+	String string_literal = "";
 	char type = 0;
-	ASTNode* assign = 0;
-	ASTNode* call_params = 0;
-	ASTNode* children = 0;
-	ASTNode* next = 0;
+	std::vector<ASTNode*> assign;
+	std::vector<ASTNode*> call_params;
+	std::vector<ASTNode*> children;
 
 	ASTNode(char _type)
 	{
-		type = _type;
-		type_name = "";
 		identifier = "";
-		assign = 0;
-		children = 0;
-		next = 0;
+		type_name = "";
+		string_literal = "";
+		type = _type;
 	}
 
 	String to_string(String indent = "")
 	{
 		String result = "";
-		ASTNode* current = this;
-		while(current)
-		{
-			result += indent + String().append(1, current->type);
-			if(identifier != "") result += " ident=" + identifier;
-			if(type_name != "")  result += " type=" + type_name;
-			result += "\n";
-			if(current->call_params)
-				result += current->call_params->to_string(indent + "--CALL ");
-			if(current->assign)
-				result += current->assign->to_string(indent + "--ASSIGN ");
-			if(current->children)
-				result += current->children->to_string(indent + "  ");
-			current = current->next;
-		}
+		result += indent + String().append(1, type);
+		if(identifier != "")
+			result += " ident=" + identifier;
+		if(type_name != "")
+			result += " type_name=" + type_name;
+		if(string_literal != "")
+			result += " " + string_literal;
+		result += "\n";
+		for(auto callp : call_params)
+			result += indent + "  CALLP " + callp->to_string(indent + "  ");
+		for(auto assign_expr : assign)
+			result += indent + "  ASSIGN VALUE " + assign_expr->to_string(indent + "  ");
+		for(auto child : children)
+			result += indent + "  " + child->to_string(indent + "  ");
 		return(result);
 	}
 
@@ -106,99 +117,200 @@ struct ASTNode
 struct ParserState
 {
 
-	ASTNode* root = 0;
+	ASTNode* root;
 	StringList tokens;
 	s32 token_index = 0;
 	String error = "";
+	u64 error_location = 0;
 
-	String next()
+	String consume(char token_kind = 0)
 	{
-		return(tokens[token_index++]);
+		if(error_location > 0) return("");
+		if(token_kind && look_ahead(0)[0] != token_kind)
+		{
+			unexpected_token();
+		}
+		printf("consume #%i %s -> %s \n", token_index, look_ahead(0).c_str(), look_ahead(1).c_str());
+		String tk = look_ahead(0);
+		token_index++;
+		return(tk);
 	}
 
-	String look_ahead(u32 by)
+	String look_ahead(s32 by)
 	{
+		if(error_location > 0)
+			return("_");
+		if(token_index+by < 0 || token_index+by >= tokens.size())
+			return("_");
 		return(tokens[token_index+by]);
 	}
 
-	bool expect(String token_str)
+	bool more()
 	{
-		String found = look_ahead(0);
-		if(found == token_str)
-			return(true);
-		token_index = tokens.size() + 1;
-		error = String("'") + token_str + "' expected but '" + found + "' found";
-		return(false);
+		if(error_location > 0)
+			return(false);
+		return(token_index < tokens.size());
 	}
 
-	void consume(String token_str)
+	void unexpected_token(s32 offset = 0)
 	{
-		if(expect(token_str))
-			next();
+		if(error_location) return;
+		String found = look_ahead(offset);
+		error_location = token_index;
+		token_index = tokens.size() + 1;
+		error = String("unexpected '") + found.substr(1) + String("' found");
+	}
+
+	bool expect(String token_str, String in_mode)
+	{
+		if(error_location) return(false);
+		String found = look_ahead(0);
+		if(found == token_str)
+		{
+			consume();
+			return(true);
+		}
+		error_location = token_index;
+		token_index = tokens.size() + 1;
+		error = String("'") + token_str.substr(1) + "' expected but '" + found.substr(1) + "' found in "+in_mode.substr(1);
+		return(false);
 	}
 
 };
 
-ASTNode* script_parse_expression(ParserState* state, String accept_delim);
+ASTNode* script_parse_expression(ParserState* state, String delim1, String delim2);
+ASTNode* script_parse_declaration(ParserState* state, String delim1, String delim2);
 
-ASTNode* script_parse_call_params(ParserState* state)
+ASTNode* script_parse_declaration(ParserState* state, String delim1, String delim2)
 {
-	ASTNode* result = new ASTNode('P');
-	while(state->look_ahead(0) != ")")
-	{
-		state->next();
-	}
-	state->consume(")");
-	return(result);
-}
+	ASTNode* result = new ASTNode('D');
 
-ASTNode* script_parse_expression(ParserState* state, String accept_delim)
-{
-	ASTNode* result = new ASTNode('E');
-	String tname = state->next();
-	String tnx = state->look_ahead(0);
-	if(tnx == ":")
+	String ident = state->consume();
+	if(ident[0] != 'I')
 	{
-		// declaration
-		result->type = 'D';
-		result->identifier = tname;
-		state->consume(":");
-		if(state->look_ahead(0) != "=")
-			result->type_name = state->next();
-		if(state->look_ahead(0) == "=")
-		{
-			state->consume("=");
-			result->assign = script_parse_expression(state, accept_delim);
-		}
-		else
-		{
-			state->consume(accept_delim);
-		}
+		state->unexpected_token(-1);
 		return(result);
 	}
-	else if(tnx == "=")
+	result->identifier = ident.substr(1);
+
+	if(!state->expect("O:", "declaration"))
+		return(result);
+
+	String n0 = state->look_ahead(0);
+	if(n0 == "O=")
 	{
-		// assignment
-		result->type = 'A';
-		result->identifier = tname;
-		state->consume("=");
-		result->assign = script_parse_expression(state, accept_delim);
+		result->type_name = "auto";
+		result->assign.push_back(script_parse_expression(state, delim1, delim2));
 		return(result);
 	}
 	else
 	{
-		// who knows
-		result->type = 'E';
-		result->identifier = tname;
-		tnx = state->look_ahead(0);
-		if(tnx == "(")
+		result->type_name = state->consume('I').substr(1);
+		String n2 = state->look_ahead(0);
+		if(n2 == delim1 || n2 == delim2)
 		{
-			result->type = 'C';
-			result->call_params = script_parse_call_params(state);
+			state->consume();
+			return(result);
 		}
-		state->consume(accept_delim);
+		else if(n2 == "O=")
+		{
+			state->expect("O=", "declaration");
+			result->assign.push_back(script_parse_expression(state, delim1, delim2));
+			return(result);
+		}
+		else
+		{
+			state->unexpected_token();
+			return(result);
+		}
+	}
+
+	return(result);
+}
+
+ASTNode* parse_single_token(ParserState* state)
+{
+	ASTNode* result = new ASTNode('?');
+
+	String n = state->consume();
+	if(n[0] == 'Q')
+	{
+		result->type = 'S';
+		result->string_literal = n.substr(1);
+	}
+	else if(n[0] == 'N')
+	{
+		result->type = 'N';
+		result->string_literal = n.substr(1);
+	}
+	else if(n[0] == 'I')
+	{
+		result->type = 'I';
+		result->identifier = n.substr(1);
+	}
+	else
+	{
+		state->unexpected_token(-1);
+	}
+	return(result);
+}
+
+ASTNode* script_parse_assignment(ParserState* state, String delim1, String delim2)
+{
+	ASTNode* result = new ASTNode('A');
+	result->identifier = state->consume('I').substr(1);
+	state->expect("O=", "assignment");
+	result->assign.push_back(script_parse_expression(state, delim1, delim2));
+	return(result);
+}
+
+ASTNode* script_parse_expression(ParserState* state, String delim1, String delim2)
+{
+	ASTNode* result = new ASTNode('E');
+
+	String n = state->look_ahead(0);
+
+	if(n == "O(")
+	{
+		state->consume();
+		result->children.push_back(script_parse_expression(state, "O)", ""));
+	}
+	else if(n == delim1 || n == delim2)
+	{
+		state->consume();
 		return(result);
 	}
+	else
+	{
+		String n2 = state->look_ahead(1);
+		if(n[0] == 'I' && n2 == "O:")
+		{
+			return(script_parse_declaration(state, "O;", ""));
+		}
+		else if(n2 == delim1 || n2 == delim2)
+		{
+			// single component 'expression'
+			result = parse_single_token(state);
+			state->consume();
+			return(result);
+		}
+		else if(n[0] == 'I' && n2 == "O=")
+		{
+			result = script_parse_assignment(state, delim1, delim2);
+			n2 = state->look_ahead(0);
+			if(n2 != delim1 && n2 != delim2)
+			{
+				state->unexpected_token();
+			}
+			return(result);
+		}
+		else
+		{
+			state->unexpected_token();
+			state->error += " in expression";
+		}
+	}
+
 	return(result);
 }
 
@@ -206,21 +318,13 @@ ParserState* script_parse(StringList tokens)
 {
 	ParserState* state = new ParserState();
 	state->tokens = tokens;
-	state->root = new ASTNode('R');
-	ASTNode* current_node = 0;
+	state->root = new ASTNode('M');
+
 	while(state->token_index < state->tokens.size())
 	{
-		if(!current_node)
-		{
-			current_node = script_parse_expression(state, ";");
-			state->root->children = current_node;
-		}
-		else
-		{
-			current_node->next = script_parse_expression(state, ";");
-			current_node = current_node->next;
-		}
+		state->root->children.push_back(script_parse_expression(state, "O;", ""));
 	}
+
 	return(state);
 }
 
@@ -235,20 +339,25 @@ RENDER()
 		</h1>
 	</>
 
+	String script_src = first(context->post["code"], file_get_contents("script-example1.usp"));
 
 	<>
 		<h3>Code</h3>
 		<form action="?" method="post">
-			<textarea name="code"><?= first(context->post["code"]) ?></textarea>
+			<textarea name="code"><?= script_src ?></textarea>
 			<input type="submit" value="parse"/>
 		</form>
 		<pre><?
 
-			StringList tokens = script_tokenize(context->post["code"]);
+			StringList tokens = script_tokenize(script_src);
+			//print(var_dump(tokens));
 
 			ParserState* ps = script_parse(tokens);
 
-			print(ps->error+"\n");
+			if(ps->error_location > 0)
+			{
+				print(ps->error, " @ token ", 1+ps->error_location, "\n");
+			}
 
 			print(ps->root->to_string());
 

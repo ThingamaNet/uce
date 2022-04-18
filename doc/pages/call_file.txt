@@ -1,0 +1,23 @@
+:sig
+DTree* call_file(String file_name, String function_name, DTree* call_param = null)
+
+:params
+file_name : UCE file to load and execute
+function_name : name of the function to invoke
+call_param : optional, call parameter
+return value : DTree* returned from function
+
+:desc
+Calls a function inside a UCE file.
+
+:Example
+// export a function
+EXPORT void test_func()
+{
+	print("HELLO FROM TEST FUNCTION");
+}
+// use that function in another file
+call_file("call_file_funcs.uce", "test_func");
+
+:see
+>ob

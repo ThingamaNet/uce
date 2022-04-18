@@ -159,20 +159,16 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 					pc.append("#include \"" + sub_su->bin_path + "/" + sub_su->pre_file_name + "\"\n");
 				}
 			}
-			else if(false && current_line.substr(0, 6) == "EXPORT" && isspace(current_line[6]))
+			else if(current_line.substr(0, 6) == "EXPORT" && isspace(current_line[6]))
 			{
+				current_line = "";
 				auto end_declaration_pos = content.find("{", i);
 				if(end_declaration_pos != std::string::npos)
 				{
-					// remove string "API " from output
-					//pc.resize(pc.length() - 7);
 					pc.append(1, '\n');
 					String declaration = trim(content.substr(i, end_declaration_pos - i));
-					String return_type_and_name = nibble(declaration, "(");
-					StringList rtn_list = split_space(return_type_and_name);
-					String fn_name = rtn_list.back(); rtn_list.pop_back();
-					su->api_declarations.push_back(fn_name + ":" + join(rtn_list, " ") + ":(" + declaration + "\n");
-					printf("declaration found: %s\n", declaration.c_str());
+					su->api_declarations.push_back(declaration+";\n");
+					//printf("declaration found: %s\n", declaration.c_str());
 				}
 			}
 		}
@@ -430,7 +426,20 @@ void render_file(String file_name, DTree& call_param)
 	compiler_invoke(context, file_name, call_param);
 }
 
-DTree* call_file_function(String file_name, String function_name, DTree* call_param)
+SharedUnit* load_file(String file_name)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(su && su->so_handle)
+	{
+		return(su);
+	}
+	else
+	{
+		return(0);
+	}
+}
+
+DTree* call_file(String file_name, String function_name, DTree* call_param)
 {
 	DTree* result;
 	auto su = compiler_load_shared_unit(context, file_name, "", false);
@@ -445,7 +454,7 @@ DTree* call_file_function(String file_name, String function_name, DTree* call_pa
 			auto f = (dtree_call_handler)dlsym(su->so_handle, function_name.c_str());
 			if(!f)
 			{
-				print("Error: call_file_function() function '", function_name, "' not found");
+				print("Error: call_file() function '", function_name, "' not found");
 			}
 			else
 			{
@@ -459,7 +468,7 @@ DTree* call_file_function(String file_name, String function_name, DTree* call_pa
 	}
 	else
 	{
-		print("Error: call_file_function() could not load unit file '", file_name, "'");
+		print("Error: call_file() could not load unit file '", file_name, "'");
 	}
 	return(result);
 }

@@ -1,0 +1,142 @@
+StringMap* already_shown_items;
+
+void render_doc_page(String page)
+{
+	(*already_shown_items)[page] = "Y";
+	auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
+	String layout_class = "text";
+	u32 line_idx = 0;
+	for(auto s : doc)
+	{
+		line_idx++;
+		if(s == "")
+		{
+
+		}
+		else if(s.substr(0, 1) == ":")
+		{
+			layout_class = s.substr(1);
+			if(line_idx > 1)
+			{
+				<></div></>
+			}
+			<><div class="<?= layout_class ?>"></>
+			if(layout_class == "params")
+			{
+				<><h3>Parameters</h3></>
+			}
+			else if(layout_class == "sig")
+			{
+				String page_name = page;
+				if(page[1] == '_')
+				{
+					nibble(page_name, "_");
+				}
+				<><h2><?= page_name ?></h2></>
+			}
+			else if(layout_class == "pre")
+			{
+				layout_class = "sig";
+			}
+			else if(layout_class == "desc")
+			{
+				<><h3>Description</h3></>
+			}
+			else if(layout_class == "see")
+			{
+
+			}
+			else
+			{
+				<><h3><?= layout_class ?></h3></>
+			}
+		}
+		else
+		{
+			if(s.substr(0, 1) == "-")
+			{
+				nibble(s, "-");
+				<><li><?= (s) ?></li></>
+			}
+			else if(layout_class == "sig")
+			{
+				<><pre><? print(s); ?></pre></>
+			}
+			else if(layout_class == "params")
+			{
+				<><div><b><?= trim(nibble(s, ":")) ?></b> : <?= trim(s) ?></div></>
+			}
+			else if(layout_class == "see")
+			{
+				if(s[0] == '>')
+				{
+					//render_see_section(s.substr(1));
+				}
+				else
+				{
+					<><div><a href="index.uce?p=<?= trim(s) ?>"><?= trim(s) ?><span style="opacity:0.5">()</span></a></div></>
+				}
+			}
+			else
+			{
+				<><div><? print(s); ?></div></>
+			}
+		}
+	}	
+}
+
+void render_see_section(String name)
+{
+	StringList lines = split(file_get_contents("areas/"+name+".txt"), "\n");
+	s32 idx = 0;
+	for(auto line : lines)
+	{
+		if(idx == 0)
+		{
+			<><h1><?= line ?></h1></>
+		}
+		else if(line != "")
+		{
+			render_doc_page(line);
+		}
+		idx += 1;
+	}
+}
+
+
+RENDER()
+{
+	
+	already_shown_items = new StringMap();
+
+	String page = first(context->get["p"], "index");
+
+	<><html>
+	<head>
+		<!--<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>-->
+	</head>
+	<body>
+		<h1>
+			UCE API
+		</h1>
+		<?
+
+		for(auto file_name : ls("areas/"))
+		{
+			String ft = nibble(file_name, ".");
+			render_see_section(ft);
+		}
+
+		?><h1>Other Functions and Data Structures</h1><?
+		for(auto file_name : ls("pages/"))
+		{
+			String ft = nibble(file_name, ".");
+			if((*already_shown_items)[ft] == "")
+				render_doc_page(ft);
+		}
+
+		?>
+	</body>
+	</html></>
+
+}

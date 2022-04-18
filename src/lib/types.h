@@ -43,7 +43,7 @@ String operator+(String lhs, f32 rhs) {
 }
 
 #define DEBUG_MEMORY_OFF
-#define GLOBAL_ARENA_ALLOCATOR
+#define NO_GLOBAL_ARENA_ALLOCATOR
 
 struct MemoryArena {
 
@@ -291,5 +291,13 @@ template <typename... Ts>
 void print(Ts... args)
 {
     ((*context->ob << args), ...);
+}
+
+template <typename... Ts>
+String concat(Ts... args)
+{
+	std::stringstream out;
+    ((out << args), ...);
+    return(out.str());
 }
 

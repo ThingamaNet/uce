@@ -1,9 +1,11 @@
 String Functions
 
+concat
 filter
 first
 join
 nibble
+print
 split
 split_space
 split_utf8

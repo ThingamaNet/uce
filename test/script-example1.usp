@@ -1,0 +1,6 @@
+v1 : string = "";
+
+v2 = 'BLA';
+
+for(v3 => c);
+	print(c);
