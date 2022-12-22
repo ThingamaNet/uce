@@ -1,5 +1,5 @@
 
-void show_form()
+EXPORT void show_form()
 {
 
 	<><form action="?" method="post">

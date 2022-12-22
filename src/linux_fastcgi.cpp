@@ -1,7 +1,6 @@
 #include "lib/uce_lib.cpp"
 
 ServerState server_state;
-MemoryArena* request_arena = 0;
 
 #include "fastcgi/src/fcgicc.cc"
 
@@ -44,6 +43,8 @@ int handle_complete(FastCGIRequest& request) {
 	server_state.request_count += 1;
 	request.server = &server_state;
 	request.stats.time_start = microtime();
+	//request.stats.mem_alloc = 0;
+	//request.stats.mem_high = 0;
     request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
     request.get = parse_query(request.params["QUERY_STRING"]);
     request.random_index = 0;
@@ -102,15 +103,8 @@ void listen_for_connections()
 	server.on_request = &handle_request;
 	server.on_data = &handle_data;
 	server.on_complete = &handle_complete;
-	/*
-	server.request_handler(&handle_request);
-	server.data_handler(&handle_data);
-	server.complete_handler(&handle_complete);
-	*/
 	for(;;)
 	{
-		//if(request_arena) request_arena->clear();
-		//current_memory_arena = request_arena;
 		server.process();
 	}
 }
@@ -143,7 +137,6 @@ void init_base_process()
 	mkdir(server_state.config["TMP_UPLOAD_PATH"]);
 	mkdir(server_state.config["SESSION_PATH"]);
 
-	request_arena = new MemoryArena(int_val(server_state.config["MAX_MEMORY"]), "request");
 	signal(SIGCHLD, on_child_exit);
 	srand(time());
 }

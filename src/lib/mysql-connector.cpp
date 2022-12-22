@@ -5,13 +5,13 @@
 
 bool MySQL::connect(String host, String username, String password)
 {
-	switch_to_system_alloc();
+	//switch_to_system_alloc();
 	connection = mysql_init(NULL);
 	if (connection == NULL)
 	{
 		auto e = mysql_error((MYSQL*)connection);
 		fprintf(stderr, "%s\n", e);
-		switch_to_arena(context->mem);
+		//switch_to_arena(context->mem);
 		statement_info.assign(e);
 		return(false);
 	}
@@ -22,7 +22,7 @@ bool MySQL::connect(String host, String username, String password)
 		auto e = mysql_error((MYSQL*)connection);
 		fprintf(stderr, "%s\n", e);
 		mysql_close((MYSQL*)connection);
-		switch_to_arena(context->mem);
+		//switch_to_arena(context->mem);
 		statement_info.assign(e);
 		return(false);
 	}
@@ -35,7 +35,7 @@ bool MySQL::connect(String host, String username, String password)
 		exit(1);
 	}
 	*/
-	switch_to_arena(context->mem);
+	//switch_to_arena(context->mem);
 	statement_info = String("connected");
 	context->resources.mysql_connections.push_back(connection);
 	return(true);
@@ -297,8 +297,8 @@ String MySQL::error()
 
 void cleanup_mysql_connections()
 {
-	switch_to_system_alloc();
+	//switch_to_system_alloc();
 	for(auto& con : context->resources.mysql_connections)
 		mysql_close((MYSQL*)con);
-	switch_to_arena(context->mem);
+	//switch_to_arena(context->mem);
 }

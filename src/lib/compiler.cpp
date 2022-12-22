@@ -89,7 +89,7 @@ String process_html_literal(Request* context, SharedUnit* su, String content)
 
 String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String content)
 {
-	String pc = "#include \"" + su->src_file_name + ".setup.h" + "\"\n";
+	String pc = "#include \"" + su->src_file_name + ".setup.h" + "\"\n#line 1\n";
 	String token = "";
 	String html_buffer = "";
 	u8 mode = 0;
@@ -235,6 +235,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
 		su->on_render = (call_handler)dlsym(su->so_handle, "render");
+		su->api_declarations = split(file_get_contents(su->api_file_name), "\n");
 		//else
 		//	printf("(i) loaded unit %s\n", su->file_name.c_str());
 	}
@@ -250,7 +251,8 @@ String compile_setup_file(Request* context, SharedUnit* su)
 		String("#ifndef UCE_LIB_INCLUDED\n") +
 		"#define UCE_LIB_INCLUDED\n" +
 		("#include \"")+context->server->config["COMPILER_SYS_PATH"] +"/src/lib/uce_lib.h\" \n"+
-		file_get_contents(context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"]) +
+		file_get_contents(
+			context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"]) +
 		"#endif \n";
 	StringList declarations;
 	StringList load_units;
@@ -363,9 +365,9 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 
 	//printf("(i) load '%s'\n", file_name.c_str());
 
-	switch_to_system_alloc();
+	//switch_to_system_alloc();
 	auto su = get_shared_unit(context, file_name, opt_so_optional);
-	switch_to_arena(context->mem);
+	//switch_to_arena(context->mem);
 	if(!su)
 	{
 		printf("Error loading unit %s\n", file_name.c_str());

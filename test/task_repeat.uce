@@ -9,7 +9,7 @@ RENDER()
 		<link rel="stylesheet" href='style.css'></link>
 		<h1>
 			<a href="index.uce">UCE Test</a>:
-			Tasks
+			Task repeat
 		</h1>
 
 		<script>
@@ -61,13 +61,13 @@ RENDER()
 
 			<pre style="white-space: pre-wrap"><?
 
-				print("New Task ID: ", task("example-task", []() {
+				print("New Task ID: ", task_repeat("example-task", 5, []() {
 
-					sleep(10);
+					sleep(1);
 
 				}), "\n");
 
-				print("Task run time: 10 seconds");
+				print("Task interval: 5 seconds");
 
 			?></pre><?
 		}

@@ -491,6 +491,20 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 	}
 }
 
+#include <unistd.h>
+pid_t task_repeat(String key, u64 interval, std::function<void()> exec_after_spawn, u64 timeout)
+{
+	auto repeater_function = [&]() {
+		while (true)
+		{
+			exec_after_spawn();
+			printf("(P) worker process '%s' sleeping\n", key.c_str());
+			usleep((s64)(interval*1000000));
+		}
+	};
+	return(task(key, repeater_function, timeout));
+}
+
 void on_child_exit(int sig)
 {
     pid_t pid;

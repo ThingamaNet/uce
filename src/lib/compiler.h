@@ -8,7 +8,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name);
 void compile_shared_unit(Request* context, SharedUnit* su, String file_name);
 SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_optional = false);
 void compiler_invoke(Request* context, String file_name, DTree& call_param);
-SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path, bool opt_so_optional = false);
+SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path = "", bool opt_so_optional = false);
 
 SharedUnit* load_file(String file_name);
 void render_file(String file_name);

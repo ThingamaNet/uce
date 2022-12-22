@@ -16,6 +16,31 @@ String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);
 
+String to_string(StringList l) {
+	String result;
+	u32 i = 0;
+	for(auto& s : l)
+	{
+		if(i > 0)
+			result.append("\n");
+		result.append(s);
+		i += 1;
+	}
+	return(result);
+}
+
+String to_string(SharedUnit* u) {
+	String result;
+
+	result += String("SharedUnit( \n")+
+		"Source:"+(u->file_name)+"\n"+
+		"SharedObject:"+(u->so_name)+"\n"+
+		"API:"+(u->api_file_name)+"\n"+
+		to_string(u->api_declarations);
+
+	return(result);
+}
+
 template <typename ITYPE>
 String to_hex(ITYPE w, size_t hex_len = sizeof(ITYPE)<<1)
 {

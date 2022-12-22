@@ -55,6 +55,7 @@ public:
 
 	void process(int timeout_ms = -1); // timeout_ms<0 blocks forever
 	void process_forever();
+	int calls_until_termination = 8; // set this to -1 to never terminate
 
 	int call_completion_handler(FastCGIRequest& request);
 

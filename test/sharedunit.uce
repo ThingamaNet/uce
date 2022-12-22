@@ -1,0 +1,7 @@
+
+RENDER()
+{
+	auto p = compiler_load_shared_unit(context, "post.uce");
+	if(p)
+		print(to_string(p));
+}

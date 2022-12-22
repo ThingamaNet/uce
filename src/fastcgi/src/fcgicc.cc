@@ -261,6 +261,12 @@ FastCGIServer::process(int timeout_ms)
 			Connection* connection = it->second;
 			read_sockets.erase(it++);
 			delete connection;
+			if(calls_until_termination != -1 && read_sockets.size() == 0)
+			{
+				calls_until_termination -= 1;
+				if(calls_until_termination <= 0)
+					exit(0);
+			}
 		} else
 			++it;
 	}
@@ -278,9 +284,9 @@ int
 FastCGIServer::call_completion_handler(FastCGIRequest& request)
 {
 	//printf("- request complete\n");
-	switch_to_arena(request.mem);
+	////switch_to_arena(request.mem);
 	auto result = on_complete(request);
-	switch_to_system_alloc();
+	////switch_to_system_alloc();
 	return(result);
 }
 
@@ -364,9 +370,9 @@ FastCGIServer::process_connection_read(Connection& connection)
 				if (it != connection.requests.end())
 				{
 					//printf("- delete request object\n");
-					switch_to_arena(it->second->mem);
+					//switch_to_arena(it->second->mem);
 					delete it->second;
-					switch_to_system_alloc();
+					//switch_to_system_alloc();
 					connection.requests.erase(it);
 				}
 			}
@@ -376,14 +382,12 @@ FastCGIServer::process_connection_read(Connection& connection)
 				printf("(!) %i requests in flight at the same time!\n", connection.requests.size());
 			}
 
-			//auto arena = new MemoryArena(server_state.config.MAX_MEMORY, "request");
-			request_arena->clear();
-			switch_to_arena(request_arena);
+			//switch_to_arena(request_arena);
 			RequestInfo* new_request = new RequestInfo();
 			new_request->resources.fcgi_socket = connection.posix_con;
-		    new_request->mem = request_arena;
+		    //new_request->mem = request_arena;
 			new_request->stats.time_init = microtime();
-			switch_to_system_alloc();
+			//switch_to_system_alloc();
 			connection.requests[request_id] = new_request;
 
 			break;
@@ -417,7 +421,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 				break;
 
 			RequestInfo& request = *it->second;
-			switch_to_arena(it->second->mem);
+			//switch_to_arena(it->second->mem);
 			if (!request.params_closed)
 				if (content_length != 0)
 				request.params_buffer.append(content, content_length);
@@ -436,7 +440,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 				}
 				process_write_request(connection, request_id, request);
 				}
-			switch_to_system_alloc();
+			//switch_to_system_alloc();
 			break;
 		}
 		case FCGI_STDIN:
@@ -446,7 +450,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 				break;
 
 			RequestInfo& request = *it->second;
-			switch_to_arena(it->second->mem);
+			//switch_to_arena(it->second->mem);
 			if (!request.in_closed)
 				if (content_length != 0) {
 				request.in.append(content, content_length);
@@ -462,7 +466,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 							process_write_request(connection, request_id, request);
 				}
 				}
-			switch_to_system_alloc();
+			//switch_to_system_alloc();
 			break;
 		}
 		case FCGI_DATA:
@@ -494,21 +498,21 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 	if (!request.out.empty())
 	{
 		write_data(connection.output_buffer, id, request.out, FCGI_STDOUT);
-		switch_to_arena(request.mem);
+		//switch_to_arena(request.mem);
 		request.out.clear();
-		switch_to_system_alloc();
+		//switch_to_system_alloc();
 	}
 	if (!request.err.empty())
 	{
 		write_data(connection.output_buffer, id, request.err, FCGI_STDERR);
-		switch_to_arena(request.mem);
+		//switch_to_arena(request.mem);
 		request.err.clear();
-		switch_to_system_alloc();
+		//switch_to_system_alloc();
 	}
 	if ((request.in_closed || request.status != 0) &&
 				!request.output_closed)
 	{
-		switch_to_arena(request.mem);
+		//switch_to_arena(request.mem);
 		request.out =
 			var_dump(request.header, "", "\r\n") +
 			var_dump(request.set_cookies, "", "\r\n") +
@@ -521,7 +525,7 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 		}
 		request.ob_stack.clear();
 
-		switch_to_system_alloc();
+		//switch_to_system_alloc();
 		write_data(connection.output_buffer, id, request.out, FCGI_STDOUT);
 		write_data(connection.output_buffer, id, request.err, FCGI_STDERR);
 
@@ -533,8 +537,8 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 				request.stats.time_end - request.stats.time_start,
 				1.0 / (request.stats.time_end - request.stats.time_start),
 				(f32)(request.out.length()/1024),
-				(f32)(request.mem->size/1024),
-				(f32)(request.mem->capacity/1024)
+				(f32)(request.stats.mem_high/1024),
+				(f32)(request.stats.mem_alloc/1024)
 			);
 
 		FCGI_EndRequestRecord complete;
@@ -557,7 +561,7 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 		request.output_closed = true;
 		//printf("- output done\n");
 	}
-	switch_to_system_alloc();
+	//switch_to_system_alloc();
 }
 
 
@@ -570,10 +574,10 @@ FastCGIServer::process_connection_write(Connection& connection)
 		process_write_request(connection, it->first, *it->second);
 		if (it->second->params_closed && it->second->in_closed)
 		{
-			switch_to_arena(it->second->mem);
+			//switch_to_arena(it->second->mem);
 			//printf("- process_connection_write close\n");
 			delete it->second;
-			switch_to_system_alloc();
+			//switch_to_system_alloc();
 			connection.requests.erase(it++);
 		}
 		else

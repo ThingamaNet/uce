@@ -51,4 +51,5 @@ pid_t my_pid = 0;
 void on_segfault(int sig);
 
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout = 60*10);
+pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spawn, u64 timeout = 60*10);
 pid_t task_pid(String key);
