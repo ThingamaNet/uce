@@ -47,7 +47,10 @@ void Request::ob_start()
 
 Request::~Request()
 {
+	for(auto* stream : ob_stack)
+		delete stream;
+	ob_stack.clear();
+	ob = 0;
 	for(auto& sockfd : resources.sockets)
 		close(sockfd);
 }
-

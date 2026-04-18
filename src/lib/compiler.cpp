@@ -202,6 +202,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	//setup_unit_paths(context, su, file_name);
 
 	su->on_render = 0;
+	su->on_websocket = 0;
 	su->on_setup = 0;
 	su->compiler_messages = "";
 
@@ -223,6 +224,9 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
 		su->on_render = (call_handler)dlsym(su->so_handle, "render");
+		dlerror();
+		su->on_websocket = (call_handler)dlsym(su->so_handle, "websocket");
+		dlerror();
 		su->api_declarations = split(file_get_contents(su->api_file_name), "\n");
 		//else
 		//	printf("(i) loaded unit %s\n", su->file_name.c_str());
@@ -403,6 +407,31 @@ void compiler_invoke(Request* context, String file_name, DTree& call_param)
 	}
 }
 
+void compiler_invoke_websocket(Request* context, String file_name, DTree& call_param)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(!su)
+		return;
+
+	if(!su->on_setup)
+	{
+		printf("internal error: set_current_request() not defined in %s\n", file_name.c_str());
+		return;
+	}
+
+	if(!su->on_websocket)
+	{
+		printf("no WS() entry point in %s\n", file_name.c_str());
+		return;
+	}
+
+	String prev_wd = get_cwd();
+	set_cwd(su->src_path);
+	su->on_setup(context);
+	su->on_websocket(call_param);
+	set_cwd(prev_wd);
+}
+
 void render_file(String file_name)
 {
 	//printf("(i) render_file(%s)\n", file_name.c_str());
@@ -461,4 +490,3 @@ DTree* call_file(String file_name, String function_name, DTree* call_param)
 	}
 	return(result);
 }
-

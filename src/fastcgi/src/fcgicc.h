@@ -48,6 +48,7 @@ public:
 	std::function<int(FastCGIRequest&)> on_request = 0;
 	std::function<int(FastCGIRequest&)> on_data = 0;
 	std::function<int(FastCGIRequest&)> on_complete = 0;
+	std::function<int(FastCGIRequest&, const String&)> on_websocket_message = 0;
 
 	int listen(unsigned tcp_port);
 	int listen_http(unsigned tcp_port);
@@ -68,6 +69,9 @@ public:
 		std::string output_buffer;
 		bool close_responsibility = false;
 		bool close_socket = false;
+		bool is_websocket = false;
+		String websocket_connection_id;
+		String websocket_scope;
 		char type = 'F'; // F = FastCGI, H = HttpServer
 	};
 
@@ -79,7 +83,13 @@ public:
 	std::map<int, char> server_socket_types;
 	std::map<int, Connection*> client_sockets;
 
+	void close_http_listeners();
 	void read_fgci(Connection&);
+	void process_websocket_input(Connection&);
+	bool websocket_send_to(String connection_id, String message);
+	u64 websocket_broadcast(String scope, String message);
+	StringList websocket_connection_ids(String scope = "");
+	bool websocket_close(String connection_id, u16 status_code = 1000, String reason = "");
 	static void request_write_fgci(Connection&, RequestID, FastCGIRequest&);
 	static void write_fgci(Connection&);
 	static Pairs parse_pairs_fcgi(const char*, std::string::size_type);

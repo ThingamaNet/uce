@@ -6,7 +6,28 @@ This is in the early stages of development. Don't use this for anything importan
 
 ## Udo's C++ Entry Points
 
-The aim of this project is to make a PHP-like runtime that enables server-side "scripting" using C/C++. At the core is a multi-worker FastCGI server that can be talked to from Nginx or similar front-end servers. UCE has a shared-nothing isolated architecture to serve page requests. To minimize the potential for memory leaks, UCE uses a per-request memory arena. UCE also provides a PHP-like API to ease web development. Advanced features such as an integrated WebSockets broker are planned. UCE aims to use minimal dependencies (at the moment, the only dependency is the Clang compiler). UCE pages are automatically recompiled and dynamically reloaded as necessary.
+The aim of this project is to make a PHP-like runtime that enables server-side "scripting" using C/C++. At the core is a multi-worker FastCGI server that can be talked to from Nginx or similar front-end servers. UCE has a shared-nothing isolated architecture to serve page requests. To minimize the potential for memory leaks, UCE uses a per-request memory arena. UCE also provides a PHP-like API to ease web development. UCE aims to use minimal dependencies (at the moment, the only dependency is the Clang compiler). UCE pages are automatically recompiled and dynamically reloaded as necessary.
+
+## WebSockets
+
+WebSocket-enabled pages can now expose both:
+
+- `RENDER() { }` for normal HTTP rendering
+- `WS() { }` for inbound WebSocket messages on the same `.ws.uce` page
+
+The runtime keeps the socket lifecycle in-process and exposes a low-boilerplate API to page code:
+
+- `ws_message()`
+- `ws_connection_id()`
+- `ws_scope()`
+- `ws_connections([scope])`
+- `ws_connection_count([scope])`
+- `ws_send(message[, scope])`
+- `ws_broadcast(message[, scope])`
+- `ws_send_to(connection_id, message)`
+- `ws_close([connection_id])`
+
+By default, the WebSocket scope is the current page file, so `ws_send()` broadcasts to other clients connected to that same `.ws.uce` endpoint.
 
 ## Service Setup
 
@@ -25,6 +46,8 @@ scripts/systemd/manage-uce-service.sh logs 200
 ```
 
 The service runs the runtime from the repository root so `COMPILER_SYS_PATH` resolves correctly and nginx can forward `.uce` requests to the Unix socket defined in `/etc/uce/settings.cfg`.
+
+For deployed WebSockets, nginx should proxy `.ws.uce` requests to the runtime's built-in HTTP listener instead of `fastcgi_pass`. The current OpenFU deployment already does this and keeps HTTP/WebSocket ownership on a single worker so page-scoped broadcasts stay coherent.
 
 # API
 

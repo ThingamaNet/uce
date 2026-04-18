@@ -78,6 +78,7 @@ struct SharedUnit {
 
 	request_handler on_setup;
 	call_handler on_render;
+	call_handler on_websocket;
 
 	String compiler_messages;
 	time_t last_compiled;
@@ -169,6 +170,9 @@ struct Request {
 		std::vector<void*> mysql_connections;
 		u64 client_socket = 0;
 		u64 server_socket = 0;
+		bool is_websocket = false;
+		String websocket_connection_id = "";
+		String websocket_scope = "";
 		std::string params_buffer;
 	} resources;
 

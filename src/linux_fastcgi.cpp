@@ -5,6 +5,92 @@ ServerState server_state;
 #include "fastcgi/src/fcgicc.cc"
 
 FastCGIServer server;
+pid_t http_worker_pid = 0;
+bool worker_accepts_http = false;
+
+Request* set_active_request(Request& request)
+{
+	Request* previous_context = context;
+	context = &request;
+	return(previous_context);
+}
+
+void restore_active_request(Request* previous_context)
+{
+	context = previous_context;
+}
+
+String current_ws_scope()
+{
+	if(!context)
+		return("");
+	return(first(
+		context->resources.websocket_scope,
+		context->params["SCRIPT_FILENAME"]
+	));
+}
+
+String normalize_ws_scope(String scope)
+{
+	if(scope == "")
+		return(current_ws_scope());
+	if(scope[0] == '/')
+		return(scope);
+	return(expand_path(scope, get_cwd()));
+}
+
+String ws_message()
+{
+	if(!context)
+		return("");
+	return(context->var["ws"]["message"].to_string());
+}
+
+String ws_connection_id()
+{
+	if(!context)
+		return("");
+	return(context->resources.websocket_connection_id);
+}
+
+String ws_scope()
+{
+	return(current_ws_scope());
+}
+
+StringList ws_connections(String scope)
+{
+	return(server.websocket_connection_ids(normalize_ws_scope(scope)));
+}
+
+u64 ws_connection_count(String scope)
+{
+	return(ws_connections(scope).size());
+}
+
+bool ws_send(String message, String scope)
+{
+	return(server.websocket_broadcast(normalize_ws_scope(scope), message) > 0);
+}
+
+u64 ws_broadcast(String message, String scope)
+{
+	return(server.websocket_broadcast(normalize_ws_scope(scope), message));
+}
+
+bool ws_send_to(String connection_id, String message)
+{
+	return(server.websocket_send_to(connection_id, message));
+}
+
+bool ws_close(String connection_id)
+{
+	if(connection_id == "")
+		connection_id = ws_connection_id();
+	if(connection_id == "")
+		return(false);
+	return(server.websocket_close(connection_id));
+}
 
 int handle_request(FastCGIRequest& request) {
     // This is always the first event to occur.  It occurs when the
@@ -39,7 +125,7 @@ int handle_complete(FastCGIRequest& request) {
     // both closed, and thus the request is complete.
 	// printf("(i) request handle\n");
 
-	context = &request;
+	Request* previous_context = set_active_request(request);
 	server_state.request_count += 1;
 	request.server = &server_state;
 	request.stats.time_start = microtime();
@@ -82,8 +168,58 @@ int handle_complete(FastCGIRequest& request) {
 		save_session_data(request.session_id, request.session);
 
 	cleanup_mysql_connections();
+	restore_active_request(previous_context);
 
     return 0;
+}
+
+int handle_websocket_message(FastCGIRequest& request, const String& message)
+{
+	Request event_request;
+	ByteStream ws_output;
+	DTree call_param;
+
+	Request* previous_context = set_active_request(event_request);
+	server_state.request_count += 1;
+	event_request.server = &server_state;
+	event_request.params = request.params;
+	event_request.params["REQUEST_METHOD"] = "WEBSOCKET";
+	event_request.get = parse_query(event_request.params["QUERY_STRING"]);
+	event_request.resources = request.resources;
+	event_request.stats.time_init = microtime();
+	event_request.stats.time_start = event_request.stats.time_init;
+	event_request.random_index = 0;
+	event_request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&event_request.stats.time_start));
+	event_request.response_code = "WEBSOCKET";
+	event_request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
+	event_request.in = message;
+	event_request.ob = &ws_output;
+
+	if(event_request.params["HTTP_COOKIE"].length() > 0)
+		event_request.cookies = parse_cookies(event_request.params["HTTP_COOKIE"]);
+
+	event_request.var["ws"]["message"] = message;
+	event_request.var["ws"]["connection_id"] = request.resources.websocket_connection_id;
+	event_request.var["ws"]["scope"] = request.resources.websocket_scope;
+	event_request.var["ws"]["connection_count"] = (f64)server.websocket_connection_ids(request.resources.websocket_scope).size();
+	event_request.var["ws"]["document_uri"] = first(
+		request.params["DOCUMENT_URI"],
+		request.params["REQUEST_URI"]
+	);
+
+	call_param["message"] = message;
+	call_param["connection_id"] = request.resources.websocket_connection_id;
+	call_param["scope"] = request.resources.websocket_scope;
+	call_param["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
+
+	compiler_invoke_websocket(&event_request, request.params["SCRIPT_FILENAME"], call_param);
+
+	if(event_request.session_id.length() > 0)
+		save_session_data(event_request.session_id, event_request.session);
+
+	cleanup_mysql_connections();
+	restore_active_request(previous_context);
+	return 0;
 }
 
 volatile bool termination_signal_received = false;
@@ -114,9 +250,12 @@ void listen_for_connections()
 	}
 
 	signal(SIGSEGV, on_segfault);
+	if(!worker_accepts_http)
+		server.close_http_listeners();
 	server.on_request = &handle_request;
 	server.on_data = &handle_data;
 	server.on_complete = &handle_complete;
+	server.on_websocket_message = &handle_websocket_message;
 	for(;;)
 	{
 		server.process();
@@ -204,7 +343,12 @@ int main(int argc, char** argv)
 				}
 			}
 			if(!termination_signal_received)
-				spawn_subprocess(listen_for_connections);
+			{
+				worker_accepts_http = (http_worker_pid == 0 || workers.count(http_worker_pid) == 0);
+				pid_t child_pid = spawn_subprocess(listen_for_connections);
+				if(child_pid > 0 && worker_accepts_http)
+					http_worker_pid = child_pid;
+			}
 		}
 		sleep(1);
 	}

@@ -1,42 +1,197 @@
+String clean_chat_field(String raw, u32 max_length)
+{
+	String value = trim(raw);
+	value = replace(value, "\r", " ");
+	value = replace(value, "\n", " ");
+	if(value.length() > max_length)
+		value.resize(max_length);
+	return(value);
+}
+
+DTree chat_event(String type, String body)
+{
+	DTree event;
+	event["type"] = type;
+	event["body"] = body;
+	event["connection_id"] = ws_connection_id();
+	event["scope"] = first(context->params["DOCUMENT_URI"], ws_scope());
+	event["online"] = (f64)ws_connection_count();
+	event["at"] = gmdate("%H:%M:%S");
+	return(event);
+}
 
 RENDER()
 {
-	String raw = first(context->post["raw"], "today");
-	String server_url = context->params["HTTP_HOST"]+context->params["DOCUMENT_URI"];
+	String ws_url = context->params["DOCUMENT_URI"];
+	u64 online = ws_connection_count();
 	<>
-		<link rel="stylesheet" href='style.css'></link>
-		<h1>
-			<a href="index.uce">UCE Test</a>:
-			WebSocket Test
-		</h1>
-		<form action="?" method="post">
-			<div>
-				<label></label>
-				<input type="text" name="raw" value="<?= raw ?>"/>
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+		<style>
+			.chat-shell { max-width: 960px; margin: 1.5rem auto; display: grid; gap: 1rem; }
+			.chat-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: #445; }
+			.chat-panel { background: #fff; border: 1px solid #d7dde7; border-radius: 14px; padding: 1rem; box-shadow: 0 10px 30px rgba(38,55,77,0.08); }
+			.chat-log { min-height: 24rem; max-height: 55vh; overflow: auto; display: grid; gap: 0.75rem; }
+			.chat-line { border-left: 4px solid #2f7ad8; padding-left: 0.75rem; }
+			.chat-line.system { border-left-color: #8794a7; color: #556; }
+			.chat-line .meta { font-size: 0.8rem; color: #667; margin-bottom: 0.2rem; }
+			.chat-composer { display: grid; gap: 0.75rem; }
+			.chat-row { display: grid; gap: 0.5rem; }
+			.chat-row.dual { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); }
+			input, textarea, button { font: inherit; border-radius: 10px; border: 1px solid #c5cedb; padding: 0.8rem 0.9rem; }
+			textarea { min-height: 6rem; resize: vertical; }
+			button { background: #1b5fc9; border-color: #1b5fc9; color: #fff; cursor: pointer; font-weight: 600; }
+			button:disabled { opacity: 0.55; cursor: wait; }
+			.status { font-weight: 600; }
+		</style>
+		<div class="chat-shell">
+			<h1>
+				<a href="index.uce">UCE Test</a>:
+				WebSocket Chat
+			</h1>
+			<div class="chat-meta">
+				<div>Page scope: <code><?= ws_url ?></code></div>
+				<div>Connected right now: <strong id="online-count"><?= online ?></strong></div>
+				<div class="status" id="status">Connecting...</div>
 			</div>
-			<div>
-				<input type="submit" value="Parse"/>
+			<div class="chat-panel">
+				<div class="chat-log" id="chat-log"></div>
 			</div>
-		</form>
-		<pre id="log"></pre>
+			<form class="chat-panel chat-composer" id="chat-form">
+				<div class="chat-row dual">
+					<input id="chat-name" maxlength="32" placeholder="Display name" value="guest-<?= draw_int(1000, 9999) ?>"/>
+					<button id="send-button" type="submit">Send Message</button>
+				</div>
+				<div class="chat-row">
+					<textarea id="chat-message" maxlength="500" placeholder="Say something to everyone connected to this same .ws.uce page"></textarea>
+				</div>
+			</form>
+		</div>
 		<script>
-		const ws = new WebSocket('wss://<?= server_url ?>');
-		const log_element = document.getElementById('log');
-		log_element.append('Connecting to wss://<?= server_url ?>...' + "\n");
-		ws.addEventListener('open', (event) => {
-			log_element.append('Connection open' + "\n");
-			ws.send('Hello, server!');
-		});
-		ws.addEventListener('message', (event) => {
-			log_element.append('Message: ' + JSON.stringify(event.data) + "\n");
-		});
-		ws.addEventListener('close', (event) => {
-			log_element.append('Connection closed' + "\n");
-		});
-		ws.addEventListener('error', (event) => {
-			log_element.append('Error: ' + JSON.stringify(event) + "\n");
-		});
+			const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}<?= ws_url ?>`;
+			const statusEl = document.getElementById('status');
+			const onlineEl = document.getElementById('online-count');
+			const logEl = document.getElementById('chat-log');
+			const formEl = document.getElementById('chat-form');
+			const nameEl = document.getElementById('chat-name');
+			const messageEl = document.getElementById('chat-message');
+			const sendButtonEl = document.getElementById('send-button');
+			const savedName = window.localStorage.getItem('uce-chat-name');
+			if (savedName) nameEl.value = savedName;
+
+			let ws;
+			let reconnectDelay = 1000;
+
+			function addLine(kind, title, body, meta = '') {
+				const wrapper = document.createElement('div');
+				wrapper.className = `chat-line ${kind}`;
+				const metaEl = document.createElement('div');
+				metaEl.className = 'meta';
+				metaEl.textContent = meta;
+				const bodyEl = document.createElement('div');
+				const titleEl = document.createElement('strong');
+				titleEl.textContent = title;
+				bodyEl.append(titleEl, document.createTextNode(` ${body}`));
+				wrapper.append(metaEl, bodyEl);
+				logEl.append(wrapper);
+				logEl.scrollTop = logEl.scrollHeight;
+			}
+
+			function setStatus(text, online) {
+				statusEl.textContent = text;
+				if (typeof online === 'number') onlineEl.textContent = String(online);
+			}
+
+			function sendPayload(payload) {
+				if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+				payload.name = (nameEl.value || '').trim().slice(0, 32) || 'guest';
+				window.localStorage.setItem('uce-chat-name', payload.name);
+				ws.send(JSON.stringify(payload));
+				return true;
+			}
+
+			function connect() {
+				ws = new WebSocket(wsUrl);
+				setStatus(`Connecting to ${wsUrl}...`);
+				sendButtonEl.disabled = true;
+
+				ws.addEventListener('open', () => {
+					reconnectDelay = 1000;
+					sendButtonEl.disabled = false;
+					setStatus('Connected');
+					addLine('system', 'system', 'socket connected', new Date().toLocaleTimeString());
+					sendPayload({ type: 'join' });
+				});
+
+				ws.addEventListener('message', (event) => {
+					let payload;
+					try {
+						payload = JSON.parse(event.data);
+					} catch (error) {
+						addLine('system', 'decode error', String(error), new Date().toLocaleTimeString());
+						return;
+					}
+					if (typeof payload.online === 'number') onlineEl.textContent = String(payload.online);
+					if (payload.type === 'message') {
+						addLine('', payload.name || 'guest', payload.body || '', `${payload.at || ''} ${payload.connection_id || ''}`);
+					} else {
+						addLine('system', payload.type || 'system', payload.body || '', `${payload.at || ''} ${payload.connection_id || ''}`);
+					}
+				});
+
+				ws.addEventListener('close', () => {
+					sendButtonEl.disabled = true;
+					setStatus(`Disconnected, retrying in ${reconnectDelay / 1000}s`);
+					addLine('system', 'system', 'socket closed', new Date().toLocaleTimeString());
+					window.setTimeout(connect, reconnectDelay);
+					reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+				});
+
+				ws.addEventListener('error', () => {
+					setStatus('WebSocket error');
+				});
+			}
+
+			formEl.addEventListener('submit', (event) => {
+				event.preventDefault();
+				const body = (messageEl.value || '').trim();
+				if (!body) return;
+				if (sendPayload({ type: 'message', body })) {
+					messageEl.value = '';
+					messageEl.focus();
+				}
+			});
+
+			connect();
 		</script>
-		<pre><?= var_dump(context->params) ?></pre>
 	</>
+}
+
+WS()
+{
+	DTree payload = json_decode(ws_message());
+	String type = clean_chat_field(payload["type"].to_string(), 24);
+	String name = clean_chat_field(payload["name"].to_string(), 32);
+	String body = clean_chat_field(payload["body"].to_string(), 500);
+
+	if(name == "")
+		name = "guest";
+
+	if(type == "join")
+	{
+		ws_send(json_encode(chat_event("join", name + " joined the room")));
+		return;
+	}
+
+	if(type == "message" && body != "")
+	{
+		DTree event = chat_event("message", body);
+		event["name"] = name;
+		ws_send(json_encode(event));
+		return;
+	}
+
+	if(type != "")
+	{
+		ws_send_to(ws_connection_id(), json_encode(chat_event("notice", "Unknown message type: " + type)));
+	}
 }

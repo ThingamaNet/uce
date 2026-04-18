@@ -1,5 +1,32 @@
 #include "uri.h"
 
+static String base64_encode(String raw)
+{
+	static const char* chars =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz"
+		"0123456789+/";
+
+	String result;
+	int val = 0;
+	int bits = -6;
+	for(unsigned char c : raw)
+	{
+		val = (val << 8) + c;
+		bits += 8;
+		while(bits >= 0)
+		{
+			result.append(1, chars[(val >> bits) & 0x3F]);
+			bits -= 6;
+		}
+	}
+	if(bits > -6)
+		result.append(1, chars[((val << 8) >> (bits + 8)) & 0x3F]);
+	while(result.length() % 4 != 0)
+		result.append(1, '=');
+	return(result);
+}
+
 String var_dump(URI uri, String prefix, String postfix)
 {
 	return(
@@ -426,4 +453,107 @@ void session_destroy(String session_name)
 		save_session_data(context->session_id, context->session);
 		context->session_id = "";
 	}
+}
+
+String ws_make_accept_key(String client_key)
+{
+	return(base64_encode(gen_sha1(
+		client_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+		true
+	)));
+}
+
+String ws_encode_frame(String payload, u8 opcode, bool is_final_fragment)
+{
+	String frame;
+	u8 first_byte = opcode & 0x0F;
+	if(is_final_fragment)
+		first_byte |= 0x80;
+	frame.append(1, first_byte);
+
+	u64 payload_length = payload.length();
+	if(payload_length <= 125)
+	{
+		frame.append(1, (char)payload_length);
+	}
+	else if(payload_length <= 0xFFFF)
+	{
+		frame.append(1, 126);
+		frame.append(1, (char)((payload_length >> 8) & 0xFF));
+		frame.append(1, (char)(payload_length & 0xFF));
+	}
+	else
+	{
+		frame.append(1, 127);
+		for(int shift = 56; shift >= 0; shift -= 8)
+			frame.append(1, (char)((payload_length >> shift) & 0xFF));
+	}
+
+	frame += payload;
+	return(frame);
+}
+
+String ws_close_frame(u16 status_code, String reason)
+{
+	String payload;
+	payload.append(1, (char)((status_code >> 8) & 0xFF));
+	payload.append(1, (char)(status_code & 0xFF));
+	payload += reason;
+	return(ws_encode_frame(payload, 0x8));
+}
+
+bool WSFrame::parse(const String& buffer, String& error)
+{
+	error = "";
+	payload = "";
+
+	if(buffer.length() < 2)
+		return(false);
+
+	const unsigned char* raw = (const unsigned char*)buffer.data();
+	opcode = raw[0] & 0x0F;
+	is_final_fragment = (raw[0] & 0x80) != 0;
+	mask_bit = (raw[1] & 0x80) != 0;
+	payload_length = raw[1] & 0x7F;
+	header_length = 2;
+
+	if(payload_length == 126)
+	{
+		if(buffer.length() < 4)
+			return(false);
+		payload_length = ((u64)raw[2] << 8) | (u64)raw[3];
+		header_length = 4;
+	}
+	else if(payload_length == 127)
+	{
+		if(buffer.length() < 10)
+			return(false);
+		payload_length = 0;
+		for(u32 i = 0; i < 8; i++)
+			payload_length = (payload_length << 8) | (u64)raw[2 + i];
+		header_length = 10;
+	}
+
+	u64 mask_offset = header_length;
+	if(mask_bit)
+		header_length += 4;
+
+	frame_length = header_length + payload_length;
+	if(frame_length < header_length)
+	{
+		error = "invalid websocket frame length";
+		return(false);
+	}
+	if(buffer.length() < frame_length)
+		return(false);
+
+	payload.assign(buffer.data() + header_length, payload_length);
+	if(mask_bit)
+	{
+		const unsigned char* mask = raw + mask_offset;
+		for(u64 i = 0; i < payload.length(); i++)
+			payload[i] = payload[i] ^ mask[i % 4];
+	}
+
+	return(true);
 }

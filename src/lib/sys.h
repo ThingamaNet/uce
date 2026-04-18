@@ -36,6 +36,16 @@ void socket_close(u64 sockfd);
 bool socket_write(u64 sockfd, String data);
 String socket_read(u64 sockfd, u32 max_length = 1024*128, u32 timeout = 1);
 
+String ws_message();
+String ws_connection_id();
+String ws_scope();
+StringList ws_connections(String scope = "");
+u64 ws_connection_count(String scope = "");
+bool ws_send(String message, String scope = "");
+u64 ws_broadcast(String message, String scope = "");
+bool ws_send_to(String connection_id, String message);
+bool ws_close(String connection_id = "");
+
 String memcache_escape_key(String key);
 StringList memcache_escape_keys(StringList keys);
 u64 memcache_connect(String host = "127.0.0.1", short port = 11211);

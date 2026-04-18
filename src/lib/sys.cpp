@@ -431,7 +431,7 @@ std::map<pid_t, Worker> workers;
 #include <sys/resource.h>
 #include <sys/prctl.h>
 
-void spawn_subprocess(std::function<void()> exec_after_spawn)
+pid_t spawn_subprocess(std::function<void()> exec_after_spawn)
 {
 	parent_pid = getpid();
 	pid_t p;
@@ -442,6 +442,7 @@ void spawn_subprocess(std::function<void()> exec_after_spawn)
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		exec_after_spawn();
+		return(0);
 	}
 	else
 	{
@@ -449,6 +450,7 @@ void spawn_subprocess(std::function<void()> exec_after_spawn)
 		w.pid = p;
 		workers[w.pid] = w;
 		printf("(P) child procress spawned: PID %i\n", p);
+		return(p);
 	}
 }
 
