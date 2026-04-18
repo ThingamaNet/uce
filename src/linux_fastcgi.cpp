@@ -58,6 +58,20 @@ String ws_scope()
 	return(current_ws_scope());
 }
 
+u8 ws_opcode()
+{
+	if(!context)
+		return(0);
+	return(context->resources.websocket_opcode);
+}
+
+bool ws_is_binary()
+{
+	if(!context)
+		return(false);
+	return(context->resources.websocket_is_binary);
+}
+
 StringList ws_connections(String scope)
 {
 	return(server.websocket_connection_ids(normalize_ws_scope(scope)));
@@ -173,7 +187,7 @@ int handle_complete(FastCGIRequest& request) {
     return 0;
 }
 
-int handle_websocket_message(FastCGIRequest& request, const String& message)
+int handle_websocket_message(FastCGIRequest& request, const String& message, u8 opcode)
 {
 	Request event_request;
 	ByteStream ws_output;
@@ -202,6 +216,9 @@ int handle_websocket_message(FastCGIRequest& request, const String& message)
 	event_request.var["ws"]["connection_id"] = request.resources.websocket_connection_id;
 	event_request.var["ws"]["scope"] = request.resources.websocket_scope;
 	event_request.var["ws"]["connection_count"] = (f64)server.websocket_connection_ids(request.resources.websocket_scope).size();
+	event_request.var["ws"]["opcode"] = (f64)opcode;
+	event_request.var["ws"]["is_binary"].set_bool(request.resources.websocket_is_binary);
+	event_request.var["ws"]["is_text"].set_bool(request.resources.websocket_is_text);
 	event_request.var["ws"]["document_uri"] = first(
 		request.params["DOCUMENT_URI"],
 		request.params["REQUEST_URI"]
@@ -210,6 +227,7 @@ int handle_websocket_message(FastCGIRequest& request, const String& message)
 	call_param["message"] = message;
 	call_param["connection_id"] = request.resources.websocket_connection_id;
 	call_param["scope"] = request.resources.websocket_scope;
+	call_param["opcode"] = (f64)opcode;
 	call_param["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
 
 	compiler_invoke_websocket(&event_request, request.params["SCRIPT_FILENAME"], call_param);

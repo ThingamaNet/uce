@@ -48,7 +48,7 @@ public:
 	std::function<int(FastCGIRequest&)> on_request = 0;
 	std::function<int(FastCGIRequest&)> on_data = 0;
 	std::function<int(FastCGIRequest&)> on_complete = 0;
-	std::function<int(FastCGIRequest&, const String&)> on_websocket_message = 0;
+	std::function<int(FastCGIRequest&, const String&, u8)> on_websocket_message = 0;
 
 	int listen(unsigned tcp_port);
 	int listen_http(unsigned tcp_port);
@@ -72,6 +72,8 @@ public:
 		bool is_websocket = false;
 		String websocket_connection_id;
 		String websocket_scope;
+		String websocket_fragment_buffer;
+		u8 websocket_fragment_opcode = 0;
 		char type = 'F'; // F = FastCGI, H = HttpServer
 	};
 
@@ -86,6 +88,9 @@ public:
 	void close_http_listeners();
 	void read_fgci(Connection&);
 	void process_websocket_input(Connection&);
+	void fail_websocket_connection(Connection& connection, u16 status_code, String reason = "");
+	void close_websocket_connection(Connection& connection, u16 status_code = 1000, String reason = "");
+	void dispatch_websocket_message(Connection& connection, RequestID request_id, String payload, u8 opcode);
 	bool websocket_send_to(String connection_id, String message);
 	u64 websocket_broadcast(String scope, String message);
 	StringList websocket_connection_ids(String scope = "");

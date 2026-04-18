@@ -1,0 +1,17 @@
+:sig
+bool ws_send(String message, String scope = "")
+
+:params
+message : text message to send
+scope : optional scope identifier, defaults to the current WebSocket page scope
+return value : true if the message was queued for at least one connected client
+
+:desc
+Queues a text WebSocket message for every client connected to the given scope.
+
+If `scope` is omitted, the current page scope is used.
+
+This helper currently sends text frames only.
+
+:see
+>websocket

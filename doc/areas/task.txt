@@ -2,4 +2,5 @@ Task API
 
 kill
 task
+task_repeat
 task_pid

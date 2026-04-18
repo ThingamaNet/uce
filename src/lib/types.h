@@ -173,6 +173,9 @@ struct Request {
 		bool is_websocket = false;
 		String websocket_connection_id = "";
 		String websocket_scope = "";
+		u8 websocket_opcode = 0;
+		bool websocket_is_binary = false;
+		bool websocket_is_text = false;
 		std::string params_buffer;
 	} resources;
 

@@ -20,6 +20,8 @@ The runtime keeps the socket lifecycle in-process and exposes a low-boilerplate 
 - `ws_message()`
 - `ws_connection_id()`
 - `ws_scope()`
+- `ws_opcode()`
+- `ws_is_binary()`
 - `ws_connections([scope])`
 - `ws_connection_count([scope])`
 - `ws_send(message[, scope])`
@@ -28,6 +30,12 @@ The runtime keeps the socket lifecycle in-process and exposes a low-boilerplate 
 - `ws_close([connection_id])`
 
 By default, the WebSocket scope is the current page file, so `ws_send()` broadcasts to other clients connected to that same `.ws.uce` endpoint.
+
+`ws_message()` may contain either text or binary payload data. Use `ws_opcode()` / `ws_is_binary()` to inspect the current inbound message type.
+
+The current `ws_send*` helpers queue text frames. Binary send helpers are not exposed yet.
+
+The runtime now accepts fragmented messages, validates reserved bits and UTF-8 for text payloads, and delivers both text and binary message frames into `WS()`.
 
 ## Service Setup
 

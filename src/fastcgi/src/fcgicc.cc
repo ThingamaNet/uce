@@ -60,6 +60,20 @@ make_http_text_response(String status_line, String body, String extra_headers = 
 	);
 }
 
+static bool
+is_valid_close_code(u16 status_code)
+{
+	if(status_code < 1000)
+		return(false);
+	if(status_code == 1004 || status_code == 1005 || status_code == 1006 || status_code == 1015)
+		return(false);
+	if(status_code <= 1014)
+		return(true);
+	if(status_code >= 3000 && status_code <= 4999)
+		return(true);
+	return(false);
+}
+
 void
 FastCGIServer::shutdown()
 {
@@ -215,6 +229,36 @@ FastCGIServer::close_http_listeners()
 		}
 		++it;
 	}
+}
+
+void
+FastCGIServer::close_websocket_connection(Connection& connection, u16 status_code, String reason)
+{
+	if(!connection.close_socket)
+		connection.output_buffer += ws_close_frame(status_code, reason);
+	connection.close_socket = true;
+}
+
+void
+FastCGIServer::fail_websocket_connection(Connection& connection, u16 status_code, String reason)
+{
+	close_websocket_connection(connection, status_code, reason);
+}
+
+void
+FastCGIServer::dispatch_websocket_message(Connection& connection, RequestID request_id, String payload, u8 opcode)
+{
+	RequestList::iterator it = connection.requests.find(request_id);
+	if(it == connection.requests.end() || !on_websocket_message)
+		return;
+
+	it->second->resources.is_websocket = true;
+	it->second->resources.websocket_connection_id = connection.websocket_connection_id;
+	it->second->resources.websocket_scope = connection.websocket_scope;
+	it->second->resources.websocket_opcode = opcode;
+	it->second->resources.websocket_is_binary = (opcode == 0x2);
+	it->second->resources.websocket_is_text = (opcode == 0x1);
+	on_websocket_message(*it->second, payload, opcode);
 }
 
 void
@@ -394,9 +438,39 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 	if(to_lower(request.params["HTTP_UPGRADE"]) == "websocket")
 	{
 		Connection* connection = client_sockets[request.resources.client_socket];
+		String request_method = trim(request.params["REQUEST_METHOD"]);
+		String request_protocol = trim(request.params["SERVER_PROTOCOL"]);
 		String websocket_connection = to_lower(request.params["HTTP_CONNECTION"]);
+		String websocket_host = trim(request.params["HTTP_HOST"]);
 		String websocket_key = trim(request.params["HTTP_SEC_WEBSOCKET_KEY"]);
 		String websocket_version = trim(request.params["HTTP_SEC_WEBSOCKET_VERSION"]);
+		if(request_method != "GET")
+		{
+			connection->output_buffer += make_http_text_response(
+				"HTTP/1.1 405 Method Not Allowed",
+				"websocket upgrades require GET"
+			);
+			connection->close_socket = true;
+			return;
+		}
+		if(request_protocol != "HTTP/1.1")
+		{
+			connection->output_buffer += make_http_text_response(
+				"HTTP/1.1 400 Bad Request",
+				"websocket upgrades require HTTP/1.1"
+			);
+			connection->close_socket = true;
+			return;
+		}
+		if(websocket_host == "")
+		{
+			connection->output_buffer += make_http_text_response(
+				"HTTP/1.1 400 Bad Request",
+				"missing Host header"
+			);
+			connection->close_socket = true;
+			return;
+		}
 		if(websocket_connection.find("upgrade") == String::npos)
 		{
 			connection->output_buffer += make_http_text_response(
@@ -411,6 +485,24 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 			connection->output_buffer += make_http_text_response(
 				"HTTP/1.1 400 Bad Request",
 				"missing Sec-WebSocket-Key header"
+			);
+			connection->close_socket = true;
+			return;
+		}
+		if(!ws_is_valid_client_key(websocket_key))
+		{
+			connection->output_buffer += make_http_text_response(
+				"HTTP/1.1 400 Bad Request",
+				"invalid Sec-WebSocket-Key header"
+			);
+			connection->close_socket = true;
+			return;
+		}
+		if(websocket_version == "")
+		{
+			connection->output_buffer += make_http_text_response(
+				"HTTP/1.1 400 Bad Request",
+				"missing Sec-WebSocket-Version header"
 			);
 			connection->close_socket = true;
 			return;
@@ -482,44 +574,108 @@ FastCGIServer::process_websocket_input(Connection& connection)
 
 		if(!frame.mask_bit)
 		{
-			connection.output_buffer += ws_close_frame(1002, "client frames must be masked");
-			connection.close_socket = true;
+			fail_websocket_connection(connection, 1002, "client frames must be masked");
 			return;
 		}
 
-		if(!frame.is_final_fragment || frame.opcode == 0x0)
+		bool is_control_frame = (frame.opcode & 0x08) != 0;
+		if(is_control_frame && !frame.is_final_fragment)
 		{
-			connection.output_buffer += ws_close_frame(1003, "fragmented frames are not supported");
-			connection.close_socket = true;
+			fail_websocket_connection(connection, 1002, "control frames must not be fragmented");
 			return;
 		}
 
 		switch(frame.opcode)
 		{
-			case 0x1:
+			case 0x0:
 			{
-				RequestList::iterator it = connection.requests.find(connection.client_socket);
-				if(it != connection.requests.end() && on_websocket_message)
+				if(connection.websocket_fragment_opcode == 0)
 				{
-					it->second->resources.is_websocket = true;
-					it->second->resources.websocket_connection_id = connection.websocket_connection_id;
-					it->second->resources.websocket_scope = connection.websocket_scope;
-					on_websocket_message(*it->second, frame.payload);
+					fail_websocket_connection(connection, 1002, "unexpected continuation frame");
+					return;
 				}
+
+				connection.websocket_fragment_buffer += frame.payload;
+				if(!frame.is_final_fragment)
+					break;
+
+				String payload = connection.websocket_fragment_buffer;
+				u8 opcode = connection.websocket_fragment_opcode;
+				connection.websocket_fragment_buffer = "";
+				connection.websocket_fragment_opcode = 0;
+
+				if(opcode == 0x1 && !ws_is_valid_utf8(payload))
+				{
+					fail_websocket_connection(connection, 1007, "invalid UTF-8 text message");
+					return;
+				}
+
+				dispatch_websocket_message(connection, connection.client_socket, payload, opcode);
+				break;
+			}
+			case 0x1:
+			case 0x2:
+			{
+				if(connection.websocket_fragment_opcode != 0)
+				{
+					fail_websocket_connection(connection, 1002, "new data frame while fragmented message is active");
+					return;
+				}
+
+				if(frame.is_final_fragment)
+				{
+					if(frame.opcode == 0x1 && !ws_is_valid_utf8(frame.payload))
+					{
+						fail_websocket_connection(connection, 1007, "invalid UTF-8 text message");
+						return;
+					}
+
+					dispatch_websocket_message(connection, connection.client_socket, frame.payload, frame.opcode);
+					break;
+				}
+
+				connection.websocket_fragment_buffer = frame.payload;
+				connection.websocket_fragment_opcode = frame.opcode;
 				break;
 			}
 			case 0x8:
-				connection.output_buffer += ws_close_frame();
-				connection.close_socket = true;
+			{
+				if(frame.payload.length() == 1)
+				{
+					fail_websocket_connection(connection, 1002, "invalid close frame payload");
+					return;
+				}
+
+				u16 status_code = 1000;
+				String reason = "";
+				if(frame.payload.length() >= 2)
+				{
+					status_code =
+						((u16)(u8)frame.payload[0] << 8) |
+						(u16)(u8)frame.payload[1];
+					reason = frame.payload.substr(2);
+					if(!is_valid_close_code(status_code))
+					{
+						fail_websocket_connection(connection, 1002, "invalid close status code");
+						return;
+					}
+					if(!ws_is_valid_utf8(reason))
+					{
+						fail_websocket_connection(connection, 1007, "invalid UTF-8 close reason");
+						return;
+					}
+				}
+
+				close_websocket_connection(connection, status_code, reason);
 				return;
+			}
 			case 0x9:
 				connection.output_buffer += ws_encode_frame(frame.payload, 0xA);
 				break;
 			case 0xA:
 				break;
 			default:
-				connection.output_buffer += ws_close_frame(1003, "unsupported websocket opcode");
-				connection.close_socket = true;
+				fail_websocket_connection(connection, 1002, "unsupported websocket opcode");
 				return;
 		}
 	}

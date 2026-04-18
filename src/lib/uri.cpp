@@ -27,6 +27,134 @@ static String base64_encode(String raw)
 	return(result);
 }
 
+static int base64_decode_value(char c)
+{
+	if(c >= 'A' && c <= 'Z')
+		return(c - 'A');
+	if(c >= 'a' && c <= 'z')
+		return(c - 'a' + 26);
+	if(c >= '0' && c <= '9')
+		return(c - '0' + 52);
+	if(c == '+')
+		return(62);
+	if(c == '/')
+		return(63);
+	return(-1);
+}
+
+static String base64_decode(String raw, bool& ok)
+{
+	ok = false;
+	String cleaned;
+	for(char c : raw)
+	{
+		if(!isspace(c))
+			cleaned.append(1, c);
+	}
+
+	if(cleaned.length() == 0 || (cleaned.length() % 4) != 0)
+		return("");
+
+	String result;
+	for(u32 i = 0; i < cleaned.length(); i += 4)
+	{
+		int values[4];
+		int padding = 0;
+		for(u32 j = 0; j < 4; j++)
+		{
+			char c = cleaned[i + j];
+			if(c == '=')
+			{
+				values[j] = 0;
+				padding += 1;
+			}
+			else
+			{
+				values[j] = base64_decode_value(c);
+				if(values[j] < 0)
+					return("");
+			}
+		}
+
+		if(padding > 2)
+			return("");
+		if(padding > 0 && i + 4 != cleaned.length())
+			return("");
+		if(cleaned[i + 2] == '=' && cleaned[i + 3] != '=')
+			return("");
+
+		result.append(1, (char)((values[0] << 2) | (values[1] >> 4)));
+		if(cleaned[i + 2] != '=')
+			result.append(1, (char)(((values[1] & 0x0F) << 4) | (values[2] >> 2)));
+		if(cleaned[i + 3] != '=')
+			result.append(1, (char)(((values[2] & 0x03) << 6) | values[3]));
+	}
+
+	ok = true;
+	return(result);
+}
+
+bool ws_is_valid_utf8(String input)
+{
+	u32 i = 0;
+	while(i < input.length())
+	{
+		u8 c = (u8)input[i];
+		u32 trailing = 0;
+		u32 codepoint = 0;
+
+		if(c <= 0x7F)
+		{
+			i += 1;
+			continue;
+		}
+		else if((c & 0xE0) == 0xC0)
+		{
+			trailing = 1;
+			codepoint = c & 0x1F;
+			if(codepoint == 0)
+				return(false);
+		}
+		else if((c & 0xF0) == 0xE0)
+		{
+			trailing = 2;
+			codepoint = c & 0x0F;
+		}
+		else if((c & 0xF8) == 0xF0)
+		{
+			trailing = 3;
+			codepoint = c & 0x07;
+		}
+		else
+		{
+			return(false);
+		}
+
+		if(i + trailing >= input.length())
+			return(false);
+
+		for(u32 j = 1; j <= trailing; j++)
+		{
+			u8 follow = (u8)input[i + j];
+			if((follow & 0xC0) != 0x80)
+				return(false);
+			codepoint = (codepoint << 6) | (follow & 0x3F);
+		}
+
+		if((trailing == 1 && codepoint < 0x80) ||
+			(trailing == 2 && codepoint < 0x800) ||
+			(trailing == 3 && codepoint < 0x10000))
+			return(false);
+		if(codepoint > 0x10FFFF)
+			return(false);
+		if(codepoint >= 0xD800 && codepoint <= 0xDFFF)
+			return(false);
+
+		i += trailing + 1;
+	}
+	return(true);
+}
+
 String var_dump(URI uri, String prefix, String postfix)
 {
 	return(
@@ -463,6 +591,13 @@ String ws_make_accept_key(String client_key)
 	)));
 }
 
+bool ws_is_valid_client_key(String client_key)
+{
+	bool ok = false;
+	String decoded = base64_decode(trim(client_key), ok);
+	return(ok && decoded.length() == 16);
+}
+
 String ws_encode_frame(String payload, u8 opcode, bool is_final_fragment)
 {
 	String frame;
@@ -513,6 +648,9 @@ bool WSFrame::parse(const String& buffer, String& error)
 	const unsigned char* raw = (const unsigned char*)buffer.data();
 	opcode = raw[0] & 0x0F;
 	is_final_fragment = (raw[0] & 0x80) != 0;
+	rsv1 = (raw[0] & 0x40) != 0;
+	rsv2 = (raw[0] & 0x20) != 0;
+	rsv3 = (raw[0] & 0x10) != 0;
 	mask_bit = (raw[1] & 0x80) != 0;
 	payload_length = raw[1] & 0x7F;
 	header_length = 2;
@@ -528,6 +666,11 @@ bool WSFrame::parse(const String& buffer, String& error)
 	{
 		if(buffer.length() < 10)
 			return(false);
+		if((raw[2] & 0x80) != 0)
+		{
+			error = "invalid websocket frame length";
+			return(false);
+		}
 		payload_length = 0;
 		for(u32 i = 0; i < 8; i++)
 			payload_length = (payload_length << 8) | (u64)raw[2 + i];
@@ -542,6 +685,17 @@ bool WSFrame::parse(const String& buffer, String& error)
 	if(frame_length < header_length)
 	{
 		error = "invalid websocket frame length";
+		return(false);
+	}
+	if(rsv1 || rsv2 || rsv3)
+	{
+		error = "reserved websocket bits are not supported";
+		return(false);
+	}
+	bool is_control_frame = (opcode & 0x08) != 0;
+	if(is_control_frame && payload_length > 125)
+	{
+		error = "control frames must be 125 bytes or less";
 		return(false);
 	}
 	if(buffer.length() < frame_length)

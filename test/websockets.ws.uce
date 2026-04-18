@@ -26,46 +26,33 @@ RENDER()
 	u64 online = ws_connection_count();
 	<>
 		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
-		<style>
-			.chat-shell { max-width: 960px; margin: 1.5rem auto; display: grid; gap: 1rem; }
-			.chat-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: #445; }
-			.chat-panel { background: #fff; border: 1px solid #d7dde7; border-radius: 14px; padding: 1rem; box-shadow: 0 10px 30px rgba(38,55,77,0.08); }
-			.chat-log { min-height: 24rem; max-height: 55vh; overflow: auto; display: grid; gap: 0.75rem; }
-			.chat-line { border-left: 4px solid #2f7ad8; padding-left: 0.75rem; }
-			.chat-line.system { border-left-color: #8794a7; color: #556; }
-			.chat-line .meta { font-size: 0.8rem; color: #667; margin-bottom: 0.2rem; }
-			.chat-composer { display: grid; gap: 0.75rem; }
-			.chat-row { display: grid; gap: 0.5rem; }
-			.chat-row.dual { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); }
-			input, textarea, button { font: inherit; border-radius: 10px; border: 1px solid #c5cedb; padding: 0.8rem 0.9rem; }
-			textarea { min-height: 6rem; resize: vertical; }
-			button { background: #1b5fc9; border-color: #1b5fc9; color: #fff; cursor: pointer; font-weight: 600; }
-			button:disabled { opacity: 0.55; cursor: wait; }
-			.status { font-weight: 600; }
-		</style>
-		<div class="chat-shell">
-			<h1>
-				<a href="index.uce">UCE Test</a>:
-				WebSocket Chat
-			</h1>
-			<div class="chat-meta">
-				<div>Page scope: <code><?= ws_url ?></code></div>
-				<div>Connected right now: <strong id="online-count"><?= online ?></strong></div>
-				<div class="status" id="status">Connecting...</div>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			WebSocket Chat
+		</h1>
+
+		<label>Chat Info</label>
+		<pre>Page scope: <?= ws_url ?>
+Connected right now: <span id="online-count"><?= online ?></span>
+Status: <span id="status">Connecting...</span></pre>
+
+		<form id="chat-form" action="?" method="post">
+			<div>
+				<label>Display name:</label>
+				<input id="chat-name" type="text" maxlength="32" value="guest-<?= draw_int(1000, 9999) ?>"/>
 			</div>
-			<div class="chat-panel">
-				<div class="chat-log" id="chat-log"></div>
+			<div>
+				<label>Message:</label>
+				<textarea id="chat-message" maxlength="500" placeholder="Say something to everyone connected to this same .ws.uce page"></textarea>
 			</div>
-			<form class="chat-panel chat-composer" id="chat-form">
-				<div class="chat-row dual">
-					<input id="chat-name" maxlength="32" placeholder="Display name" value="guest-<?= draw_int(1000, 9999) ?>"/>
-					<button id="send-button" type="submit">Send Message</button>
-				</div>
-				<div class="chat-row">
-					<textarea id="chat-message" maxlength="500" placeholder="Say something to everyone connected to this same .ws.uce page"></textarea>
-				</div>
-			</form>
-		</div>
+			<div>
+				<input id="send-button" type="submit" value="Send Message"/>
+			</div>
+		</form>
+
+		<label>Chat Log</label>
+		<pre id="chat-log"></pre>
+
 		<script>
 			const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}<?= ws_url ?>`;
 			const statusEl = document.getElementById('status');
@@ -82,17 +69,9 @@ RENDER()
 			let reconnectDelay = 1000;
 
 			function addLine(kind, title, body, meta = '') {
-				const wrapper = document.createElement('div');
-				wrapper.className = `chat-line ${kind}`;
-				const metaEl = document.createElement('div');
-				metaEl.className = 'meta';
-				metaEl.textContent = meta;
-				const bodyEl = document.createElement('div');
-				const titleEl = document.createElement('strong');
-				titleEl.textContent = title;
-				bodyEl.append(titleEl, document.createTextNode(` ${body}`));
-				wrapper.append(metaEl, bodyEl);
-				logEl.append(wrapper);
+				const prefix = kind === 'system' ? '[system]' : `[${title}]`;
+				const metaText = meta ? ` ${meta}` : '';
+				logEl.append(`${prefix} ${body}${metaText}\n`);
 				logEl.scrollTop = logEl.scrollHeight;
 			}
 
@@ -168,6 +147,15 @@ RENDER()
 
 WS()
 {
+	if(ws_is_binary())
+	{
+		ws_send_to(
+			ws_connection_id(),
+			json_encode(chat_event("notice", "Binary messages are not handled by this demo"))
+		);
+		return;
+	}
+
 	DTree payload = json_decode(ws_message());
 	String type = clean_chat_field(payload["type"].to_string(), 24);
 	String name = clean_chat_field(payload["name"].to_string(), 32);

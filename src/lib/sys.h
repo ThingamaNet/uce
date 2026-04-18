@@ -39,6 +39,8 @@ String socket_read(u64 sockfd, u32 max_length = 1024*128, u32 timeout = 1);
 String ws_message();
 String ws_connection_id();
 String ws_scope();
+u8 ws_opcode();
+bool ws_is_binary();
 StringList ws_connections(String scope = "");
 u64 ws_connection_count(String scope = "");
 bool ws_send(String message, String scope = "");

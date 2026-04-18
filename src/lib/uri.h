@@ -18,14 +18,19 @@ void save_session_data(String session_id, StringMap data);
 String session_start(String session_name = "uce-session");
 void session_destroy(String session_name = "uce-session");
 String ws_make_accept_key(String client_key);
+bool ws_is_valid_client_key(String client_key);
 String ws_encode_frame(String payload, u8 opcode = 0x1, bool is_final_fragment = true);
 String ws_close_frame(u16 status_code = 1000, String reason = "");
+bool ws_is_valid_utf8(String input);
 
 struct WSFrame {
 
 	u8 opcode = 0;
 	bool is_final_fragment = false;
 	bool mask_bit = false;
+	bool rsv1 = false;
+	bool rsv2 = false;
+	bool rsv3 = false;
 	u64 payload_length = 0;
 	u64 header_length = 0;
 	u64 frame_length = 0;
