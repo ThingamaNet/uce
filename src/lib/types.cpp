@@ -41,7 +41,7 @@ String nibble(String div, String& haystack)
 
 void Request::ob_start()
 {
-	ob_stack.push_back(new std::ostringstream());
+	ob_stack.push_back(new ByteStream());
 	ob = ob_stack.back();
 }
 

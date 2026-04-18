@@ -135,14 +135,28 @@ String file_get_contents(String file_name)
 
 bool file_put_contents(String file_name, String content)
 {
-	s32 fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC);
+	s32 fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if(fd == -1)
 	{
 		printf("(!) Could not write %s\n", file_name.c_str());
 		return(false);
 	}
 	flock(fd, LOCK_EX);
-	write(fd, content.data(), content.length());
+	const char* data = content.data();
+	size_t remaining = content.length();
+	while(remaining > 0)
+	{
+		auto bytes_written = write(fd, data, remaining);
+		if(bytes_written < 0)
+		{
+			flock(fd, LOCK_UN);
+			close(fd);
+			printf("(!) Could not fully write %s\n", file_name.c_str());
+			return(false);
+		}
+		data += bytes_written;
+		remaining -= bytes_written;
+	}
 	flock(fd, LOCK_UN);
 	close(fd);
 	return(true);
@@ -242,7 +256,7 @@ String gmdate(String format, u64 timestamp)
 
 u64 parse_time(String time_String)
 {
-	return(int_val(trim(shell_exec("date -u -d '"+time_String+"' +'%s'"))));
+	return(int_val(trim(shell_exec("date -u -d "+shell_escape(time_String)+" +'%s'"))));
 }
 
 u64 socket_connect(String host, short port)
@@ -475,8 +489,8 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		my_pid = getpid();
 		file_put_contents(status_file_name, std::to_string(my_pid));
 
-		close(context->resources.fcgi_socket);
-		context->resources.fcgi_socket = 0;
+		close(context->resources.client_socket);
+		context->resources.client_socket = 0;
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		//prctl(PR_SET_PDEATHSIG, SIGHUP);
 		exec_after_spawn();
@@ -534,13 +548,13 @@ StringMap make_server_settings()
 	cfg["SETUP_TEMPLATE"] = "scripts/setup.h.template";
 	cfg["LIT_ESC"] = "3d5b5_1";
 	cfg["CONTENT_TYPE"] = "text/html; charset=utf-8";
-	cfg["SOCKET_PATH"] = "/run/uce.sock";
+	cfg["FCGI_SOCKET_PATH"] = "/run/uce.sock";
 	cfg["TMP_UPLOAD_PATH"] = "/tmp/uce/uploads";
 	cfg["SESSION_PATH"] = "/tmp/uce/sessions";
 	cfg["COMPILER_SYS_PATH"] = ".";
 	cfg["PRECOMPILE_FILES_IN"] = ".";
 
-	cfg["LISTEN_PORT"] = std::to_string(9993);
+	cfg["HTTP_PORT"] = std::to_string(8080);
 	cfg["SESSION_TIME"] = std::to_string(60*60*24*30);
 	cfg["WORKER_COUNT"] = std::to_string(4);
 	cfg["MAX_MEMORY"] = std::to_string(1024*1024*16);
@@ -549,6 +563,16 @@ StringMap make_server_settings()
 	{
 		cfg[it.first] = it.second;
 	}
+
+	if(cfg["FCGI_SOCKET_PATH"] == "" && cfg["SOCKET_PATH"] != "")
+		cfg["FCGI_SOCKET_PATH"] = cfg["SOCKET_PATH"];
+	if(cfg["SOCKET_PATH"] == "" && cfg["FCGI_SOCKET_PATH"] != "")
+		cfg["SOCKET_PATH"] = cfg["FCGI_SOCKET_PATH"];
+
+	if(cfg["FCGI_PORT"] == "" && cfg["LISTEN_PORT"] != "")
+		cfg["FCGI_PORT"] = cfg["LISTEN_PORT"];
+	if(cfg["LISTEN_PORT"] == "" && cfg["FCGI_PORT"] != "")
+		cfg["LISTEN_PORT"] = cfg["FCGI_PORT"];
 
 	return(cfg);
 }

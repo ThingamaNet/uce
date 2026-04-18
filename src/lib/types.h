@@ -47,6 +47,7 @@ String operator+(String lhs, f32 rhs) {
 
 typedef std::map<String, String> StringMap;
 typedef std::vector<String> StringList;
+typedef std::ostringstream ByteStream;
 
 struct Request;
 struct DTree;
@@ -129,22 +130,27 @@ struct Request {
 	String session_name = "";
 	std::vector<UploadedFile> uploaded_files;
 
+	String response_code = "HTTP/1.1 200 OK";
 	StringMap header;
 	StringList set_cookies;
 
 	u64 random_seed;
 	u64 random_index;
 
+	std::vector<ByteStream*> ob_stack;
+	ByteStream* ob;
+
 	String in;
-	std::vector<std::ostringstream*> ob_stack;
-	std::ostringstream* ob;
 	String out;
 	String err;
 
-	bool is_finished = false;
-
 	struct Flags {
 		bool log_request = true;
+		bool is_finished = false;
+		int status;
+		bool output_closed = false;
+		bool params_closed = false;
+		bool input_closed = false;
 	} flags;
 
 	struct Stats {
@@ -152,19 +158,19 @@ struct Request {
 		f64 time_init;
 		f64 time_start;
 		f64 time_end;
-		u64 mem_high;
-		u64 mem_alloc;
+		u64 mem_high = 0;
+		u64 mem_alloc = 0;
 		u32 invoke_count = 0;
 	} stats;
 
+	// OS-related resources
 	struct Resources {
 		std::vector<u64> sockets;
 		std::vector<void*> mysql_connections;
-		u64 fcgi_socket = 0;
+		u64 client_socket = 0;
+		u64 server_socket = 0;
+		std::string params_buffer;
 	} resources;
-
-	//void invoke(String file_name);
-	//void invoke(String file_name, DTree& call_param);
 
 	void ob_start();
 
@@ -185,9 +191,15 @@ void print(Ts... args)
 }
 
 template <typename... Ts>
+void out(Ts... args)
+{
+    ((*context->ob << args), ...);
+}
+
+template <typename... Ts>
 String concat(Ts... args)
 {
-	std::stringstream out;
+	ByteStream out;
     ((out << args), ...);
     return(out.str());
 }

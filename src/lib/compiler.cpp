@@ -1,7 +1,7 @@
 #include "compiler.h"
 #include <sys/file.h>
 
-String process_html_literal(Request* context, SharedUnit* su, String content)
+String process_text_literal(Request* context, SharedUnit* su, String content)
 {
 	String pc;
 	String HT_START = "print(R\"(";
@@ -89,7 +89,12 @@ String process_html_literal(Request* context, SharedUnit* su, String content)
 
 String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String content)
 {
-	String pc = "#include \"" + su->src_file_name + ".setup.h" + "\"\n#line 1\n";
+	String pc =
+		("#include \"")+context->server->config["COMPILER_SYS_PATH"] +"/src/lib/uce_lib.h\" \n"+
+		file_get_contents(
+			context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"]
+		)+
+		"#line 1\n";
 	String token = "";
 	String html_buffer = "";
 	u8 mode = 0;
@@ -100,29 +105,13 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 	{
 		char c = content[i];
 		current_line.append(1, c);
-		if(mode == 2)
+		if(mode == 1)
 		{
-			auto end_pos = content.find(String("</")+token+">", i);
-			if(end_pos != String::npos)
+			if(c == '<' && (content[i+1] == '/') && (content[i+2] == '>'))
 			{
-				u32 len = token.length() + 3 + end_pos - i;
-				html_buffer.append(content.substr(i, len - (token.length() == 0 ? 3 : 0)));
-				i += len - 1;
-				pc.append(process_html_literal(context, su, html_buffer));
-			}
-			else
-			{
-				printf("(!) unterminated HTML literal <%s> in %s", token.c_str(), su->file_name.c_str());
-			}
-			mode = 0;
-		}
-		else if(mode == 1)
-		{
-			if(isspace(c) || c == '>')
-			{
-				mode = 2;
-				if(token.length() > 0)
-					html_buffer.append(1, c);
+				i += 2;
+				pc.append(process_text_literal(context, su, html_buffer));
+				mode = 0;
 			}
 			else
 			{
@@ -130,13 +119,12 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 				html_buffer.append(1, c);
 			}
 		}
-		else if(!inside_quote && c == '<' && (content[i+1] == '>'/* || isalpha(content[i+1])*/))
+		else if(!inside_quote && c == '<' && (content[i+1] == '>'))
 		{
 			mode = 1;
 			token = "";
 			html_buffer = "";
-			if(content[i+1] != '>')
-				html_buffer.append(1, c);
+			i += 1;
 		}
 		else if(c == '\"')
 		{
@@ -206,7 +194,7 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 
 	su->so_name = su->bin_path + "/" + su->bin_file_name;
 	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".exports.txt";
-	su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
+	//su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
 }
 
 void load_shared_unit(Request* context, SharedUnit* su, String file_name)
@@ -245,7 +233,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	}
 }
 
-String compile_setup_file(Request* context, SharedUnit* su)
+/*String compile_setup_file(Request* context, SharedUnit* su)
 {
 	String result =
 		String("#ifndef UCE_LIB_INCLUDED\n") +
@@ -254,17 +242,13 @@ String compile_setup_file(Request* context, SharedUnit* su)
 		file_get_contents(
 			context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"]) +
 		"#endif \n";
-	StringList declarations;
-	StringList load_units;
-
-	result = replace(result, "/*load_declarations*/", join(declarations, "\n"));
-	result = replace(result, "/*load_units*/", join(load_units, "\n"));
 	return(result);
-}
+}*/
 
 void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 {
 	//setup_unit_paths(context, su, file_name);
+	f64 comp_start = microtime();
 
 	if(!file_exists(su->file_name))
 	{
@@ -274,7 +258,7 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 
 	shell_exec("mkdir -p " + shell_escape(su->pre_path));
 	file_put_contents(su->pre_path + "/" + su->pre_file_name, preprocess_shared_unit(context, su));
-	file_put_contents(su->setup_file_name, compile_setup_file(context, su));
+	//file_put_contents(su->setup_file_name, compile_setup_file(context, su));
 	file_put_contents(su->api_file_name, join(su->api_declarations, "\n"));
 
 	if(!su->opt_so_optional)
@@ -293,7 +277,9 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 	else
 	{
 		load_shared_unit(context, su, file_name);
-		//printf("(i) compiled unit %s\n", file_name.c_str());
+		printf("(i) compiled unit %s in %f s\n",
+			(su->pre_path + "/" + su->pre_file_name).c_str(),
+			microtime() - comp_start);
 	}
 }
 
@@ -390,6 +376,7 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 
 void compiler_invoke(Request* context, String file_name, DTree& call_param)
 {
+	printf("(i) compiler_invoke file %s\n", file_name.c_str());
 	auto su = compiler_load_shared_unit(context, file_name, "", false);
 	if(su)
 	{

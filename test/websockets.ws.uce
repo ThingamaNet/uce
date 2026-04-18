@@ -1,0 +1,42 @@
+
+RENDER()
+{
+	String raw = first(context->post["raw"], "today");
+	String server_url = context->params["HTTP_HOST"]+context->params["DOCUMENT_URI"];
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			WebSocket Test
+		</h1>
+		<form action="?" method="post">
+			<div>
+				<label></label>
+				<input type="text" name="raw" value="<?= raw ?>"/>
+			</div>
+			<div>
+				<input type="submit" value="Parse"/>
+			</div>
+		</form>
+		<pre id="log"></pre>
+		<script>
+		const ws = new WebSocket('wss://<?= server_url ?>');
+		const log_element = document.getElementById('log');
+		log_element.append('Connecting to wss://<?= server_url ?>...' + "\n");
+		ws.addEventListener('open', (event) => {
+			log_element.append('Connection open' + "\n");
+			ws.send('Hello, server!');
+		});
+		ws.addEventListener('message', (event) => {
+			log_element.append('Message: ' + JSON.stringify(event.data) + "\n");
+		});
+		ws.addEventListener('close', (event) => {
+			log_element.append('Connection closed' + "\n");
+		});
+		ws.addEventListener('error', (event) => {
+			log_element.append('Error: ' + JSON.stringify(event) + "\n");
+		});
+		</script>
+		<pre><?= var_dump(context->params) ?></pre>
+	</>
+}

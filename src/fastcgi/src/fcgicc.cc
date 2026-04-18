@@ -47,138 +47,150 @@
 
 #include "../fastcgi_devkit/fastcgi.h"
 
-
-FastCGIServer::RequestInfo::RequestInfo() :
-	params_closed(false),
-	in_closed(false),
-	output_closed(false)
+void
+FastCGIServer::shutdown()
 {
 
-}
+	if(getpid() != parent_pid) // if we're a child process, we must not close the handles
+		return;
 
+	for (std::vector<int>::iterator it = server_sockets.begin();
+		it != server_sockets.end(); ++it)
+	{
+		printf("Closing server socket %i\n", *it);
+		close(*it);
+		sleep(1);
+	}
 
+	for (std::vector<std::string>::iterator it = listen_unlink.begin();
+		it != listen_unlink.end(); ++it)
+		unlink(it->c_str());
 
-FastCGIServer::Connection::Connection() :
-	close_responsibility(false),
-	close_socket(false)
-{
+	for (std::map<int, Connection*>::iterator it = client_sockets.begin();
+		it != client_sockets.end(); ++it)
+	{
+		close(it->first);
+		for (RequestList::iterator req_it = it->second->requests.begin();
+			req_it != it->second->requests.end(); ++req_it)
+			delete req_it->second;
+		delete it->second;
+	}
 
-}
-
-FastCGIServer::FastCGIServer()
-{
+	sleep(1);
+	server_sockets.clear();
 
 }
 
 FastCGIServer::~FastCGIServer()
 {
-
-	if(my_pid != parent_pid) // if we're a child process, we must not close the handles
-		return;
-
-	for (std::vector<int>::iterator it = listen_sockets.begin();
-				it != listen_sockets.end(); ++it)
-	close(*it);
-
-	for (std::vector<std::string>::iterator it = listen_unlink.begin();
-				it != listen_unlink.end(); ++it)
-	unlink(it->c_str());
-
-	for (std::map<int, Connection*>::iterator it = read_sockets.begin();
-				it != read_sockets.end(); ++it) {
-	close(it->first);
-	for (RequestList::iterator req_it = it->second->requests.begin();
-					req_it != it->second->requests.end(); ++req_it)
-				delete req_it->second;
-	delete it->second;
-	}
-
+	shutdown();
 }
 
+int
+FastCGIServer::listen_http(unsigned tcp_port)
+{
+	int server_socket = listen(tcp_port);
+	server_socket_types[server_socket] = 'H';
+	return server_socket;
+}
 
-void
+int
 FastCGIServer::listen(unsigned tcp_port)
 {
-	int listen_socket = socket(PF_INET, SOCK_STREAM, 0);
-	if (listen_socket == -1)
-	throw std::runtime_error("socket() failed");
+	int server_socket = socket(PF_INET, SOCK_STREAM, 0);
+	if (server_socket == -1)
+		throw std::runtime_error("socket() failed");
 
 	try {
-	struct sockaddr_in sa;
-	bzero(&sa, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_port = htons(tcp_port);
-	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	if (bind(listen_socket, (struct sockaddr*)&sa, sizeof(sa)) == -1)
-				throw std::runtime_error("bind() failed");
 
-	if (::listen(listen_socket, 100))
-				throw std::runtime_error("listen() failed");
+		int iSetOption = 1;
+		setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption,
+			sizeof(iSetOption));
 
-	listen_sockets.push_back(listen_socket);
+		struct sockaddr_in sa;
+		bzero(&sa, sizeof(sa));
+		sa.sin_family = AF_INET;
+		sa.sin_port = htons(tcp_port);
+		sa.sin_addr.s_addr = htonl(INADDR_ANY);
+		if (bind(server_socket, (struct sockaddr*)&sa, sizeof(sa)) == -1)
+			throw std::runtime_error("bind() failed");
 
+		if (::listen(server_socket, 100))
+			throw std::runtime_error("listen() failed");
+
+		server_sockets.push_back(server_socket);
 	} catch (...) {
-	close(listen_socket);
-	throw;
+		close(server_socket);
+		throw;
 	}
+
+	server_socket_types[server_socket] = 'F';
+	printf("(P) listening to #%i port %i\n", server_socket, tcp_port);
+	return server_socket;
 }
 
-
-void
+int
 FastCGIServer::listen(const std::string& local_path)
 {
-	int listen_socket = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (listen_socket == -1)
+	int server_socket = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (server_socket == -1)
 	throw std::runtime_error("socket() failed");
 
 	try {
-	struct sockaddr_un sa;
-	bzero(&sa, sizeof(sa));
-	sa.sun_family = AF_LOCAL;
+		struct sockaddr_un sa;
+		bzero(&sa, sizeof(sa));
+		sa.sun_family = AF_LOCAL;
 
-	std::string::size_type size = local_path.size();
-	if (size >= sizeof(sa.sun_path))
-				throw std::runtime_error("path too long");
-	if (local_path.find_first_of('\0') != std::string::npos)
-				throw std::runtime_error("null character in path");
+		std::string::size_type size = local_path.size();
+		if (size >= sizeof(sa.sun_path))
+			throw std::runtime_error("path too long");
+		if (local_path.find_first_of('\0') != std::string::npos)
+			throw std::runtime_error("null character in path");
 
-	std::memcpy(sa.sun_path, local_path.data(), size);
+		std::memcpy(sa.sun_path, local_path.data(), size);
 
-	unlink(local_path.c_str());
-	try {
-				if (bind(listen_socket, (struct sockaddr*)&sa,
-					sizeof(sa) - (sizeof(sa.sun_path) - size - 1)) == -1)
-					throw std::runtime_error("bind() failed");
+		unlink(local_path.c_str());
+		try {
+			if (bind(server_socket, (struct sockaddr*)&sa,
+				sizeof(sa) - (sizeof(sa.sun_path) - size - 1)) == -1)
+				throw std::runtime_error("bind() failed");
 
-				if (::listen(listen_socket, 100))
-					throw std::runtime_error("listen() failed");
+			if (::listen(server_socket, 100))
+				throw std::runtime_error("listen() failed");
 
-				listen_sockets.push_back(listen_socket);
-				listen_unlink.push_back(local_path);
+			server_sockets.push_back(server_socket);
+			listen_unlink.push_back(local_path);
+
+			printf("(P) listening to #%i socket %s\n", server_socket, local_path.c_str());
+
+		} catch (...) {
+			unlink(local_path.c_str());
+			throw;
+		}
 
 	} catch (...) {
-				unlink(local_path.c_str());
-				throw;
+		close(server_socket);
+		throw;
 	}
-
-	} catch (...) {
-	close(listen_socket);
-	throw;
-	}
+	return server_socket;
 }
 
-
-void
-FastCGIServer::abandon_files()
+int
+FastCGIServer::send_output_buffer(Connection& con)
 {
-	listen_unlink.clear();
+	int write_result = write(con.client_socket,
+		con.output_buffer.data(),
+		con.output_buffer.size());
+	if (write_result == -1)
+		throw std::runtime_error("write() failed");
+	con.output_buffer.erase(0, write_result);
+	return write_result;
 }
-
 
 void
 FastCGIServer::process(int timeout_ms)
 {
-	char buffer[4096];
+	char buffer[64*1024];
 	fd_set fs_read;
 	fd_set fs_write;
 	int nfd = 0;
@@ -187,16 +199,16 @@ FastCGIServer::process(int timeout_ms)
 	FD_ZERO(&fs_read);
 	FD_ZERO(&fs_write);
 
-	for(auto socket_handle : listen_sockets)
+	for(auto socket_handle : server_sockets)
 	{
 		FD_SET(socket_handle, &fs_read);
 		nfd = std::max(nfd, socket_handle);
 	}
 
-	for(auto con : read_sockets)
+	for(auto con : client_sockets)
 	{
 		FD_SET(con.first, &fs_read);
-		if (!con.second->output_buffer.empty())
+		if (!con.second->output_buffer.empty() || con.second->close_socket)
 			FD_SET(con.first, &fs_write);
 		nfd = std::max(nfd, con.first);
 	}
@@ -209,18 +221,29 @@ FastCGIServer::process(int timeout_ms)
 	else
 		throw std::runtime_error("select() failed");
 
-	for(auto socket_handle : listen_sockets)
+	for(auto socket_handle : server_sockets)
 	if (FD_ISSET(socket_handle, &fs_read))
 	{
-		int posix_con = accept(socket_handle, NULL, NULL);
-		if (posix_con == -1)
+		int client_socket = accept(socket_handle, NULL, NULL);
+		if (client_socket == -1)
 			throw std::runtime_error("accept() failed");
-		read_sockets[posix_con] = new Connection();
-		read_sockets[posix_con]->posix_con = posix_con;
+		printf("Opening socket %i\n", client_socket);
+		client_sockets[client_socket] = new Connection();
+		client_sockets[client_socket]->client_socket = client_socket;
+		client_sockets[client_socket]->server_socket = socket_handle;
+		client_sockets[client_socket]->type = server_socket_types[socket_handle];
+		if(client_sockets[client_socket]->type == 'H')
+		{
+			FastCGIRequest* new_request = new FastCGIRequest();
+			new_request->resources.client_socket = client_socket;
+			new_request->resources.server_socket = socket_handle;
+			new_request->stats.time_init = microtime();
+			client_sockets[client_socket]->requests[client_socket] = new_request;
+		}
 	}
 
-	for (std::map<int, Connection*>::iterator it = read_sockets.begin();
-		it != read_sockets.end();)
+	for (std::map<int, Connection*>::iterator it = client_sockets.begin();
+		it != client_sockets.end();)
 	{
 		int read_socket = it->first;
 
@@ -229,39 +252,62 @@ FastCGIServer::process(int timeout_ms)
 			int read_result = read(read_socket, buffer, sizeof(buffer));
 			if (read_result == -1)
 				if (errno == ECONNRESET)
-				goto close_socket;
+					goto close_socket;
 				else
-				throw std::runtime_error("read() on socket failed");
-			if (read_result == 0)
-				it->second->close_socket = true;
-			else {
+					throw std::runtime_error("read() on socket failed");
+				if (read_result == 0)
+				{
+					if(it->second->type == 'H' && it->second->input_buffer != "")
+					{
+						process_http_request(
+							*client_sockets[it->second->client_socket]->requests[it->second->client_socket],
+							it->second->input_buffer);
+						if(it->second->close_socket || !it->second->output_buffer.empty())
+							it->second->input_buffer = "";
+						else
+							it->second->close_socket = true;
+					}
+					else
+					{
+						it->second->close_socket = true;
+				}
+			}
+			else
+			{
 				it->second->input_buffer.append(buffer, read_result);
-				process_connection_read(*it->second);
+					if(it->second->type == 'H')
+					{
+						process_http_request(
+							*client_sockets[it->second->client_socket]->requests[it->second->client_socket],
+							it->second->input_buffer);
+						if(it->second->close_socket || !it->second->output_buffer.empty())
+							it->second->input_buffer = "";
+					}
+					else
+					{
+						read_fgci(*it->second);
+				}
 			}
 		}
 
 		if (!it->second->output_buffer.empty() &&
 				FD_ISSET(read_socket, &fs_write))
 		{
-			process_connection_write(*it->second);
-			int write_result = write(read_socket,
-				it->second->output_buffer.data(),
-				it->second->output_buffer.size());
-			if (write_result == -1)
-				throw std::runtime_error("write() failed");
-			it->second->output_buffer.erase(0, write_result);
+			write_fgci(*it->second);
+			send_output_buffer(*it->second);
 		}
 
 		if (it->second->close_socket && it->second->output_buffer.empty())
 		{
 		close_socket:
+			printf("Closing socket %i\n", it->first);
 			int close_result = close(it->first);
 			if (close_result == -1 && errno != ECONNRESET)
 				throw std::runtime_error("close() failed");
 			Connection* connection = it->second;
-			read_sockets.erase(it++);
+			client_sockets.erase(it++);
 			delete connection;
-			if(calls_until_termination != -1 && read_sockets.size() == 0)
+			if(calls_until_termination != -1 && client_sockets.size() == 0)
 			{
 				calls_until_termination -= 1;
 				if(calls_until_termination <= 0)
@@ -272,6 +318,54 @@ FastCGIServer::process(int timeout_ms)
 	}
 }
 
+void
+FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
+{
+	auto header_end = data.find("\r\n\r\n");
+	if(header_end == String::npos)
+		return;
+
+	if(request.params.size() == 0)
+	{
+		request.params = split_http_headers(data.substr(0, header_end));
+		request.flags.params_closed = true;
+		if(request.params["HTTP_SCRIPT_FILENAME"] != "")
+			request.params["SCRIPT_FILENAME"] = request.params["HTTP_SCRIPT_FILENAME"];
+		else if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
+		{
+			String document_root = first(request.params["DOCUMENT_ROOT"], get_cwd());
+			if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
+				document_root.resize(document_root.length()-1);
+			request.params["DOCUMENT_ROOT"] = document_root;
+			request.params["SCRIPT_FILENAME"] = document_root + request.params["DOCUMENT_URI"];
+		}
+	}
+
+	request.in = data.substr(header_end + 4);
+	u64 content_length = int_val(first(request.params["CONTENT_LENGTH"], "0"));
+	if(request.in.length() < content_length)
+		return;
+	request.flags.input_closed = true;
+
+	if(request.params["HTTP_UPGRADE"] == "websocket")
+	{
+		printf("(i) got upgrade request %s\n", var_dump(request.params).c_str());
+		client_sockets[request.resources.client_socket]->close_socket = true;
+	}
+	else
+	{
+		on_complete(request);
+
+		assemble_output_buffer(
+			request,
+			client_sockets[request.resources.client_socket]);
+
+		printf("data written: %i bytes\n",
+			client_sockets[request.resources.client_socket]->output_buffer.size());
+
+		client_sockets[request.resources.client_socket]->close_socket = true;
+	}
+}
 
 void
 FastCGIServer::process_forever()
@@ -280,18 +374,8 @@ FastCGIServer::process_forever()
 	process();
 }
 
-int
-FastCGIServer::call_completion_handler(FastCGIRequest& request)
-{
-	//printf("- request complete\n");
-	////switch_to_arena(request.mem);
-	auto result = on_complete(request);
-	////switch_to_system_alloc();
-	return(result);
-}
-
 void
-FastCGIServer::process_connection_read(Connection& connection)
+FastCGIServer::read_fgci(Connection& connection)
 {
 	std::string::size_type n = 0;
 	while (connection.input_buffer.size() - n >= FCGI_HEADER_LEN) {
@@ -316,7 +400,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 	{
 		case FCGI_GET_VALUES:
 		{
-			Pairs pairs = parse_pairs(content, content_length);
+			Pairs pairs = parse_pairs_fcgi(content, content_length);
 
 			std::string::size_type base = connection.output_buffer.size();
 			connection.output_buffer.push_back(FCGI_VERSION_1);
@@ -325,13 +409,13 @@ FastCGIServer::process_connection_read(Connection& connection)
 
 			for (Pairs::iterator it = pairs.begin(); it != pairs.end(); ++it)
 				if (it->first == FCGI_MAX_CONNS)
-				write_pair(connection.output_buffer,
+				write_pair_fcgi(connection.output_buffer,
 							it->first, std::string("100"));
 				else if (it->first == FCGI_MAX_REQS)
-				write_pair(connection.output_buffer,
+				write_pair_fcgi(connection.output_buffer,
 							it->first, std::string("1000"));
 				else if (it->first == FCGI_MPXS_CONNS)
-				write_pair(connection.output_buffer,
+				write_pair_fcgi(connection.output_buffer,
 							it->first, std::string("1"));
 
 			std::string::size_type len = connection.output_buffer.size() - base;
@@ -361,7 +445,7 @@ FastCGIServer::process_connection_read(Connection& connection)
 				connection.output_buffer.append(
 				reinterpret_cast<const char*>(&unknown), sizeof(unknown));
 				if (connection.close_responsibility)
-				connection.close_socket = true;
+					connection.close_socket = true;
 				break;
 			}
 
@@ -382,12 +466,10 @@ FastCGIServer::process_connection_read(Connection& connection)
 				printf("(!) %i requests in flight at the same time!\n", connection.requests.size());
 			}
 
-			//switch_to_arena(request_arena);
-			RequestInfo* new_request = new RequestInfo();
-			new_request->resources.fcgi_socket = connection.posix_con;
-		    //new_request->mem = request_arena;
+			FastCGIRequest* new_request = new FastCGIRequest();
+			new_request->resources.client_socket = connection.client_socket;
+			new_request->resources.server_socket = connection.server_socket;
 			new_request->stats.time_init = microtime();
-			//switch_to_system_alloc();
 			connection.requests[request_id] = new_request;
 
 			break;
@@ -420,25 +502,26 @@ FastCGIServer::process_connection_read(Connection& connection)
 			if (it == connection.requests.end())
 				break;
 
-			RequestInfo& request = *it->second;
+			FastCGIRequest& request = *it->second;
 			//switch_to_arena(it->second->mem);
-			if (!request.params_closed)
+			if (!request.flags.params_closed)
 				if (content_length != 0)
-				request.params_buffer.append(content, content_length);
+					request.resources.params_buffer.append(content, content_length);
 				else {
-				request.params = parse_pairs(request.params_buffer.data(),
-							request.params_buffer.size());
-				request.params_buffer.clear();
-				request.params_closed = true;
-
-				request.status = on_request(request);
-				if (request.status == 0 && !request.in.empty())
-				{
-					request.status = on_data(request);
-					if (request.status == 0 && request.in_closed)
-						request.status = call_completion_handler(request);
-				}
-				process_write_request(connection, request_id, request);
+					request.params = parse_pairs_fcgi(
+						request.resources.params_buffer.data(),
+						request.resources.params_buffer.size());
+					request.resources.params_buffer.clear();
+					request.flags.params_closed = true;
+					//std::cout << "Params " << var_dump(request.params) << "\n";
+					request.flags.status = on_request(request);
+					if (request.flags.status == 0 && !request.in.empty())
+					{
+						request.flags.status = on_data(request);
+						if (request.flags.status == 0 && request.flags.input_closed)
+							request.flags.status = on_complete(request);
+					}
+					request_write_fgci(connection, request_id, request);
 				}
 			//switch_to_system_alloc();
 			break;
@@ -449,22 +532,22 @@ FastCGIServer::process_connection_read(Connection& connection)
 			if (it == connection.requests.end())
 				break;
 
-			RequestInfo& request = *it->second;
+			FastCGIRequest& request = *it->second;
 			//switch_to_arena(it->second->mem);
-			if (!request.in_closed)
+			if (!request.flags.input_closed)
 				if (content_length != 0) {
-				request.in.append(content, content_length);
-				if (request.params_closed && request.status == 0)
-				{
-					request.status = on_data(request);
-					process_write_request(connection, request_id, request);
-				}
+					request.in.append(content, content_length);
+					if (request.flags.params_closed && request.flags.status == 0)
+					{
+						request.flags.status = on_data(request);
+						request_write_fgci(connection, request_id, request);
+					}
 				} else {
-				request.in_closed = true;
-				if (request.params_closed && request.status == 0) {
-							request.status = call_completion_handler(request);
-							process_write_request(connection, request_id, request);
-				}
+					request.flags.input_closed = true;
+					if (request.flags.params_closed && request.flags.status == 0) {
+								request.flags.status = on_complete(request);
+								request_write_fgci(connection, request_id, request);
+					}
 				}
 			//switch_to_system_alloc();
 			break;
@@ -490,56 +573,70 @@ FastCGIServer::process_connection_read(Connection& connection)
 	connection.input_buffer.erase(0, n);
 }
 
+void
+FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* connection)
+{
+	request.out =
+		request.response_code+"\r\n"+
+		var_dump(request.header, "", "\r\n") +
+		var_dump(request.set_cookies, "", "\r\n") +
+		"\r\n";
+
+	for(auto obs : request.ob_stack)
+	{
+		request.out += obs->str();
+		delete obs;
+	}
+	request.ob_stack.clear();
+	request.flags.output_closed = true;
+	request.stats.time_end = microtime();
+	if(request.flags.log_request)
+		printf("(r) pid:%i\t%s\t%0.6fs\tfps:%0.0f\tout:%0.1fkB\tmem:%0.0f/%0.0fkB\n",
+			my_pid,
+			request.params["REQUEST_URI"].c_str(),
+			request.stats.time_end - request.stats.time_start,
+			1.0 / (request.stats.time_end - request.stats.time_start),
+			(f32)(request.out.length()/1024),
+			(f32)(request.stats.mem_high/1024),
+			(f32)(request.stats.mem_alloc/1024)
+		);
+
+	if(connection)
+	{
+		connection->output_buffer.clear();
+		connection->output_buffer.append(request.out);
+		request.out.clear();
+	}
+
+}
 
 void
-FastCGIServer::process_write_request(Connection& connection, RequestID id,
-												RequestInfo& request)
+FastCGIServer::request_write_fgci(Connection& connection, RequestID id,
+												FastCGIRequest& request)
 {
 	if (!request.out.empty())
 	{
-		write_data(connection.output_buffer, id, request.out, FCGI_STDOUT);
+		write_data_fcgi(connection.output_buffer, id, request.out, FCGI_STDOUT);
 		//switch_to_arena(request.mem);
 		request.out.clear();
 		//switch_to_system_alloc();
 	}
 	if (!request.err.empty())
 	{
-		write_data(connection.output_buffer, id, request.err, FCGI_STDERR);
+		write_data_fcgi(connection.output_buffer, id, request.err, FCGI_STDERR);
 		//switch_to_arena(request.mem);
 		request.err.clear();
 		//switch_to_system_alloc();
 	}
-	if ((request.in_closed || request.status != 0) &&
-				!request.output_closed)
+	if ((request.flags.input_closed || request.flags.status != 0) &&
+		!request.flags.output_closed)
 	{
 		//switch_to_arena(request.mem);
-		request.out =
-			var_dump(request.header, "", "\r\n") +
-			var_dump(request.set_cookies, "", "\r\n") +
-			"\r\n";
-
-		for(auto obs : request.ob_stack)
-		{
-			request.out += obs->str();
-			delete obs;
-		}
-		request.ob_stack.clear();
+		assemble_output_buffer(request);
 
 		//switch_to_system_alloc();
-		write_data(connection.output_buffer, id, request.out, FCGI_STDOUT);
-		write_data(connection.output_buffer, id, request.err, FCGI_STDERR);
-
-		request.stats.time_end = microtime();
-		if(request.flags.log_request)
-			printf("(r) pid:%i\t%s\t%0.6fs\tfps:%0.0f\tout:%0.1fkB\tmem:%0.0f/%0.0fkB\n",
-				my_pid,
-				request.params["REQUEST_URI"].c_str(),
-				request.stats.time_end - request.stats.time_start,
-				1.0 / (request.stats.time_end - request.stats.time_start),
-				(f32)(request.out.length()/1024),
-				(f32)(request.stats.mem_high/1024),
-				(f32)(request.stats.mem_alloc/1024)
-			);
+		write_data_fcgi(connection.output_buffer, id, request.out, FCGI_STDOUT);
+		write_data_fcgi(connection.output_buffer, id, request.err, FCGI_STDERR);
 
 		FCGI_EndRequestRecord complete;
 		bzero(&complete, sizeof(complete));
@@ -548,17 +645,17 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 		complete.header.requestIdB1 = (id >> 8) & 0xff;
 		complete.header.requestIdB0 = id & 0xff;
 		complete.header.contentLengthB0 = sizeof(complete.body);
-		complete.body.appStatusB3 = (request.status >> 24) & 0xff;
-		complete.body.appStatusB2 = (request.status >> 16) & 0xff;
-		complete.body.appStatusB1 = (request.status >> 8) & 0xff;
-		complete.body.appStatusB0 = request.status & 0xff;
+		complete.body.appStatusB3 = (request.flags.status >> 24) & 0xff;
+		complete.body.appStatusB2 = (request.flags.status >> 16) & 0xff;
+		complete.body.appStatusB1 = (request.flags.status >> 8) & 0xff;
+		complete.body.appStatusB0 = request.flags.status & 0xff;
 		complete.body.protocolStatus = FCGI_REQUEST_COMPLETE;
 		connection.output_buffer.append(
 					reinterpret_cast<const char*>(&complete), sizeof(complete));
 		if (connection.close_responsibility)
 					connection.close_socket = true;
 
-		request.output_closed = true;
+
 		//printf("- output done\n");
 	}
 	//switch_to_system_alloc();
@@ -566,16 +663,16 @@ FastCGIServer::process_write_request(Connection& connection, RequestID id,
 
 
 void
-FastCGIServer::process_connection_write(Connection& connection)
+FastCGIServer::write_fgci(Connection& connection)
 {
 	for (RequestList::iterator it = connection.requests.begin();
 				it != connection.requests.end();)
 	{
-		process_write_request(connection, it->first, *it->second);
-		if (it->second->params_closed && it->second->in_closed)
+		request_write_fgci(connection, it->first, *it->second);
+		if (it->second->flags.params_closed && it->second->flags.input_closed)
 		{
 			//switch_to_arena(it->second->mem);
-			//printf("- process_connection_write close\n");
+			//printf("- write_fgci close\n");
 			delete it->second;
 			//switch_to_system_alloc();
 			connection.requests.erase(it++);
@@ -587,7 +684,7 @@ FastCGIServer::process_connection_write(Connection& connection)
 
 
 FastCGIServer::Pairs
-FastCGIServer::parse_pairs(const char* data, std::string::size_type n)
+FastCGIServer::parse_pairs_fcgi(const char* data, std::string::size_type n)
 {
 	Pairs pairs;
 
@@ -633,7 +730,7 @@ FastCGIServer::parse_pairs(const char* data, std::string::size_type n)
 
 
 void
-FastCGIServer::write_pair(std::string& buffer,
+FastCGIServer::write_pair_fcgi(std::string& buffer,
 							const std::string& key, const std::string& value)
 {
 	if (key.size() > 0x7f) {
@@ -658,7 +755,7 @@ FastCGIServer::write_pair(std::string& buffer,
 
 
 void
-FastCGIServer::write_data(std::string& buffer, RequestID id,
+FastCGIServer::write_data_fcgi(std::string& buffer, RequestID id,
 							const std::string& input, unsigned char type)
 {
 	FCGI_Header header;

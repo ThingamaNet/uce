@@ -11,7 +11,8 @@ String trim(String raw);
 StringList split_space(String str);
 StringList split(String str, String delim);
 StringList split_utf8(String s, bool compound_characters = false);
-StringMap split_kv(String s, char separator = '=', bool trim_whitespace = true);
+StringMap split_kv(String s, char separator = '=', bool trim_whitespace = true, bool uppercase_keys = false);
+StringMap split_http_headers(String s);
 String join(StringList l, String delim = "\n");
 String nibble(String& haystack, String delim);
 void json_consume_space(String s, u32& i);
@@ -84,9 +85,10 @@ String var_dump(StringMap map, String prefix = "", String postfix = "\n");
 String var_dump(StringList slist, String prefix = "", String postfix = "\n");
 
 void ob_start();
-void ob_clear();
-String ob_get_clear();
+void ob_close();
 String ob_get();
+String ob_get_close();
+
 String safe_name(String raw);
 
 #define is_bit_set(var,pos) ((var) & (1<<(pos)))

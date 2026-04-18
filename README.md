@@ -8,6 +8,24 @@ This is in the early stages of development. Don't use this for anything importan
 
 The aim of this project is to make a PHP-like runtime that enables server-side "scripting" using C/C++. At the core is a multi-worker FastCGI server that can be talked to from Nginx or similar front-end servers. UCE has a shared-nothing isolated architecture to serve page requests. To minimize the potential for memory leaks, UCE uses a per-request memory arena. UCE also provides a PHP-like API to ease web development. Advanced features such as an integrated WebSockets broker are planned. UCE aims to use minimal dependencies (at the moment, the only dependency is the Clang compiler). UCE pages are automatically recompiled and dynamically reloaded as necessary.
 
+## Service Setup
+
+The repository now includes a systemd unit template and a management script for the FastCGI runtime:
+
+- `scripts/systemd/uce.service`
+- `scripts/systemd/manage-uce-service.sh`
+
+Typical usage on the deployment host:
+
+```bash
+scripts/systemd/manage-uce-service.sh setup
+scripts/systemd/manage-uce-service.sh status
+scripts/systemd/manage-uce-service.sh restart
+scripts/systemd/manage-uce-service.sh logs 200
+```
+
+The service runs the runtime from the repository root so `COMPILER_SYS_PATH` resolves correctly and nginx can forward `.uce` requests to the Unix socket defined in `/etc/uce/settings.cfg`.
+
 # API
 
 Memcache Functions

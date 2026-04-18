@@ -1,0 +1,11 @@
+:sig
+void ob_close()
+
+:params
+(none)
+
+:desc
+Discard the current output buffer. If are more output buffers on the stack, switch to the next one.
+
+:see
+>ob

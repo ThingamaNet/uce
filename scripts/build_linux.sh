@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 cd ..
 
 BUILDMODE=${2:-"debug"}
-OPT_FLAG="O3"
+OPT_FLAG="O0"
 GF="uce_fastcgi"
 
 mkdir bin > /dev/null 2>&1

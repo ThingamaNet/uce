@@ -6,7 +6,7 @@ String var_dump(StringMap map, String prefix, String postfix)
 
 	for (auto it = map.begin(); it != map.end(); ++it)
 	{
-		result.append(prefix + it->first + ": " + it->second + postfix);
+		result.append(prefix + to_upper(it->first) + ": " + it->second + postfix);
 	}
 
 	return(result);
@@ -42,25 +42,15 @@ u8 hex_to_u8(String src)
 
 String to_lower(String s)
 {
-	String result = "";
-	for(auto c : s)
-	{
-		if(c >= 'A' && c <= 'Z')
-			c = tolower(c);
-		result.append(1, c);
-	}
+	String result = s;
+	std::transform(result.begin(), result.end(),result.begin(), ::tolower);
 	return(result);
 }
 
 String to_upper(String s)
 {
-	String result = "";
-	for(auto c : s)
-	{
-		if(c >= 'A' && c <= 'Z')
-			c = toupper(c);
-		result.append(1, c);
-	}
+	String result = s;
+	std::transform(result.begin(), result.end(),result.begin(), ::toupper);
 	return(result);
 }
 
@@ -140,7 +130,7 @@ StringList split(String str, String delim)
     return(result);
 }
 
-StringMap split_kv(String s, char separator, bool trim_whitespace)
+StringMap split_kv(String s, char separator, bool trim_whitespace, bool uppercase_keys)
 {
 	StringMap result;
 	String k;
@@ -157,7 +147,7 @@ StringMap split_kv(String s, char separator, bool trim_whitespace)
 				if(c == separator)
 					mode = 1;
 				else
-					k.append(1, c);
+					k.append(1, uppercase_keys ? toupper(c) : c);
 			}
 			else
 			{
@@ -172,6 +162,68 @@ StringMap split_kv(String s, char separator, bool trim_whitespace)
 				result[k] = v;
 		}
 	}
+	return(result);
+}
+
+StringMap split_http_headers(String s)
+{
+	StringMap result;
+	String k;
+	String v;
+	String query_string;
+	String base_uri;
+	for(auto s : split(s, "\n"))
+	{
+		u8 mode = 0;
+		k = "";
+		v = "";
+		for(auto c : s)
+		{
+			if(mode == 0)
+			{
+				if(c == ':')
+					mode = 1;
+				else
+					k.append(1, c);
+			}
+			else
+			{
+				v.append(1, c);
+			}
+		}
+		if(k != "")
+		{
+			k = trim(k);
+			v = trim(v);
+			if(v == "")
+			{
+				if(result["REQUEST_METHOD"] == "")
+				{
+					result["REQUEST_METHOD"] = nibble(k, " ");
+					result["REQUEST_URI"] = nibble(k, " ");
+					String query_string = result["REQUEST_URI"];
+					String base_uri = nibble(query_string, "?");
+					result["SERVER_PROTOCOL"] = k;
+					result["SCRIPT_NAME"] = base_uri;
+					result["DOCUMENT_URI"] = base_uri;
+					result["QUERY_STRING"] = query_string;
+				}
+				else
+				{
+					if(k != "")
+						result["_"] = k;
+				}
+				}
+				else
+				{
+					String header_key = to_upper(k);
+					std::replace(header_key.begin(), header_key.end(), '-', '_');
+					result["HTTP_"+header_key] = v;
+					if(header_key == "CONTENT_TYPE" || header_key == "CONTENT_LENGTH")
+						result[header_key] = v;
+				}
+			}
+		}
 	return(result);
 }
 

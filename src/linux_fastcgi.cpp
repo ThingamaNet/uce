@@ -70,8 +70,8 @@ int handle_complete(FastCGIRequest& request) {
 		}
 	}
 
-	// printf("(i) request ready\n");
-    render_file(request.params["SCRIPT_FILENAME"]);
+	DTree call_param;
+	compiler_invoke(&request, request.params["SCRIPT_FILENAME"], call_param);
 
 	for( auto &f : request.uploaded_files)
 	{
@@ -84,6 +84,20 @@ int handle_complete(FastCGIRequest& request) {
 	cleanup_mysql_connections();
 
     return 0;
+}
+
+volatile bool termination_signal_received = false;
+
+void on_terminate(int sig)
+{
+	if(termination_signal_received)
+		return;
+	termination_signal_received = true;
+	if(getpid() != parent_pid)
+		exit(1);
+	printf("Terminating... PID %i:%i\n", getpid(), parent_pid);
+	server.shutdown();
+	exit(1);
 }
 
 void listen_for_connections()
@@ -119,25 +133,27 @@ void init_base_process()
 
 	server_state.config["COMPILE_SCRIPT"] =
 		server_state.config["COMPILER_SYS_PATH"] + "/" + server_state.config["COMPILE_SCRIPT"];
-	if(server_state.config["LISTEN_PORT"] != "")
-		server.listen(int_val(server_state.config["LISTEN_PORT"]));
+
+	if(server_state.config["FCGI_PORT"] != "")
+		server.listen(int_val(server_state.config["FCGI_PORT"]));
 
 	printf("%s\n", var_dump(server_state.config).c_str());
 
-	if(server_state.config["SOCKET_PATH"] != "")
+	if(server_state.config["FCGI_SOCKET_PATH"] != "")
 	{
-		server.listen(server_state.config["SOCKET_PATH"]);
-		chmod(server_state.config["SOCKET_PATH"].c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+		server.listen(server_state.config["FCGI_SOCKET_PATH"]);
+		chmod(server_state.config["FCGI_SOCKET_PATH"].c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	}
 
-	//dirname(server_state.config.COMPILER_SYS_PATH);
-	//basename(server_state.config.COMPILER_SYS_PATH);
+	if(server_state.config["HTTP_PORT"] != "")
+		server.listen_http(int_val(server_state.config["HTTP_PORT"]));
 
 	mkdir(server_state.config["BIN_DIRECTORY"]);
 	mkdir(server_state.config["TMP_UPLOAD_PATH"]);
 	mkdir(server_state.config["SESSION_PATH"]);
 
 	signal(SIGCHLD, on_child_exit);
+	signal(SIGINT, on_terminate);
 	srand(time());
 }
 
@@ -187,7 +203,8 @@ int main(int argc, char** argv)
 					}
 				}
 			}
-			spawn_subprocess(listen_for_connections);
+			if(!termination_signal_received)
+				spawn_subprocess(listen_for_connections);
 		}
 		sleep(1);
 	}

@@ -41,65 +41,55 @@
 
 class FastCGIServer {
 public:
-	FastCGIServer();
 	~FastCGIServer();
+	void shutdown();
 
 	// called when the parameters and standard input have been receieved
 	std::function<int(FastCGIRequest&)> on_request = 0;
 	std::function<int(FastCGIRequest&)> on_data = 0;
 	std::function<int(FastCGIRequest&)> on_complete = 0;
 
-	void listen(unsigned tcp_port);
-	void listen(const std::string& local_path);
-	void abandon_files();
+	int listen(unsigned tcp_port);
+	int listen_http(unsigned tcp_port);
+	int listen(const std::string& local_path);
 
 	void process(int timeout_ms = -1); // timeout_ms<0 blocks forever
 	void process_forever();
 	int calls_until_termination = 8; // set this to -1 to never terminate
 
-	int call_completion_handler(FastCGIRequest& request);
-
-protected:
-	struct RequestInfo : FastCGIRequest {
-		RequestInfo();
-
-		std::string params_buffer;
-		bool params_closed;
-		bool in_closed;
-		int status;
-		bool output_closed;
-
-		friend class FastCGIServer;
-	};
-
 	typedef unsigned RequestID;
-	typedef std::map<RequestID, RequestInfo*> RequestList;
-	struct Connection {
-		Connection();
+	typedef std::map<RequestID, FastCGIRequest*> RequestList;
 
+	struct Connection {
 		RequestList requests;
-		u64 posix_con = 0;
+		u64 client_socket = 0;
+		u64 server_socket = 0;
 		std::string input_buffer;
 		std::string output_buffer;
-		bool close_responsibility;
-		bool close_socket;
+		bool close_responsibility = false;
+		bool close_socket = false;
+		char type = 'F'; // F = FastCGI, H = HttpServer
 	};
 
 	typedef StringMap Pairs;
 
-	std::vector<int> listen_sockets;
+	std::vector<int> server_sockets;
 	std::vector<std::string> listen_unlink;
 
-	std::map<int, Connection*> read_sockets;
+	std::map<int, char> server_socket_types;
+	std::map<int, Connection*> client_sockets;
 
-	void process_connection_read(Connection&);
-	static void process_write_request(Connection&, RequestID, RequestInfo&);
-	static void process_connection_write(Connection&);
-	static Pairs parse_pairs(const char*, std::string::size_type);
-	static void write_pair(std::string& buffer,
+	void read_fgci(Connection&);
+	static void request_write_fgci(Connection&, RequestID, FastCGIRequest&);
+	static void write_fgci(Connection&);
+	static Pairs parse_pairs_fcgi(const char*, std::string::size_type);
+	static void write_pair_fcgi(std::string& buffer,
 		const std::string& key, const std::string&);
-	static void write_data(std::string& buffer, RequestID id,
+	static void write_data_fcgi(std::string& buffer, RequestID id,
 		const std::string& input, unsigned char type);
+	static void assemble_output_buffer(FastCGIRequest& request, Connection* connection = 0);
+	int send_output_buffer(Connection& con);
+	void process_http_request(FastCGIRequest& request, String& data);
 
 };
 
