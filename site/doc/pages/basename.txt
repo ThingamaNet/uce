@@ -10,3 +10,7 @@ Isolates the file name component from a path/file name.
 
 :see
 >sys
+
+:related
+**PHP:** `basename()`
+**JavaScript / Node.js:** Node `path.basename()`

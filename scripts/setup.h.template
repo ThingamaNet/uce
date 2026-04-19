@@ -3,7 +3,7 @@
 
 /*load_declarations*/
 
-extern "C" void set_current_request(Request* _request)
+extern "C" void __uce_set_current_request(Request* _request)
 {
 	context = _request;
 	/*load_units*/

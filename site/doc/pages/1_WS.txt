@@ -12,15 +12,15 @@ UCE reassembles fragmented messages before calling `WS(Request& context)`. Text 
 
 The current message data is available in `context.call`:
 
-context.call["message"] : current message payload
+- `context.call["message"]`: current message payload
+- `context.call["connection_id"]`: sender connection ID
+- `context.call["scope"]`: current endpoint scope
+- `context.call["opcode"]`: WebSocket opcode of the current message
+- `context.call["document_uri"]`: request URI of the current endpoint
 
-context.call["connection_id"] : sender connection ID
-
-context.call["scope"] : current endpoint scope
-
-context.call["opcode"] : WebSocket opcode of the current message
-
-context.call["document_uri"] : request URI of the current endpoint
+:related
+**PHP:** Ratchet `onMessage`, Workerman WebSocket handlers, or lower-level callbacks around accepted socket connections.
+**JavaScript / Node.js:** Browser `WebSocket` `message` handlers and Node `ws` server `connection` and `message` callbacks.
 
 :see
 >websocket

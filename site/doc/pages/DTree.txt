@@ -9,20 +9,24 @@ Dynamic tree/container type used throughout UCE for structured data.
 Use `t["key"]` to access or create child entries. Use `push()` / `pop()` when treating it like an array-like container with numeric string keys.
 
 Common uses include:
-`json_decode()` / `json_encode()`
-`context.var`
-`context.call`
-`unit_call()` return values
+- `json_decode()` / `json_encode()`
+- `context.var`
+- `context.call`
+- `unit_call()` return values
 
 Useful methods include:
-`to_string()`
-`to_json()`
-`get_type_name()`
-`get_by_path()`
-`set_bool()`
-`remove()`
-`clear()`
-`each()`
+- `to_string()`
+- `to_json()`
+- `get_type_name()`
+- `get_by_path()`
+- `set_bool()`
+- `remove()`
+- `clear()`
+- `each()`
+
+:related
+**PHP:** Nested associative arrays, `stdClass`, decoded JSON trees, and helper accessors for deep array paths.
+**JavaScript / Node.js:** Plain objects, arrays, `Map`, and JSON-shaped data passed between handlers.
 
 :see
 >types

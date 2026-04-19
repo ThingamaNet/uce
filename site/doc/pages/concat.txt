@@ -9,3 +9,7 @@ Returns a string with all the parameters concatenated into one.
 
 :see
 >string
+
+:related
+**PHP:** String concatenation with `.` or helpers like `implode()`
+**JavaScript / Node.js:** String concatenation with `+`, template literals, or `Array.prototype.join()`

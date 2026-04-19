@@ -8,7 +8,11 @@ call_param : optional, call parameter
 return value : DTree* returned from function
 
 :desc
-Calls an exported function inside a UCE file.
+Calls an exported function inside another UCE file.
+
+Use `unit_call()` when you need a structured data exchange between units rather than rendered HTML output.
+
+The callee must expose an `EXPORT` function whose name matches `function_name`. Arguments are passed through `call_param`, and the return value is a `DTree*` owned by the callee.
 
 :Example
 // export a function
@@ -19,6 +23,10 @@ EXPORT DTree* test_func(DTree* call_param)
 }
 // use that function in another file
 unit_call("call_file_funcs.uce", "test_func");
+
+:related
+**PHP:** `include`, `require`, or calling a function from an included module, especially when returning arrays or objects instead of rendering a view.
+**JavaScript / Node.js:** Importing a module and calling an exported function, or dynamically loading a module and passing structured arguments.
 
 :see
 >ob

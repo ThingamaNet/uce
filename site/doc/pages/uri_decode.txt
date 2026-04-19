@@ -10,3 +10,7 @@ Decodes an URI-encoded string 's'.
 
 :see
 >uri
+
+:related
+**PHP:** `urldecode()` or `rawurldecode()`
+**JavaScript / Node.js:** `decodeURIComponent()`

@@ -7,6 +7,12 @@ u64 int_val(String s, u32 base = 10);
 f64 float_val(String s);
 String to_lower(String s);
 String to_upper(String s);
+String substr(String s, s64 start_pos);
+String substr(String s, s64 start_pos, s64 length);
+s64 strpos(String haystack, String needle, s64 offset = 0);
+bool str_starts_with(String haystack, String needle);
+bool str_ends_with(String haystack, String needle);
+bool contains(String haystack, String needle);
 String replace(String s, String search, String replace_with);
 
 String trim(String raw);
@@ -86,6 +92,8 @@ DTree json_decode(String s);
 
 String var_dump(StringMap map, String prefix = "", String postfix = "\n");
 String var_dump(StringList slist, String prefix = "", String postfix = "\n");
+StringMap array_merge(StringMap a, StringMap b);
+DTree array_merge(DTree a, DTree b);
 
 void ob_start();
 void ob_close();

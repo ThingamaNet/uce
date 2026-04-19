@@ -20,3 +20,7 @@ unit_render("page-template.uce", context);
 
 :see
 >ob
+
+:related
+**PHP:** Rendering another view or template with the current request state and captured output
+**JavaScript / Node.js:** Calling another template renderer or SSR partial with the current request context

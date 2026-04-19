@@ -7,6 +7,7 @@ String uri_decode(String q);
 String uri_encode(String q);
 StringMap parse_query(String q);
 String encode_query(StringMap map);
+void redirect(String url, s32 code = 302);
 StringMap parse_multipart(String q, String boundary, std::vector<UploadedFile>& uploaded_files);
 URI parse_uri(String uri_String);
 void set_cookie(

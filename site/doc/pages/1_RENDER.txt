@@ -20,3 +20,7 @@ Pages intended to serve WebSocket traffic may expose both `RENDER(Request& conte
 
 :see
 >ob
+
+:related
+**PHP:** Front controller entrypoints, template files, `include`, `require`, and route handlers that write the HTTP response
+**JavaScript / Node.js:** Express or Fastify route handlers, page controller functions, and SSR entrypoints that build a response

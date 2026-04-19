@@ -20,3 +20,7 @@ Related helpers such as `parse_query()` and `encode_query()` convert between que
 
 :see
 >types
+
+:related
+**PHP:** Associative arrays keyed by string, especially request bags like `$_GET` and `$_SERVER`
+**JavaScript / Node.js:** Plain objects, dictionaries, `Map`, and header or query objects in web frameworks

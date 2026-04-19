@@ -11,11 +11,12 @@ Returns runtime metadata for a UCE compilation unit.
 The returned tree includes:
 
 - normalized paths and generated artifact paths
+- unit metadata sidecar paths plus runtime and compiled unit ABI version information
 - compile status, compile error status, runtime error status, and a combined `error_status`
 - request and invocation counters
 - best, worst, last, and average render time
 - compile counters plus best, worst, last, and average compile time
-- file mtimes, stale status, load status, and exported API declarations
+- file mtimes, stale status, ABI compatibility status, load status, and exported API declarations
 
 If `path` is relative, it is resolved relative to the current executing unit.
 
@@ -25,3 +26,7 @@ Because unit metadata lives in process memory alongside `SharedUnit`, request an
 units_list
 unit_compile
 0_context
+
+:related
+**PHP:** Reflection-style metadata about included modules, callables, or exported capabilities
+**JavaScript / Node.js:** Module metadata, reflection-like inspection, or manifest-based capability lookup

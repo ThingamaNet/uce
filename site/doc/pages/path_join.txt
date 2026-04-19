@@ -13,3 +13,7 @@ If `child` is empty, `base` is returned. If `child` already starts with `/`, it 
 
 :see
 >sys
+
+:related
+**PHP:** Manual path composition with `DIRECTORY_SEPARATOR` or helper wrappers around it
+**JavaScript / Node.js:** Node `path.join()`

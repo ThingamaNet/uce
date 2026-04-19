@@ -14,3 +14,7 @@ This is a low-level runtime helper. Most application code should prefer `unit_re
 unit_render
 unit_call
 load
+
+:related
+**PHP:** `include`, `require`, autoloaders, and lazy-loading of modules
+**JavaScript / Node.js:** Dynamic `import()`, lazy module loading, or require-on-demand patterns

@@ -28,3 +28,7 @@ Example:
 
 :see
 >ob
+
+:related
+**PHP:** Reusable template partials or helper-rendered view fragments returned as strings
+**JavaScript / Node.js:** Component render helpers, especially patterns that return markup as a string

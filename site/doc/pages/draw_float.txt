@@ -11,3 +11,7 @@ This function works exactly like generate_float(), but context.random_index is u
 
 :see
 >noise
+
+:related
+**PHP:** `random_int()`, `mt_rand()`, and custom numeric random helpers
+**JavaScript / Node.js:** `Math.random()` or `crypto.getRandomValues()`-based helpers for numeric ranges

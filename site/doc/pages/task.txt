@@ -11,3 +11,7 @@ task() starts the 'exec_func' in a new process and returns that process' ID. If 
 
 :see
 >task
+
+:related
+**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

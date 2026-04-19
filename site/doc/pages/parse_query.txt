@@ -10,3 +10,7 @@ Decodes a string of the format 'a=b&c=d' into a StringMap containing keyed entri
 
 :see
 >uri
+
+:related
+**PHP:** `parse_str()`
+**JavaScript / Node.js:** `URLSearchParams` or Node `querystring.parse()`

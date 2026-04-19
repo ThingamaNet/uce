@@ -19,3 +19,7 @@ Example:
 
 :see
 >ob
+
+:related
+**PHP:** Rendering a partial directly into the current output buffer rather than returning a string
+**JavaScript / Node.js:** Direct `res.write()`-style partial rendering or imperative component mount helpers

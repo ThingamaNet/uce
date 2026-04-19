@@ -11,3 +11,7 @@ This function works exactly like generate_int(), but context.random_index is use
 
 :see
 >noise
+
+:related
+**PHP:** `random_int()`, `mt_rand()`, and custom numeric random helpers
+**JavaScript / Node.js:** `Math.random()` or `crypto.getRandomValues()`-based helpers for numeric ranges

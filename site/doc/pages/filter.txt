@@ -12,3 +12,7 @@ Returns a list containing the members of 'items' for which 'f' returned boolean 
 
 :see
 >string
+
+:related
+**PHP:** `array_filter()` for arrays or custom predicate-based filtering over strings and collections
+**JavaScript / Node.js:** `Array.prototype.filter()` and custom predicate helpers

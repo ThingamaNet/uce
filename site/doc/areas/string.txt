@@ -1,6 +1,7 @@
 String Functions
 
 ascii_safe_name
+contains
 concat
 filter
 first
@@ -8,6 +9,10 @@ join
 json_encode
 nibble
 print
+strpos
+str_ends_with
+str_starts_with
+substr
 split
 split_space
 split_utf8

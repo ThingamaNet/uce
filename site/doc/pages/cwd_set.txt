@@ -9,3 +9,7 @@ Sets a new working directory.
 
 :see
 >sys
+
+:related
+**PHP:** `chdir()`
+**JavaScript / Node.js:** Node `process.chdir()`

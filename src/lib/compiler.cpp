@@ -1,18 +1,111 @@
 #include "compiler.h"
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <sys/file.h>
 
 namespace {
 
+const char* UCE_SETUP_SYMBOL = "__uce_set_current_request";
+const char* UCE_RENDER_SYMBOL = "__uce_render";
+const char* UCE_COMPONENT_SYMBOL = "__uce_component";
+const char* UCE_WEBSOCKET_SYMBOL = "__uce_websocket";
+const u64 UCE_UNIT_ABI_VERSION = 1;
+
 struct SharedUnitFilesystemState
 {
 	bool source_exists = false;
+	bool metadata_exists = false;
+	bool metadata_parsed = false;
+	bool abi_compatible = false;
 	time_t source_time = 0;
 	time_t compiled_time = 0;
+	time_t metadata_time = 0;
 	time_t setup_template_time = 0;
+	time_t compiler_header_time = 0;
+	time_t compiler_source_time = 0;
+	time_t runtime_binary_time = 0;
+	time_t compiler_abi_time = 0;
 	time_t required_time = 0;
+	u64 metadata_abi_version = 0;
+	u64 runtime_abi_version = UCE_UNIT_ABI_VERSION;
 };
+
+bool compiler_is_u64_string(String value)
+{
+	value = trim(value);
+	if(value == "")
+		return(false);
+	for(auto c : value)
+	{
+		if(c < '0' || c > '9')
+			return(false);
+	}
+	return(true);
+}
+
+bool compiler_parse_unit_metadata_abi(String content, u64& abi_out)
+{
+	content = trim(content);
+	if(content == "")
+		return(false);
+
+	auto lines = split(content, "\n");
+	for(auto& raw_line : lines)
+	{
+		auto line = trim(raw_line);
+		if(line == "")
+			continue;
+		auto split_pos = line.find("=");
+		if(split_pos == String::npos)
+			continue;
+		auto key = trim(line.substr(0, split_pos));
+		auto value = trim(line.substr(split_pos + 1));
+		if(key != "unit_abi_version" || !compiler_is_u64_string(value))
+			continue;
+		abi_out = (u64)atoll(value.c_str());
+		return(true);
+	}
+	return(false);
+}
+
+String compiler_unit_metadata_text()
+{
+	return(
+		"format=uce-unit-metadata-v1\n"
+		"unit_abi_version=" + std::to_string(UCE_UNIT_ABI_VERSION) + "\n"
+	);
+}
+
+bool shared_unit_filesystem_requires_recompile(const SharedUnitFilesystemState& state)
+{
+	if(!state.source_exists)
+		return(true);
+	if(state.compiled_time == 0)
+		return(true);
+	if(state.compiled_time < state.required_time)
+		return(true);
+	if(!state.metadata_exists)
+		return(true);
+	if(!state.metadata_parsed)
+		return(true);
+	if(!state.abi_compatible)
+		return(true);
+	return(false);
+}
+
+time_t compiler_runtime_abi_time(Request* context)
+{
+	if(!context || !context->server)
+		return(0);
+
+	String root = context->server->config["COMPILER_SYS_PATH"];
+	return(std::max({
+		file_mtime(root + "/src/lib/compiler.h"),
+		file_mtime(root + "/src/lib/compiler.cpp"),
+		file_mtime(root + "/bin/uce_fastcgi.linux.bin")
+	}));
+}
 
 String compiler_registry_file_name(Request* context)
 {
@@ -109,7 +202,19 @@ SharedUnitFilesystemState inspect_shared_unit_filesystem(Request* context, Share
 	state.setup_template_time = file_mtime(
 		context->server->config["COMPILER_SYS_PATH"] + "/" +
 		context->server->config["SETUP_TEMPLATE"]);
-	state.required_time = std::max(state.source_time, state.setup_template_time);
+	state.compiler_header_time = file_mtime(context->server->config["COMPILER_SYS_PATH"] + "/src/lib/compiler.h");
+	state.compiler_source_time = file_mtime(context->server->config["COMPILER_SYS_PATH"] + "/src/lib/compiler.cpp");
+	state.runtime_binary_time = file_mtime(context->server->config["COMPILER_SYS_PATH"] + "/bin/uce_fastcgi.linux.bin");
+	state.compiler_abi_time = compiler_runtime_abi_time(context);
+	state.metadata_time = file_mtime(su->meta_file_name);
+	state.metadata_exists = (state.metadata_time != 0);
+	if(state.metadata_exists)
+		state.metadata_parsed = compiler_parse_unit_metadata_abi(
+			file_get_contents(su->meta_file_name),
+			state.metadata_abi_version
+		);
+	state.abi_compatible = (state.metadata_parsed && state.metadata_abi_version == state.runtime_abi_version);
+	state.required_time = std::max({state.source_time, state.setup_template_time, state.compiler_abi_time});
 	state.compiled_time = file_mtime(su->so_name);
 	return(state);
 }
@@ -120,11 +225,7 @@ bool shared_unit_cache_is_stale(Request* context, SharedUnit* su)
 		return(true);
 
 	auto state = inspect_shared_unit_filesystem(context, su);
-	if(!state.source_exists)
-		return(true);
-	if(state.compiled_time == 0)
-		return(true);
-	if(state.compiled_time < state.required_time)
+	if(shared_unit_filesystem_requires_recompile(state))
 		return(true);
 	if(su->last_compiled != 0 && state.compiled_time != su->last_compiled)
 		return(true);
@@ -251,9 +352,9 @@ String compiler_status_from_filesystem(const SharedUnitFilesystemState& state, S
 {
 	if(!state.source_exists)
 		return("missing_source");
-	if(state.compiled_time == 0)
+	if(state.compiled_time == 0 || !state.metadata_exists)
 		return("not_compiled");
-	if(state.compiled_time < state.required_time)
+	if(shared_unit_filesystem_requires_recompile(state))
 		return("stale");
 	if(su && su->so_handle)
 		return("loaded");
@@ -506,7 +607,7 @@ String preprocess_named_render_syntax(String content)
 				String render_name = trim(signature.substr(0, open_paren_pos));
 				String render_signature = signature.substr(open_paren_pos);
 				if(render_name != "")
-					line = indent + "EXPORT void __unit_render_" + safe_name(render_name) + render_signature;
+					line = indent + "EXPORT void " + String(UCE_RENDER_SYMBOL) + "_" + safe_name(render_name) + render_signature;
 			}
 		}
 		else if(trimmed.rfind("COMPONENT:", 0) == 0)
@@ -518,7 +619,7 @@ String preprocess_named_render_syntax(String content)
 				String render_name = trim(signature.substr(0, open_paren_pos));
 				String render_signature = signature.substr(open_paren_pos);
 				if(render_name != "")
-					line = indent + "EXPORT void __unit_component_" + safe_name(render_name) + render_signature;
+					line = indent + "EXPORT void " + String(UCE_COMPONENT_SYMBOL) + "_" + safe_name(render_name) + render_signature;
 			}
 		}
 
@@ -670,6 +771,7 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 
 	su->so_name = su->bin_path + "/" + su->bin_file_name;
 	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".exports.txt";
+	su->meta_file_name = su->bin_path + "/" + su->src_file_name + ".meta.txt";
 	//su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
 }
 
@@ -707,14 +809,14 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		su->compile_status = "loaded";
 		su->compile_error_status = "";
 		char *error;
-		su->on_setup = (request_handler)dlsym(su->so_handle, "set_current_request");
+		su->on_setup = (request_handler)dlsym(su->so_handle, UCE_SETUP_SYMBOL);
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
-		su->on_render = (request_ref_handler)dlsym(su->so_handle, "__unit_render");
+		su->on_render = (request_ref_handler)dlsym(su->so_handle, UCE_RENDER_SYMBOL);
 		dlerror();
-		su->on_component = (request_ref_handler)dlsym(su->so_handle, "__unit_component");
+		su->on_component = (request_ref_handler)dlsym(su->so_handle, UCE_COMPONENT_SYMBOL);
 		dlerror();
-		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, "__unit_websocket");
+		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, UCE_WEBSOCKET_SYMBOL);
 		dlerror();
 		su->api_declarations = split(file_get_contents(su->api_file_name), "\n");
 		//else
@@ -777,6 +879,8 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 	else
 	{
 		load_shared_unit(context, su, file_name);
+		if(su->so_handle)
+			file_put_contents(su->meta_file_name, compiler_unit_metadata_text());
 		compiler_record_compile_result(
 			su,
 			time_precise() - comp_start,
@@ -1055,6 +1159,7 @@ DTree unit_info(String path)
 	info["pre_file_name"] = su->pre_file_name;
 	info["so_name"] = su->so_name;
 	info["api_file_name"] = su->api_file_name;
+	info["meta_file_name"] = su->meta_file_name;
 	info["compile_status"] = (su->compile_status != "unknown" ? su->compile_status : compiler_status_from_filesystem(fs_state, su));
 	info["compile_error_status"] = su->compile_error_status;
 	info["runtime_error_status"] = su->runtime_error_status;
@@ -1080,14 +1185,20 @@ DTree unit_info(String path)
 	info["worst_render_time"] = su->worst_render_duration;
 	info["source_mtime"] = (f64)fs_state.source_time;
 	info["compiled_mtime"] = (f64)fs_state.compiled_time;
+	info["metadata_mtime"] = (f64)fs_state.metadata_time;
 	info["setup_template_mtime"] = (f64)fs_state.setup_template_time;
 	info["required_mtime"] = (f64)fs_state.required_time;
+	info["runtime_abi_version"] = (f64)fs_state.runtime_abi_version;
+	info["metadata_abi_version"] = (f64)fs_state.metadata_abi_version;
 	compiler_tree_set_bool(info, "known", context->server->known_unit_files[resolved_path]);
 	compiler_tree_set_bool(info, "current_unit", resolved_path == compiler_current_unit_path(context));
 	compiler_tree_set_bool(info, "loaded", su->so_handle != 0);
 	compiler_tree_set_bool(info, "source_exists", fs_state.source_exists);
 	compiler_tree_set_bool(info, "compiled_exists", fs_state.compiled_time != 0);
-	compiler_tree_set_bool(info, "stale", fs_state.source_exists && fs_state.compiled_time != 0 && fs_state.compiled_time < fs_state.required_time);
+	compiler_tree_set_bool(info, "metadata_exists", fs_state.metadata_exists);
+	compiler_tree_set_bool(info, "metadata_parsed", fs_state.metadata_parsed);
+	compiler_tree_set_bool(info, "abi_compatible", fs_state.abi_compatible);
+	compiler_tree_set_bool(info, "stale", shared_unit_cache_is_stale(context, su));
 	compiler_tree_set_bool(info, "has_render", su->on_render != 0);
 	compiler_tree_set_bool(info, "has_component", su->on_component != 0);
 	compiler_tree_set_bool(info, "has_websocket", su->on_websocket != 0);
@@ -1225,22 +1336,22 @@ String page_render_handler_symbol(String render_name)
 {
 	render_name = trim(render_name);
 	if(render_name == "" || render_name == "render")
-		return("__unit_render");
-	return("__unit_render_" + safe_name(render_name));
+		return(UCE_RENDER_SYMBOL);
+	return(String(UCE_RENDER_SYMBOL) + "_" + safe_name(render_name));
 }
 
 String component_handler_symbol(String render_name)
 {
 	render_name = trim(render_name);
 	if(render_name == "")
-		return("__unit_component");
-	return("__unit_component_" + safe_name(render_name));
+		return(UCE_COMPONENT_SYMBOL);
+	return(String(UCE_COMPONENT_SYMBOL) + "_" + safe_name(render_name));
 }
 
 request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 {
 	String symbol = page_render_handler_symbol(render_name);
-	if(symbol == "__unit_render")
+	if(symbol == UCE_RENDER_SYMBOL)
 		return(su->on_render);
 
 	auto it = su->api_functions.find(symbol);
@@ -1256,7 +1367,7 @@ request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 request_ref_handler get_component_handler(SharedUnit* su, String render_name)
 {
 	String symbol = component_handler_symbol(render_name);
-	if(symbol == "__unit_component")
+	if(symbol == UCE_COMPONENT_SYMBOL)
 		return(su->on_component);
 
 	auto it = su->api_functions.find(symbol);
@@ -1278,7 +1389,7 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 	if(!su->on_setup)
 	{
 		if(error_out)
-			*error_out = "internal error: set_current_request() not defined in " + file_name;
+			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + file_name;
 		return(false);
 	}
 
@@ -1327,7 +1438,7 @@ bool compiler_invoke_component(Request* context, String file_name, String render
 	if(!su->on_setup)
 	{
 		if(error_out)
-			*error_out = "internal error: set_current_request() not defined in " + file_name;
+			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + file_name;
 		return(false);
 	}
 
@@ -1386,7 +1497,7 @@ void compiler_invoke_websocket(Request* context, String file_name)
 
 	if(!su->on_setup)
 	{
-		printf("internal error: set_current_request() not defined in %s\n", file_name.c_str());
+		printf("internal error: %s() not defined in %s\n", UCE_SETUP_SYMBOL, file_name.c_str());
 		return;
 	}
 
@@ -1529,7 +1640,7 @@ DTree* unit_call(String file_name, String function_name, DTree* call_param)
 	{
 		if(!su->on_setup)
 		{
-			print("internal error: set_current_request() not defined in", file_name, "\n");
+			print("internal error: ", UCE_SETUP_SYMBOL, "() not defined in ", file_name, "\n");
 		}
 		else
 		{

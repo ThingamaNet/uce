@@ -10,3 +10,7 @@ Opens or creates a given file and appends data to it.
 
 :see
 >sys
+
+:related
+**PHP:** `file_put_contents($file, $data, FILE_APPEND)`
+**JavaScript / Node.js:** Node `fs.appendFileSync()` or `fs.promises.appendFile()`

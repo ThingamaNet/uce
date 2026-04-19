@@ -18,3 +18,7 @@ If 'compound_characters' is true, split_utf8 will attempt to combine compound ch
 
 :see
 >string
+
+:related
+**PHP:** `preg_split(//u, ...)`, `mb_*` helpers, or grapheme-aware libraries
+**JavaScript / Node.js:** `Array.from(str)` or iterator-based Unicode-aware splitting

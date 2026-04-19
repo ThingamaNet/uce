@@ -9,3 +9,7 @@ Deletes the file identified by `file_name`.
 
 :see
 >sys
+
+:related
+**PHP:** `unlink()`
+**JavaScript / Node.js:** Node `fs.unlinkSync()` or `fs.promises.unlink()`

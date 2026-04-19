@@ -10,3 +10,7 @@ If are more output buffers on the stack, switch to the next one.
 
 :see
 >ob
+
+:related
+**PHP:** `ob_start()`, `ob_get_contents()`, `ob_get_clean()`, and related output-buffering APIs
+**JavaScript / Node.js:** String accumulation, buffer capture, or render-to-string patterns in server code

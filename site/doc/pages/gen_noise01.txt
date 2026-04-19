@@ -11,3 +11,7 @@ Generates a noise value in the range from 0 to 1 for the given 'index' and 'seed
 
 :see
 >noise
+
+:related
+**PHP:** There is no built-in PHP equivalent; this is closest to userland noise or deterministic pseudo-random helpers
+**JavaScript / Node.js:** There is no built-in browser equivalent; closest matches are userland noise libraries or deterministic PRNG helpers

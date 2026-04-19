@@ -10,3 +10,7 @@ URI-encodes a string.
 
 :see
 >uri
+
+:related
+**PHP:** `urlencode()` or `rawurlencode()`
+**JavaScript / Node.js:** `encodeURIComponent()`

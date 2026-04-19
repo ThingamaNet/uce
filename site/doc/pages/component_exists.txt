@@ -12,3 +12,7 @@ This is useful when a page wants to render an optional component if it is presen
 
 :see
 >ob
+
+:related
+**PHP:** `function_exists()`, `class_exists()`, or file-existence checks before including a partial
+**JavaScript / Node.js:** Module existence checks, dynamic import guards, or registry lookups for named components

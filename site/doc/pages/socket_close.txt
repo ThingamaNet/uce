@@ -9,3 +9,7 @@ Closes an existing socket connection.
 
 :see
 >socket
+
+:related
+**PHP:** PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
+**JavaScript / Node.js:** Node `net.Socket` connect, read, write, and close operations

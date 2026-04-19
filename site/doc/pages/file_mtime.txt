@@ -11,3 +11,7 @@ Retrieves the last modification date of 'file_name' as a Unix timestamp.
 :see
 >sys
 >time
+
+:related
+**PHP:** `filemtime()`
+**JavaScript / Node.js:** Node `fs.statSync().mtimeMs` or `fs.promises.stat()`

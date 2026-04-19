@@ -9,3 +9,7 @@ Returns a 64 bit integer containing the current Unix timestamp.
 
 :see
 >time
+
+:related
+**PHP:** `time()`
+**JavaScript / Node.js:** `Math.floor(Date.now() / 1000)` or `Date.now()` depending on units

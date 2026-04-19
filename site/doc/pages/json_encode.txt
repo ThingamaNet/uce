@@ -13,3 +13,7 @@ Serializes either a `String` or a `DTree` into JSON notation.
 When passed a `String`, `json_encode()` returns a quoted and escaped JSON string literal.
 
 When passed a `DTree`, scalar values are serialized directly and nested map values are emitted as JSON objects.
+
+:related
+**PHP:** `json_encode()`
+**JavaScript / Node.js:** `JSON.stringify()`

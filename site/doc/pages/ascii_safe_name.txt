@@ -12,3 +12,7 @@ This is useful when turning user- or config-provided names into handler suffixes
 
 :see
 >string
+
+:related
+**PHP:** Slug or safe-filename helpers built with `preg_replace()` and transliteration utilities
+**JavaScript / Node.js:** Regex-based slugify or safe-name helpers used for URLs and filenames

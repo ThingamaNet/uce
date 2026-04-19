@@ -9,3 +9,7 @@ Deletes the cookie specified by 'session_name' and clears the data stored under 
 
 :see
 >session
+
+:related
+**PHP:** `session_destroy()`
+**JavaScript / Node.js:** Express session store teardown or manual cookie-session invalidation

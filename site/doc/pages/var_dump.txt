@@ -10,3 +10,7 @@ return value : string containing a human-friendly representation of 't'
 :desc
 Returns a string representation of 't' intended for debugging.
 
+
+:related
+**PHP:** `var_dump()` and `print_r()`
+**JavaScript / Node.js:** `console.log()`, `console.dir()`, and structured inspection helpers like `util.inspect()`

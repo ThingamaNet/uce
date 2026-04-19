@@ -10,3 +10,7 @@ Attempts to parse the given 'time_string' into a Unix timestamp.
 
 :see
 >time
+
+:related
+**PHP:** `strtotime()` or `DateTimeImmutable` parsing
+**JavaScript / Node.js:** `Date.parse()` or date-library parsing helpers

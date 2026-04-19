@@ -5,7 +5,7 @@
 
 RENDER(Request& context)
 {
-	DTree t;
+	String sample = "  Hello UCE World  ";
 
 	<>
 		<link rel="stylesheet" href='style.css'></link>
@@ -16,7 +16,14 @@ RENDER(Request& context)
 
 		<pre style="white-space: pre-wrap"><?
 
-		print(String("!") + 60*60*24);
+		print("sample: [", sample, "]\n");
+		print("trim(sample): [", trim(sample), "]\n");
+		print("substr(sample, 2, 5): [", substr(sample, 2, 5), "]\n");
+		print("substr(sample, -7): [", substr(sample, -7), "]\n");
+		print("strpos(sample, \"UCE\"): ", strpos(sample, "UCE"), "\n");
+		print("contains(sample, \"World\"): ", contains(sample, "World") ? "true" : "false", "\n");
+		print("str_starts_with(trim(sample), \"Hello\"): ", str_starts_with(trim(sample), "Hello") ? "true" : "false", "\n");
+		print("str_ends_with(trim(sample), \"World\"): ", str_ends_with(trim(sample), "World") ? "true" : "false", "\n");
 
 		?></pre>
 

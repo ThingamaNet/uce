@@ -10,3 +10,7 @@ Checks whether the file or path specified by 'path' exists.
 
 :see
 >sys
+
+:related
+**PHP:** `file_exists()` or `is_file()`
+**JavaScript / Node.js:** Node `fs.existsSync()` or `fs.stat()`

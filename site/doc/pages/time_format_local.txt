@@ -123,3 +123,7 @@ Returns a formatted date. This is based on the Linux date() command. The formatt
 
 :see
 >time
+
+:related
+**PHP:** `date()` and `DateTime` formatting in the server local timezone
+**JavaScript / Node.js:** `Intl.DateTimeFormat`, `Date#toLocaleString()`, or date libraries

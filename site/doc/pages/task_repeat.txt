@@ -15,3 +15,7 @@ If a process with the same `key` is already running, `task_repeat()` does not st
 
 :see
 >task
+
+:related
+**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

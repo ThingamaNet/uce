@@ -14,3 +14,7 @@ If `scope` is omitted, the current page scope is used.
 
 :see
 >websocket
+
+:related
+**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

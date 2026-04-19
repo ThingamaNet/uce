@@ -12,3 +12,7 @@ This is primarily a debugging helper so you can see which concrete file a shorth
 
 :see
 >ob
+
+:related
+**PHP:** Resolving include paths or view names to a concrete template file before rendering
+**JavaScript / Node.js:** Resolving module paths, alias-based imports, or component registry entries

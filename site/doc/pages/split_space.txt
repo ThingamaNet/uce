@@ -10,3 +10,7 @@ Splits 'str' into multiple strings along any whitespace characters (multiple whi
 
 :see
 >string
+
+:related
+**PHP:** Whitespace splitting via `preg_split(/\s+/, ...)`
+**JavaScript / Node.js:** Whitespace splitting via regex with `split(/\\s+/)`

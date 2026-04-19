@@ -10,3 +10,7 @@ Encodes a StringMap containing URL parameters into a single String.
 
 :see
 >uri
+
+:related
+**PHP:** `http_build_query()`
+**JavaScript / Node.js:** `URLSearchParams` and `toString()`

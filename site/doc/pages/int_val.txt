@@ -9,3 +9,7 @@ return value : a u64 containing the number (0 if no number could be identified).
 :desc
 Extracts an integer from a String.
 
+
+:related
+**PHP:** `intval()`
+**JavaScript / Node.js:** `Number()` or `parseInt()`

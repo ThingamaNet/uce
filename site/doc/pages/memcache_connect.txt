@@ -11,3 +11,7 @@ Connects to a memcache server instance.
 
 :see
 >memcache
+
+:related
+**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages

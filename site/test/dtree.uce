@@ -3,6 +3,12 @@
 RENDER(Request& context)
 {
 	DTree t;
+	DTree assoc_left;
+	DTree assoc_right;
+	DTree assoc_merged;
+	DTree list_left;
+	DTree list_right;
+	DTree list_merged;
 
 	<>
 		<link rel="stylesheet" href='style.css'></link>
@@ -44,6 +50,40 @@ RENDER(Request& context)
 		t["g"]["x"]["y3"] = time();
 		t["g"]["x"]["y4"] = "Ünicödä";
 		print(var_dump(t));
+
+		?></pre>
+
+		Array Merge
+
+		<pre><?
+
+		assoc_left["name"] = "left";
+		assoc_left["shared"] = "left-value";
+		assoc_right["shared"] = "right-value";
+		assoc_right["extra"] = "new-value";
+		assoc_merged = array_merge(assoc_left, assoc_right);
+		print("Associative merge:\n");
+		print(var_dump(assoc_merged));
+
+		list_left.set_array();
+		DTree a;
+		a = "A";
+		list_left.push(a);
+		DTree b;
+		b = "B";
+		list_left.push(b);
+
+		list_right.set_array();
+		DTree c;
+		c = "C";
+		list_right.push(c);
+		DTree d;
+		d = "D";
+		list_right.push(d);
+
+		list_merged = array_merge(list_left, list_right);
+		print("\nList merge:\n");
+		print(var_dump(list_merged));
 
 		?></pre>
 

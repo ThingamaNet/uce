@@ -9,3 +9,7 @@ Includes another UCE file
 
 :see
 >ob
+
+:related
+**PHP:** `include`, `require`, and config-loader patterns that resolve and import another file
+**JavaScript / Node.js:** `import()`, `require()`, or file-loader helpers that resolve modules at runtime

@@ -10,3 +10,7 @@ Given a variable number of String parameters, the first() function returns the f
 
 :see
 >string
+
+:related
+**PHP:** Null-coalescing patterns like `$a ?? $b`, fallback helpers, or `reset()` for arrays
+**JavaScript / Node.js:** `??`, `||`, and small fallback helper functions

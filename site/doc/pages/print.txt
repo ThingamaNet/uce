@@ -9,3 +9,7 @@ Appends data to the current request's output stream.
 
 :see
 >string
+
+:related
+**PHP:** `echo`, `print`, and output buffering patterns
+**JavaScript / Node.js:** `res.write()`, stream writes, or string-returning render helpers depending on context

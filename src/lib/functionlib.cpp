@@ -54,6 +54,82 @@ String to_upper(String s)
 	return(result);
 }
 
+String substr(String s, s64 start_pos)
+{
+	s64 len = s.length();
+	s64 start = start_pos;
+	if(start < 0)
+		start = len + start;
+	if(start < 0)
+		start = 0;
+	if(start >= len)
+		return("");
+	return(s.substr(start));
+}
+
+String substr(String s, s64 start_pos, s64 length)
+{
+	s64 len = s.length();
+	s64 start = start_pos;
+	if(start < 0)
+		start = len + start;
+	if(start < 0)
+		start = 0;
+	if(start >= len)
+		return("");
+
+	s64 end = len;
+	if(length >= 0)
+		end = start + length;
+	else
+		end = len + length;
+
+	if(end < start)
+		return("");
+	if(end > len)
+		end = len;
+	return(s.substr(start, end - start));
+}
+
+s64 strpos(String haystack, String needle, s64 offset)
+{
+	s64 start = offset;
+	s64 len = haystack.length();
+	if(start < 0)
+		start = len + start;
+	if(start < 0)
+		start = 0;
+	if(start > len)
+		return(-1);
+	if(needle == "")
+		return(start);
+	auto pos = haystack.find(needle, start);
+	if(pos == std::string::npos)
+		return(-1);
+	return(pos);
+}
+
+bool str_starts_with(String haystack, String needle)
+{
+	if(needle.length() > haystack.length())
+		return(false);
+	return(haystack.compare(0, needle.length(), needle) == 0);
+}
+
+bool str_ends_with(String haystack, String needle)
+{
+	if(needle.length() > haystack.length())
+		return(false);
+	return(haystack.compare(haystack.length() - needle.length(), needle.length(), needle) == 0);
+}
+
+bool contains(String haystack, String needle)
+{
+	if(needle == "")
+		return(true);
+	return(haystack.find(needle) != std::string::npos);
+}
+
 String replace(String s, String search, String replace_with)
 {
 	s64 last_spos = 0;
@@ -237,6 +313,58 @@ String join(StringList l, String delim)
 			result.append(delim);
 		result.append(s);
 		i += 1;
+	}
+	return(result);
+}
+
+namespace {
+
+bool array_merge_key_is_index(String key)
+{
+	if(key == "")
+		return(false);
+	for(auto c : key)
+	{
+		if(!isdigit(c))
+			return(false);
+	}
+	return(true);
+}
+
+}
+
+StringMap array_merge(StringMap a, StringMap b)
+{
+	StringMap result = a;
+	for(const auto& entry : b)
+		result[entry.first] = entry.second;
+	return(result);
+}
+
+DTree array_merge(DTree a, DTree b)
+{
+	const DTree& left = a.deref();
+	const DTree& right = b.deref();
+	if(left.type != 'M')
+		return(b);
+
+	DTree result;
+	result.set(a);
+	if(right.type != 'M')
+		return(result);
+
+	bool append_numeric_keys = left.is_list() || right.is_list();
+	for(const auto& entry : right._map)
+	{
+		if(append_numeric_keys && array_merge_key_is_index(entry.first))
+		{
+			DTree child = entry.second;
+			result.push(child);
+		}
+		else
+		{
+			result[entry.first] = entry.second;
+		}
 	}
 	return(result);
 }

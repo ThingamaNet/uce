@@ -11,3 +11,7 @@ Returns a version of the input string where the following characters have been r
 - < → lt;
 - > → &gt;
 - " → &quot;
+
+:related
+**PHP:** `htmlspecialchars()` or `htmlentities()`
+**JavaScript / Node.js:** Safe text insertion via `textContent` or server-side HTML escaping libraries

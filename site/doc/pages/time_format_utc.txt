@@ -123,3 +123,7 @@ Returns a formatted date in the GMT/UTC timezone. This is based on the Linux dat
 
 :see
 >time
+
+:related
+**PHP:** `gmdate()` and UTC `DateTime` formatting
+**JavaScript / Node.js:** `Date#toISOString()` and UTC formatting helpers

@@ -13,3 +13,7 @@ If `path` is relative, it is resolved relative to the current executing unit. Su
 :see
 unit_info
 units_list
+
+:related
+**PHP:** Template compilation or preloading steps that generate cached PHP artifacts
+**JavaScript / Node.js:** Build-step compilation, bundling, or ahead-of-time template transforms

@@ -14,3 +14,7 @@ For UTF-8-aware splitting, use helpers such as `split_utf8()` instead of assumin
 
 :see
 >types
+
+:related
+**PHP:** Native PHP strings with helpers such as `substr()`, `trim()`, `explode()`, and `implode()`
+**JavaScript / Node.js:** JavaScript `string` values with methods such as `slice()`, `trim()`, `split()`, and `join()`

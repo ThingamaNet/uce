@@ -10,3 +10,7 @@ Returns a string where leading an trailing whitespace characters have been trimm
 
 :see
 >string
+
+:related
+**PHP:** `trim()`
+**JavaScript / Node.js:** `String.prototype.trim()`

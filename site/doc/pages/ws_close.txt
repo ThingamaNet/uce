@@ -12,3 +12,7 @@ If `connection_id` is omitted, the current connection handled by `WS(Request& co
 
 :see
 >websocket
+
+:related
+**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

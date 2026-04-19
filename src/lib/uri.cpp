@@ -256,6 +256,12 @@ String encode_query(StringMap map)
 	return(result);
 }
 
+void redirect(String url, s32 code)
+{
+	context->header["Location"] = url;
+	context->set_status(code);
+}
+
 String trim_wrapping_quotes(String raw)
 {
 	if(raw.length() >= 2 && raw[0] == '"' && raw[raw.length()-1] == '"')

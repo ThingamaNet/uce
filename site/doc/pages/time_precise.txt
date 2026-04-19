@@ -9,3 +9,7 @@ Returns a 64 bit float containing the current Unix timestamp with millisecond ac
 
 :see
 >time
+
+:related
+**PHP:** `microtime(true)` or high-resolution timers
+**JavaScript / Node.js:** `performance.now()` or high-resolution Node timers

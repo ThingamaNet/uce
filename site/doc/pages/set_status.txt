@@ -13,3 +13,7 @@ When `reason` is omitted, UCE fills in a standard reason phrase for common HTTP 
 :see
 0_context
 >types
+
+:related
+**PHP:** `http_response_code()` and explicit status-line header control
+**JavaScript / Node.js:** `res.status(...)`, `Response` init status, or low-level status assignment on an HTTP response

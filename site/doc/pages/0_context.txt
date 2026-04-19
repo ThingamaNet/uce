@@ -69,3 +69,7 @@ Invokes another UCE file using the current or supplied request context
 
 :see
 >types
+
+:related
+**PHP:** `$_SERVER`, `$_GET`, `$_POST`, `$_COOKIE`, `$_SESSION`, `header()`, and `http_response_code()`
+**JavaScript / Node.js:** Express `req` and `res`, Fetch `Request`, `Headers`, cookies or session middleware, and per-connection state in WebSocket handlers

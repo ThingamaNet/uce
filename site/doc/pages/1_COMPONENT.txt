@@ -34,3 +34,7 @@ Examples:
 >component_render
 >1_RENDER
 >1_WS
+
+:related
+**PHP:** View partials, reusable include files, small template helpers, and server-side component-like rendering patterns
+**JavaScript / Node.js:** Reusable component functions, React or Vue components, and server-rendered partials

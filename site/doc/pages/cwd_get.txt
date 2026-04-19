@@ -9,3 +9,7 @@ Returns the current working directory.
 
 :see
 >sys
+
+:related
+**PHP:** `getcwd()`
+**JavaScript / Node.js:** Node `process.cwd()`

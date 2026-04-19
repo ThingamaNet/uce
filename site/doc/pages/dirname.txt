@@ -10,3 +10,7 @@ Isolates the directory name component from a path/file name.
 
 :see
 >sys
+
+:related
+**PHP:** `dirname()`
+**JavaScript / Node.js:** Node `path.dirname()`

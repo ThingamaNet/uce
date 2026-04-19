@@ -11,3 +11,7 @@ Returns the sha1 hash of 's'.
 
 :see
 >noise
+
+:related
+**PHP:** `sha1()`
+**JavaScript / Node.js:** Node `crypto.createHash("sha1")` or browser `SubtleCrypto` wrappers

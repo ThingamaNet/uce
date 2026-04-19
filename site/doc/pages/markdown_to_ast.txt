@@ -75,3 +75,7 @@ component
 component_render
 json_encode
 DTree
+
+:related
+**PHP:** CommonMark or Parsedown parsing pipelines that expose a syntax tree or token stream
+**JavaScript / Node.js:** `remark`, `micromark`, or `markdown-it` token streams and AST-like structures

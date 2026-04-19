@@ -15,3 +15,7 @@ Executes a MySQL query and returns the resulting data (if any).
 
 :see
 >mysql
+
+:related
+**PHP:** Modern PHP database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
+**JavaScript / Node.js:** Node database clients such as `mysql2`, query builders, or ORM adapters

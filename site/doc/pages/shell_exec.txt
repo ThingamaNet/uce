@@ -10,3 +10,7 @@ Executes a Linux shell command and returns the generated output
 
 :see
 >sys
+
+:related
+**PHP:** `shell_exec()`, `exec()`, or `proc_open()`
+**JavaScript / Node.js:** Node `child_process.exec()` or `spawn()`

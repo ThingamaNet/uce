@@ -1,5 +1,6 @@
 Types
 
+array_merge
 DTree
 get_by_path
 set_status

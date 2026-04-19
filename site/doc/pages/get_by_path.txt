@@ -18,3 +18,7 @@ Typical usage:
 DTree
 0_context
 >types
+
+:related
+**PHP:** Deep array access helpers for associative arrays, decoded JSON, or configuration trees
+**JavaScript / Node.js:** Optional chaining like `obj?.a?.b`, lodash `get`, or small path-walking helpers

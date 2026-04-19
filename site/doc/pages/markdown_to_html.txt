@@ -98,3 +98,7 @@ component
 component_render
 json_decode
 String
+
+:related
+**PHP:** Parsedown, League CommonMark, or similar Markdown-to-HTML renderers
+**JavaScript / Node.js:** `marked`, `markdown-it`, `remark-html`, or other Markdown renderers

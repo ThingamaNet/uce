@@ -12,3 +12,7 @@ Replace all occurrences of 'search' with the string defined in 'replace_with'.
 
 :see
 >string
+
+:related
+**PHP:** `str_replace()` or `preg_replace()`
+**JavaScript / Node.js:** `String.prototype.replace()` or `replaceAll()`

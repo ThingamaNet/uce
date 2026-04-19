@@ -18,7 +18,7 @@ The implementation lives in `src/lib/compiler.cpp`. It does not try to parse all
 
 :Pipeline
 - The generated file starts by including `COMPILER_SYS_PATH/src/lib/uce_lib.h`.
-- It then inlines the configured setup template from `SETUP_TEMPLATE` (by default `scripts/setup.h.template`), which defines `set_current_request(Request*)`.
+- It then inlines the configured setup template from `SETUP_TEMPLATE` (by default `scripts/setup.h.template`), which defines the internal hook `__uce_set_current_request(Request*)`.
 - It inserts `#line 1` before page code so compiler diagnostics point back to the original `.uce` file.
 - Each literal block is rewritten into one or more `print(R"( ... )");` calls.
 - `<? ... ?>` temporarily breaks out of literal printing, emits the enclosed C++ unchanged, then resumes literal output.
@@ -26,7 +26,8 @@ The implementation lives in `src/lib/compiler.cpp`. It does not try to parse all
 - `<?: ... ?>` becomes `print(...);` and is intended for trusted markup or already-escaped content.
 - `#load "file.uce"` is replaced with a generated C++ `#include` that points at the loaded unit's preprocessed `.cpp` file under `BIN_DIRECTORY`.
 - Lines beginning with `EXPORT` are scanned so their declarations can be written to a sibling `.exports.txt` file.
-- Lines beginning with `COMPONENT:NAME(...)` are rewritten into exported `component_render_NAME(...)` functions for the component helpers.
+- Lines beginning with `RENDER:NAME(...)` are rewritten into exported `__uce_render_NAME(...)` functions.
+- Lines beginning with `COMPONENT:NAME(...)` are rewritten into exported `__uce_component_NAME(...)` functions for the component helpers.
 - The final generated source is written to `BIN_DIRECTORY + src_path + "/" + source_file + ".cpp"`.
 - `scripts/compile` then compiles that generated `.cpp` into `source_file + ".so"` with `clang++ -shared -std=c++20 ...`.
 
@@ -96,3 +97,7 @@ unit_render
 unit_call
 0_context
 1_COMPONENT
+
+:related
+**PHP:** Template tags like `<?php ... ?>`, `<?= ... ?>`, output buffering, and compile-time include patterns
+**JavaScript / Node.js:** JSX transforms, tagged templates, server-side rendering pipelines, and build-time HTML generation

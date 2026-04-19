@@ -14,3 +14,7 @@ Generates a noise value between 'from' and 'to', given the 'index' and 'seed' nu
 
 :see
 >noise
+
+:related
+**PHP:** `random_int()`, `mt_rand()`, and custom numeric random helpers
+**JavaScript / Node.js:** `Math.random()` or `crypto.getRandomValues()`-based helpers for numeric ranges

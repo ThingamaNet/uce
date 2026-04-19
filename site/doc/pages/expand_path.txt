@@ -11,3 +11,7 @@ Converts a relative path name into an absolute path, using the current working d
 
 :see
 >sys
+
+:related
+**PHP:** `realpath()` and application-specific path normalization helpers
+**JavaScript / Node.js:** Node `path.resolve()` and `path.normalize()`

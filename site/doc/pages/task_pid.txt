@@ -10,3 +10,7 @@ Checks whether a process with the given 'key' is running and returns its PID if 
 
 :see
 >task
+
+:related
+**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

@@ -10,3 +10,7 @@ Returns a list of files and subdirectories within the given 'path'.
 
 :see
 >sys
+
+:related
+**PHP:** `scandir()`, `glob()`, or `DirectoryIterator`
+**JavaScript / Node.js:** Node `fs.readdirSync()` or `fs.promises.readdir()`

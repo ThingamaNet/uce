@@ -16,3 +16,7 @@ context.session : the current session data. The session data is automatically sa
 
 :see
 >session
+
+:related
+**PHP:** `session_start()`
+**JavaScript / Node.js:** Express `express-session`, `cookie-session`, or similar request-bound session middleware

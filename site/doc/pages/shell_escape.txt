@@ -10,3 +10,7 @@ Escapes a parameter for shell_exec
 
 :see
 >sys
+
+:related
+**PHP:** `escapeshellarg()` and `escapeshellcmd()`
+**JavaScript / Node.js:** There is no direct built-in equivalent; prefer `spawn()` argument arrays and avoid shell interpolation

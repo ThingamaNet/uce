@@ -1,6 +1,7 @@
 URI Functions
 
 encode_query
+redirect
 session_id_create
 parse_query
 uri_decode

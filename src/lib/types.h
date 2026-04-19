@@ -65,6 +65,7 @@ struct SharedUnit {
 	String file_name;
 	String so_name;
 	String api_file_name;
+	String meta_file_name;
 	String setup_file_name;
 	StringList api_declarations;
 	std::map<String, void*> api_functions;

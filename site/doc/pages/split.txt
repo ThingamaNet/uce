@@ -11,3 +11,7 @@ Splits 'str' into multiple strings based on the given delimiter 'delim'.
 
 :see
 >string
+
+:related
+**PHP:** `explode()` or `preg_split()`
+**JavaScript / Node.js:** `String.prototype.split()`

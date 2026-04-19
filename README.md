@@ -444,7 +444,7 @@ Common failure modes:
 - WebSocket upgrade fails
   Check that nginx is routing `.ws.uce` to `proxy_pass`, not `fastcgi_pass`, and that `HTTP_PORT` is reachable on localhost.
 - Requests compile but immediately crash
-  Check `journalctl -u uce.service` and clear stale generated artifacts under `BIN_DIRECTORY` if you have changed runtime ABI or entrypoint signatures.
+  Check `journalctl -u uce.service`. Generated units now carry an ABI metadata sidecar and should be recompiled automatically after runtime ABI changes, but clearing stale artifacts under `BIN_DIRECTORY` is still a useful last-resort recovery step if the cache has been damaged manually.
 - nginx serves raw source or internal files
   Tighten the server root and add explicit deny rules for non-public directories.
 

@@ -9,3 +9,7 @@ This includes the shared known-unit registry plus any units already loaded in th
 :see
 unit_info
 unit_compile
+
+:related
+**PHP:** Enumerating available modules, templates, or plugin entrypoints
+**JavaScript / Node.js:** Listing registered modules, routes, or dynamically discovered components

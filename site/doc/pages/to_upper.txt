@@ -12,3 +12,7 @@ Note: this function is not yet Unicode-aware.
 
 :see
 >string
+
+:related
+**PHP:** `strtoupper()`
+**JavaScript / Node.js:** `String.prototype.toUpperCase()`

@@ -8,3 +8,7 @@ return value : a DTree object containing the deserialized JSON data
 :desc
 Deserializes 's' into a DTree structure.
 
+
+:related
+**PHP:** `json_decode()`
+**JavaScript / Node.js:** `JSON.parse()`

@@ -168,6 +168,10 @@ RENDER(Request& context)
 					{
 						?><h3>Description</h3><?
 					}
+					else if(layout_class == "related")
+					{
+						?><h3>Related PHP and JS</h3><?
+					}
 					else if(layout_class == "see")
 					{
 						?><h3>Related</h3><?

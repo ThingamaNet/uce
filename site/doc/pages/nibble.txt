@@ -11,3 +11,7 @@ Returns the part of 'haystack' before the first occurrence of 'delim', removing 
 
 :see
 >string
+
+:related
+**PHP:** Small parsing helpers built with `strpos()`, `substr()`, and `explode()`
+**JavaScript / Node.js:** Manual parsing with `indexOf()`, `slice()`, and `split()`

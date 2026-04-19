@@ -11,3 +11,7 @@ This ID can be passed to `ws_send_to()` or `ws_close()` to target a single conne
 
 :see
 >websocket
+
+:related
+**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

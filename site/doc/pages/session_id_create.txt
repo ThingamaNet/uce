@@ -9,3 +9,7 @@ Creates a session ID.
 
 :see
 >session
+
+:related
+**PHP:** `session_create_id()` or custom session token generators
+**JavaScript / Node.js:** `crypto.randomUUID()` or custom secure session ID generation

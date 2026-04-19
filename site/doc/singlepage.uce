@@ -42,6 +42,10 @@ void render_doc_page(String page)
 			{
 				<><h3>Description</h3></>
 			}
+			else if(layout_class == "related")
+			{
+				<><h3>Related PHP and JS</h3></>
+			}
 			else if(layout_class == "see")
 			{
 
@@ -79,7 +83,7 @@ void render_doc_page(String page)
 			}
 			else
 			{
-				<><div><? print(s); ?></div></>
+				<><div><?: markdown_to_html(s) ?></div></>
 			}
 		}
 	}	
