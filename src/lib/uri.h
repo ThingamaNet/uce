@@ -1,4 +1,6 @@
 
+#pragma once
+
 
 String var_dump(URI uri, String prefix = "", String postfix = "\n");
 String uri_decode(String q);

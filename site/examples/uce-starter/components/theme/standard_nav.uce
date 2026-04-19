@@ -1,0 +1,20 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+
+	<>
+		<nav<?: starter_theme_value("key", context) == "portal-dark" || starter_theme_value("key", context) == "dark" || starter_theme_value("key", context) == "retro-gaming" ? " class=\"nav-shell\"" : "" ?>>
+			<div class="nav-menu">
+				<a href="<?= starter_link("", context) ?>"><?= starter_cfg_string("site/name", context) ?></a>
+				<? starter_cfg("menu", context).each([&](DTree menu_item, String menu_key) {
+					if(menu_item["hidden"].to_string() == "1")
+						return;
+					?><a href="<?= starter_menu_href(menu_key, menu_item, context) ?>"><?= menu_item["title"].to_string() ?></a><?
+				}); ?>
+			</div>
+			<?: component("account_links", context) ?>
+		</nav>
+	</>
+}

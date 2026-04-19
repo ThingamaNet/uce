@@ -1,0 +1,46 @@
+#load "../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_title"] = "Themes";
+	starter_register_css("views/themes.css", context);
+	String current_theme = starter_theme_value("key", context);
+
+	<>
+		<div class="theme-gallery-shell">
+			<section class="theme-gallery-hero card">
+				<span class="theme-gallery-kicker">Starter Theme Gallery</span>
+				<h1>Compare Themes Side by Side</h1>
+				<p>The gallery renders the same preview content in each theme family. This makes it easier to judge shell fit, typography, token balance, and embed behavior.</p>
+			</section>
+			<div class="theme-gallery-grid">
+				<? starter_cfg("theme/options", context).each([&](DTree theme_info, String theme_key) {
+					StringMap params;
+					params["theme"] = theme_key;
+					String preview_href = starter_link("theme-preview", params, context);
+					params["embed"] = "1";
+					String iframe_href = starter_link("theme-preview", params, context);
+					StringMap home_params;
+					home_params["theme"] = theme_key;
+					?><section class="theme-gallery-card<?= theme_key == current_theme ? " is-active" : "" ?>">
+						<div class="theme-gallery-head">
+							<div>
+								<h2><?= theme_info["label"].to_string() ?></h2>
+								<p><?= first(theme_info["description"].to_string(), "Reusable starter theme family.") ?></p>
+							</div>
+							<? if(theme_key == current_theme) { ?><span class="theme-gallery-badge">Active</span><? } ?>
+						</div>
+						<div class="theme-gallery-actions">
+							<a class="btn" href="<?= preview_href ?>">Open Preview</a>
+							<a class="btn btn-secondary" href="<?= starter_link("", home_params, context) ?>">Open Home</a>
+						</div>
+						<div class="theme-gallery-frame-wrap">
+							<iframe title="<?= theme_info["label"].to_string() ?> preview" src="<?= iframe_href ?>"></iframe>
+						</div>
+					</section><?
+				}); ?>
+			</div>
+		</div>
+	</>
+}

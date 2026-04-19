@@ -1,0 +1,14 @@
+:sig
+String component_resolve(String name)
+
+:desc
+Resolves a component name to the concrete `.uce` file path that will be loaded.
+
+Resolution tries the exact file name first, then the same name with `.uce` appended, and then the same two forms under the `components/` prefix.
+
+If `name` contains a colon, only the file portion is used for resolution.
+
+This is primarily a debugging helper so you can see which concrete file a shorthand component name maps to.
+
+:see
+>ob

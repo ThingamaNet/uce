@@ -1,0 +1,30 @@
+
+RENDER(Request& context)
+{
+
+	String raw = first(context.post["raw"], "today");
+
+	<>
+		<link rel="stylesheet" href='style.css'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			parse_time
+		</h1>
+		<form action="?" method="post">
+			<div>
+				<label>Time string</label>
+				<input type="text" name="raw" value="<?= raw ?>"/>
+			</div>
+			<div>
+				<input type="submit" value="Parse"/>
+			</div>
+		</form>
+		<pre><?
+
+		print(date("%Y-%m-%d %H:%M", parse_time(raw)));
+
+		?></pre>
+		<pre><?= var_dump(context.params) ?></pre>
+	</>
+
+}

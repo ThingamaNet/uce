@@ -1,0 +1,26 @@
+
+RENDER(Request& context)
+{
+	String mode = context.get["mode"];
+
+	if(mode == "exception")
+		throw std::runtime_error("Intentional test exception from /test/error-reporting.uce");
+	if(mode == "abort")
+		raise(SIGABRT);
+	if(mode == "segfault")
+		raise(SIGSEGV);
+
+	<>
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+		<h1>
+			<a href="index.uce">UCE Test</a>:
+			Error reporting
+		</h1>
+		<p>These actions intentionally trigger failures so you can verify that UCE returns a usable `500` response instead of dropping the upstream connection.</p>
+		<ul>
+			<li><a href="?mode=exception">Trigger uncaught exception</a></li>
+			<li><a href="?mode=abort">Trigger SIGABRT</a></li>
+			<li><a href="?mode=segfault">Trigger SIGSEGV</a></li>
+		</ul>
+	</>
+}

@@ -1,0 +1,19 @@
+:sig
+void render_component(String name, [DTree props], [Request& context])
+
+:desc
+Renders another `.uce` file as a component and writes the result directly to the current output buffer.
+
+This is the direct-output counterpart to `component()`.
+
+Component props are passed through `context.call`, and `name:RENDERFUNC` may be used to select a named handler exported by `RENDER:RENDERFUNC(Request& context)`.
+
+Use `render_component()` when you want to write component output directly from C++ code instead of capturing it as a `String`.
+
+Example:
+`DTree props;`
+`props["body"] = "Hello";`
+`render_component("components/card:BODY", props, context);`
+
+:see
+>ob

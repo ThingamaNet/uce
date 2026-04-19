@@ -1,3 +1,5 @@
+#pragma once
+
 String json_escape(String s);
 
 struct DTree {
@@ -16,6 +18,11 @@ struct DTree {
 	String to_string();
 	String to_json();
 	String get_type_name();
+	bool is_reference();
+	DTree* reference_target();
+	const DTree* reference_target() const;
+	DTree& deref();
+	const DTree& deref() const;
 	void set_type(char t);
 	void set(String s);
 	void set(void* p);
@@ -23,6 +30,7 @@ struct DTree {
 	void set_bool(bool b);
 	void set(DTree source);
 	void set(StringMap source);
+	void set_reference(DTree* target);
 	DTree* key(String s);
 	DTree& operator [] (String s);
 	void operator = (String v);

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <map>
 #include <list>
@@ -52,7 +54,7 @@ typedef std::ostringstream ByteStream;
 struct Request;
 struct DTree;
 
-typedef void (*call_handler)(DTree& call_param);
+typedef void (*request_ref_handler)(Request& request);
 typedef DTree* (*dtree_call_handler)(DTree* call_param);
 typedef void (*request_handler)(Request* request);
 
@@ -77,8 +79,8 @@ struct SharedUnit {
 	void* so_handle;
 
 	request_handler on_setup;
-	call_handler on_render;
-	call_handler on_websocket;
+	request_ref_handler on_render;
+	request_ref_handler on_websocket;
 
 	String compiler_messages;
 	time_t last_compiled;
@@ -113,7 +115,7 @@ String nibble(String div, String& haystack);
 
 #include "dtree.h"
 
-void compiler_invoke(Request* context, String file_name, DTree& call_param);
+void compiler_invoke(Request* context, String file_name);
 
 struct Request {
 
@@ -126,6 +128,8 @@ struct Request {
 	StringMap session;
 
 	DTree var;
+	DTree call;
+	DTree connection;
 
 	String session_id = "";
 	String session_name = "";
@@ -148,7 +152,7 @@ struct Request {
 	struct Flags {
 		bool log_request = true;
 		bool is_finished = false;
-		int status;
+		int status = 0;
 		bool output_closed = false;
 		bool params_closed = false;
 		bool input_closed = false;
@@ -173,6 +177,7 @@ struct Request {
 		bool is_websocket = false;
 		String websocket_connection_id = "";
 		String websocket_scope = "";
+		DTree* websocket_connection_state = 0;
 		u8 websocket_opcode = 0;
 		bool websocket_is_binary = false;
 		bool websocket_is_text = false;

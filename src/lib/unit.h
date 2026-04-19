@@ -1,3 +1,4 @@
-#include "uce_lib.h"
+#pragma once
 
+#include "uce_lib.h"
 

@@ -1,0 +1,21 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_title"] = "Register";
+	DTree result;
+	if(context.params["REQUEST_METHOD"] == "POST")
+		result = starter_user_create(context.post["email"], context.post["password"], context);
+
+	<>
+		<h1>Register</h1>
+		<? if(result["result"].to_string() != "") { ?><div class="banner success">Registration successful. <a href="<?= starter_link("account/login", context) ?>">Log in</a></div><? } ?>
+		<? if(result["message"].to_string() != "" && result["result"].to_string() == "") { ?><div class="banner error"><?= result["message"].to_string() ?></div><? } ?>
+		<form method="post">
+			<label>Email: <input type="email" name="email" required></label><br>
+			<label>Password: <input type="password" name="password" required></label><br>
+			<button type="submit">Register</button>
+		</form>
+	</>
+}

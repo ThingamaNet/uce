@@ -1,0 +1,15 @@
+RENDER(Request& context)
+{
+	String title = first(
+		context.call["node"]["attrs"]["title"].to_string(),
+		context.call["argument"].to_string(),
+		"Notice"
+	);
+
+	<>
+		<aside>
+			<p><strong><?= title ?></strong></p>
+			<div><?: context.call["children_html"].to_string() ?></div>
+		</aside>
+	</>
+}

@@ -7,4 +7,5 @@
 #include "sys.cpp"
 #include "uri.cpp"
 #include "compiler.cpp"
+#include "markdown.cpp"
 #include "mysql-connector.cpp"

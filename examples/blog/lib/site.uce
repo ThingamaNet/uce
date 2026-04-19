@@ -1,5 +1,0 @@
-EXPORT
-String bla(String x)
-{
-	return(x + "!");
-}

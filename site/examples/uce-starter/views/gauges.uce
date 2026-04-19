@@ -1,0 +1,90 @@
+#load "../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_title"] = "Gauges";
+	starter_register_css("themes/common/css/gauges.css", context);
+
+	DTree props;
+	DTree item;
+
+	<>
+		<h1>Gauge Components Demo</h1>
+		<div class="demo-section gauge-demo-row">
+	</>
+
+	props["id"] = "horizontal_demo";
+	props["title"] = "Horizontal Progress Bar";
+	props["subtitle"] = "The original bar gauges, restyled to share the same card and token language as the new arc gauges.";
+	props["layout"] = "horizontal";
+	props["style"] = "flex:1 1 24rem";
+	props["listen"].set_bool(true);
+	item["value"] = "45"; item["min"] = "0"; item["max"] = "200"; item["label"] = "CPU"; item["tooltip"] = "CPU Usage"; props["items"]["cpu"] = item; item.clear();
+	item["value"] = "92"; item["min"] = "-50"; item["max"] = "100"; item["label"] = "Memory"; item["tooltip"] = "Memory Usage"; props["items"]["memory"] = item; item.clear();
+	item["value"] = "28"; item["min"] = "0"; item["max"] = "100"; item["label"] = "Disk I/O"; item["tooltip"] = "Disk I/O"; props["items"]["disk"] = item;
+	print(component("../components/gauges/gauges:PROGRESSBAR", props, context));
+
+	props.clear();
+	props["id"] = "vertical_demo";
+	props["title"] = "Vertical Progress Bar";
+	props["subtitle"] = "Same abstraction, but stacked as compact KPI cards.";
+	props["layout"] = "vertical";
+	props["style"] = "flex:1 1 24rem";
+	props["height"] = "350";
+	props["listen"].set_bool(true);
+	item.clear(); item["value"] = "45"; item["min"] = "0"; item["max"] = "200"; item["label"] = "CPU"; props["items"]["cpu"] = item;
+	item.clear(); item["value"] = "92"; item["min"] = "-50"; item["max"] = "100"; item["label"] = "RAM"; props["items"]["memory"] = item;
+	item.clear(); item["value"] = "28"; item["min"] = "0"; item["max"] = "100"; item["label"] = "I/O"; props["items"]["disk"] = item;
+	print(component("../components/gauges/gauges:PROGRESSBAR", props, context));
+
+	<>
+			<div class="gauge-control-panel">
+				<div class="control-group">
+					<h4>Event Binding</h4>
+					<div class="gauge-slider-group"><label for="cpu-slider">CPU</label><input type="range" id="cpu-slider" min="0" max="200" value="45" onchange="$.events.emit('value-broadcast', { name: 'cpu', value: this.value });"></div>
+					<div class="gauge-slider-group"><label for="memory-slider">Memory</label><input type="range" id="memory-slider" min="-50" max="100" value="92" onchange="$.events.emit('value-broadcast', { name: 'memory', value: this.value });"></div>
+					<div class="gauge-slider-group"><label for="disk-slider">Disk I/O</label><input type="range" id="disk-slider" min="0" max="100" value="28" onchange="$.events.emit('value-broadcast', { name: 'disk', value: this.value });"></div>
+				</div>
+			</div>
+		</div>
+		<div class="demo-section gauge-demo-row">
+	</>
+
+	props.clear();
+	props["id"] = "needle_demo";
+	props["title"] = "Needle Gauge";
+	props["subtitle"] = "The original analog gauge now uses the same elevated panels and theme-token palette as the arc gauges.";
+	props["style"] = "flex:1 1 24rem";
+	props["listen"].set_bool(true);
+	item.clear(); item["value"] = "45"; item["min"] = "0"; item["max"] = "200"; item["label"] = "CPU"; item["tooltip"] = "CPU Usage"; props["items"]["cpu"] = item;
+	item.clear(); item["value"] = "92"; item["min"] = "-50"; item["max"] = "100"; item["label"] = "Memory"; item["tooltip"] = "Memory Usage"; props["items"]["memory"] = item;
+	item.clear(); item["value"] = "28"; item["min"] = "0"; item["max"] = "100"; item["label"] = "Disk I/O"; item["tooltip"] = "Disk I/O"; props["items"]["disk"] = item;
+	print(component("../components/gauges/gauges:NEEDLEGAUGE", props, context));
+
+	<>
+		</div>
+		<div class="demo-section gauge-demo-row">
+	</>
+
+	props.clear();
+	props["id"] = "arc_demo";
+	props["title"] = "SVG Arc Gauges";
+	props["subtitle"] = "Backported from the llm2 overview as reusable KPI-style gauges.";
+	props["style"] = "flex: 2 1 36rem";
+	props["listen"].set_bool(true);
+	item.clear(); item["label"] = "System Load"; item["value"] = "1.8"; item["max"] = "8"; item["precision"] = "1"; item["caption"] = "LOAD 1M"; item["meta"] = "4 cores available"; props["items"]["load"] = item;
+	item.clear(); item["label"] = "Memory"; item["value"] = "62"; item["max"] = "100"; item["precision"] = "0"; item["unit"] = "%"; item["caption"] = "MEMORY"; item["meta"] = "9.9 / 16 GB"; props["items"]["memory_arc"] = item;
+	item.clear(); item["label"] = "Network"; item["value"] = "18"; item["max"] = "100"; item["precision"] = "0"; item["unit"] = " MB/s"; item["caption"] = "THROUGHPUT"; item["meta"] = "Inbound + outbound"; props["items"]["network"] = item;
+	print(component("../components/gauges/gauges:ARCGAUGE", props, context));
+
+	<>
+			<div class="gauge-control-panel">
+				<h4>Arc Gauge Controls</h4>
+				<div class="gauge-slider-group"><label for="load-slider">Load</label><input type="range" id="load-slider" min="0" max="8" value="1.8" step="0.1" oninput="$.events.emit('value-broadcast', { name: 'load', value: this.value, meta: this.value + ' / 8.0 load' });"></div>
+				<div class="gauge-slider-group"><label for="memory-arc-slider">Memory</label><input type="range" id="memory-arc-slider" min="0" max="100" value="62" step="1" oninput="$.events.emit('value-broadcast', { name: 'memory_arc', value: this.value, meta: this.value + '% used' });"></div>
+				<div class="gauge-slider-group"><label for="network-slider">Network Throughput</label><input type="range" id="network-slider" min="0" max="100" value="18" step="1" oninput="$.events.emit('value-broadcast', { name: 'network', value: this.value, meta: this.value + ' MB/s aggregate' });"></div>
+			</div>
+		</div>
+	</>
+}

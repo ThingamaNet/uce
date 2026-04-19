@@ -1,4 +1,5 @@
 #include "lib/uce_lib.cpp"
+#include <csetjmp>
 
 ServerState server_state;
 
@@ -7,6 +8,11 @@ ServerState server_state;
 FastCGIServer server;
 pid_t http_worker_pid = 0;
 bool worker_accepts_http = false;
+static sigjmp_buf request_fault_jmp;
+static volatile sig_atomic_t request_fault_active = 0;
+static volatile sig_atomic_t request_fault_signal = 0;
+static Request* request_fault_request = 0;
+static String request_fault_trace = "";
 
 Request* set_active_request(Request& request)
 {
@@ -18,6 +24,98 @@ Request* set_active_request(Request& request)
 void restore_active_request(Request* previous_context)
 {
 	context = previous_context;
+}
+
+String request_status_line(Request& request, int status_code, String reason)
+{
+	String status = std::to_string(status_code) + " " + reason;
+	if(request.params["GATEWAY_INTERFACE"] != "")
+		return("Status: " + status);
+	return("HTTP/1.1 " + status);
+}
+
+void clear_request_output(Request& request)
+{
+	for(auto* stream : request.ob_stack)
+		delete stream;
+	request.ob_stack.clear();
+	request.ob_start();
+}
+
+void render_request_failure(Request& request, String title, String details, String trace, int status_code = 500)
+{
+	request.response_code = request_status_line(request, status_code, "Internal Server Error");
+	request.header.clear();
+	request.set_cookies.clear();
+	request.header["Content-Type"] = "text/plain; charset=utf-8";
+	request.err.clear();
+
+	Request* previous_context = set_active_request(request);
+	clear_request_output(request);
+
+	print("UCE runtime error\n");
+	print("Request: ", first(request.params["REQUEST_URI"], request.params["SCRIPT_FILENAME"]), "\n");
+	print("Script: ", request.params["SCRIPT_FILENAME"], "\n");
+	print("Error: ", title, "\n");
+	if(details != "")
+		print("Details: ", details, "\n");
+	if(request_fault_signal != 0)
+	{
+		String sig_label = signal_name((int)request_fault_signal);
+		print("Signal: ", (s64)request_fault_signal);
+		if(sig_label != "")
+			print(" (", sig_label, ")");
+		print("\n");
+	}
+	if(trace != "")
+		print("\nTrace:\n", trace);
+
+	request.err += "UCE runtime error\n";
+	request.err += "Request: " + first(request.params["REQUEST_URI"], request.params["SCRIPT_FILENAME"]) + "\n";
+	request.err += "Script: " + request.params["SCRIPT_FILENAME"] + "\n";
+	request.err += "Error: " + title + "\n";
+	if(details != "")
+		request.err += "Details: " + details + "\n";
+	if(request_fault_signal != 0)
+	{
+		String sig_label = signal_name((int)request_fault_signal);
+		request.err += "Signal: " + std::to_string((int)request_fault_signal);
+		if(sig_label != "")
+			request.err += " (" + sig_label + ")";
+		request.err += "\n";
+	}
+	if(trace != "")
+		request.err += "\nTrace:\n" + trace;
+
+	request.flags.status = status_code;
+	restore_active_request(previous_context);
+}
+
+void on_request_fault_signal(int sig)
+{
+	request_fault_signal = sig;
+	request_fault_trace = capture_backtrace_string(32, 1);
+	if(request_fault_active && request_fault_request)
+		siglongjmp(request_fault_jmp, 1);
+	on_segfault(sig);
+}
+
+void install_request_fault_handlers()
+{
+	signal(SIGSEGV, on_request_fault_signal);
+	signal(SIGABRT, on_request_fault_signal);
+	signal(SIGBUS, on_request_fault_signal);
+	signal(SIGILL, on_request_fault_signal);
+	signal(SIGFPE, on_request_fault_signal);
+}
+
+void restore_request_fault_handlers()
+{
+	signal(SIGSEGV, on_segfault);
+	signal(SIGABRT, on_segfault);
+	signal(SIGBUS, on_segfault);
+	signal(SIGILL, on_segfault);
+	signal(SIGFPE, on_segfault);
 }
 
 String current_ws_scope()
@@ -43,7 +141,7 @@ String ws_message()
 {
 	if(!context)
 		return("");
-	return(context->var["ws"]["message"].to_string());
+	return(context->call["message"].to_string());
 }
 
 String ws_connection_id()
@@ -82,19 +180,14 @@ u64 ws_connection_count(String scope)
 	return(ws_connections(scope).size());
 }
 
-bool ws_send(String message, String scope)
+bool ws_send(String message, bool binary, String scope)
 {
-	return(server.websocket_broadcast(normalize_ws_scope(scope), message) > 0);
+	return(server.websocket_broadcast(normalize_ws_scope(scope), message, binary) > 0);
 }
 
-u64 ws_broadcast(String message, String scope)
+bool ws_send_to(String connection_id, String message, bool binary)
 {
-	return(server.websocket_broadcast(normalize_ws_scope(scope), message));
-}
-
-bool ws_send_to(String connection_id, String message)
-{
-	return(server.websocket_send_to(connection_id, message));
+	return(server.websocket_send_to(connection_id, message, binary));
 }
 
 bool ws_close(String connection_id)
@@ -147,51 +240,89 @@ int handle_complete(FastCGIRequest& request) {
 	//request.stats.mem_high = 0;
     request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
     request.get = parse_query(request.params["QUERY_STRING"]);
-    request.random_index = 0;
-    request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&request.stats.time_start));
+	request.random_index = 0;
+	request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&request.stats.time_start));
 	request.ob_start();
+	request_fault_request = &request;
+	request_fault_active = 1;
+	request_fault_signal = 0;
+	request_fault_trace = "";
+	install_request_fault_handlers();
 
-	if(request.params["HTTP_COOKIE"].length() > 0)
-		request.cookies = parse_cookies(request.params["HTTP_COOKIE"]);
+	String failure_title = "";
+	String failure_details = "";
+	String failure_trace = "";
 
-	String ct_info = request.params["CONTENT_TYPE"];
-	String ct_type = nibble(";", ct_info);
-
-	if(request.params["REQUEST_METHOD"] == "POST")
+	if(sigsetjmp(request_fault_jmp, 1) != 0)
 	{
-		if(ct_type == "multipart/form-data")
+		failure_title = "fatal signal during request";
+		failure_details = "worker recovered before closing the upstream connection";
+		failure_trace = request_fault_trace;
+	}
+	else
+	{
+		try
 		{
-			nibble("boundary=", ct_info);
-			request.post = parse_multipart(request.in, String("--")+ct_info, request.uploaded_files);
+			if(request.params["HTTP_COOKIE"].length() > 0)
+				request.cookies = parse_cookies(request.params["HTTP_COOKIE"]);
+
+			String ct_info = request.params["CONTENT_TYPE"];
+			String ct_type = nibble(";", ct_info);
+
+			if(request.params["REQUEST_METHOD"] == "POST")
+			{
+				if(ct_type == "multipart/form-data")
+				{
+					nibble("boundary=", ct_info);
+					request.post = parse_multipart(request.in, String("--")+ct_info, request.uploaded_files);
+				}
+				else
+				{
+					request.post = parse_query(request.in);
+				}
+			}
+
+			request.call = DTree();
+			compiler_invoke(&request, request.params["SCRIPT_FILENAME"]);
 		}
-		else
+		catch(const std::exception& e)
 		{
-			request.post = parse_query(request.in);
+			failure_title = "uncaught exception during request";
+			failure_details = e.what();
+			failure_trace = capture_backtrace_string(32, 1);
+		}
+		catch(...)
+		{
+			failure_title = "unknown uncaught exception during request";
+			failure_trace = capture_backtrace_string(32, 1);
 		}
 	}
 
-	DTree call_param;
-	compiler_invoke(&request, request.params["SCRIPT_FILENAME"], call_param);
+	request_fault_active = 0;
+	request_fault_request = 0;
+	restore_request_fault_handlers();
+
+	if(failure_title != "")
+		render_request_failure(request, failure_title, failure_details, failure_trace, 500);
 
 	for( auto &f : request.uploaded_files)
 	{
 		unlink(f.tmp_name);
 	}
 
-	if(request.session_id.length() > 0)
+	if(failure_title == "" && request.session_id.length() > 0)
 		save_session_data(request.session_id, request.session);
 
 	cleanup_mysql_connections();
 	restore_active_request(previous_context);
 
-    return 0;
+    return request.flags.status;
 }
 
 int handle_websocket_message(FastCGIRequest& request, const String& message, u8 opcode)
 {
 	Request event_request;
 	ByteStream ws_output;
-	DTree call_param;
 
 	Request* previous_context = set_active_request(event_request);
 	server_state.request_count += 1;
@@ -200,6 +331,8 @@ int handle_websocket_message(FastCGIRequest& request, const String& message, u8 
 	event_request.params["REQUEST_METHOD"] = "WEBSOCKET";
 	event_request.get = parse_query(event_request.params["QUERY_STRING"]);
 	event_request.resources = request.resources;
+	if(event_request.resources.websocket_connection_state)
+		event_request.connection.set_reference(event_request.resources.websocket_connection_state);
 	event_request.stats.time_init = microtime();
 	event_request.stats.time_start = event_request.stats.time_init;
 	event_request.random_index = 0;
@@ -224,13 +357,13 @@ int handle_websocket_message(FastCGIRequest& request, const String& message, u8 
 		request.params["REQUEST_URI"]
 	);
 
-	call_param["message"] = message;
-	call_param["connection_id"] = request.resources.websocket_connection_id;
-	call_param["scope"] = request.resources.websocket_scope;
-	call_param["opcode"] = (f64)opcode;
-	call_param["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
+	event_request.call["message"] = message;
+	event_request.call["connection_id"] = request.resources.websocket_connection_id;
+	event_request.call["scope"] = request.resources.websocket_scope;
+	event_request.call["opcode"] = (f64)opcode;
+	event_request.call["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
 
-	compiler_invoke_websocket(&event_request, request.params["SCRIPT_FILENAME"], call_param);
+	compiler_invoke_websocket(&event_request, request.params["SCRIPT_FILENAME"]);
 
 	if(event_request.session_id.length() > 0)
 		save_session_data(event_request.session_id, event_request.session);
@@ -268,6 +401,19 @@ void listen_for_connections()
 	}
 
 	signal(SIGSEGV, on_segfault);
+	signal(SIGABRT, on_segfault);
+	signal(SIGBUS, on_segfault);
+	signal(SIGILL, on_segfault);
+	signal(SIGFPE, on_segfault);
+	signal(SIGPIPE, SIG_IGN);
+	if(worker_accepts_http)
+	{
+		// Keep the dedicated HTTP/WebSocket worker alive. If it ages out like a
+		// normal FastCGI worker, nginx can connect to the shared listening socket
+		// while no child is actively accepting, which makes `.ws.uce` page loads
+		// appear to hang until the parent respawns a replacement worker.
+		server.calls_until_termination = -1;
+	}
 	if(!worker_accepts_http)
 		server.close_http_listeners();
 	server.on_request = &handle_request;
@@ -311,6 +457,7 @@ void init_base_process()
 
 	signal(SIGCHLD, on_child_exit);
 	signal(SIGINT, on_terminate);
+	signal(SIGPIPE, SIG_IGN);
 	srand(time());
 }
 

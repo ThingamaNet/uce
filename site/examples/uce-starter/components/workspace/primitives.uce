@@ -1,0 +1,122 @@
+#load "../../lib/app.uce"
+
+RENDER:APP_FRAME(Request& context)
+{
+	starter_register_css("themes/common/css/workspace.css", context);
+	starter_register_js("js/u-workspace-shell.js", context);
+	String id = context.call["id"].to_string();
+	String overlay_id = context.call["overlay_id"].to_string();
+	String class_name = context.call["class"].to_string();
+	<>
+		<div<?: id != "" ? " id=\"" + html_escape(id) + "\"" : "" ?> class="ws-app<?= class_name != "" ? " " + html_escape(class_name) : "" ?>">
+			<?: context.call["sidebar_html"].to_string() ?>
+			<div<?: overlay_id != "" ? " id=\"" + html_escape(overlay_id) + "\"" : "" ?> class="ws-sidebar-overlay"></div>
+			<main class="ws-main"><?: context.call["main_html"].to_string() ?></main>
+		</div>
+	</>
+}
+
+RENDER:EMPTY_STATE(Request& context)
+{
+	<>
+		<div class="ws-empty-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<div class="ws-empty-icon"><i class="<?= first(context.call["icon_class"].to_string(), "fas fa-layer-group") ?>"></i></div>
+			<h2><?= context.call["title"].to_string() ?></h2>
+			<p><?= context.call["text"].to_string() ?></p>
+			<?: context.call["action_html"].to_string() ?>
+		</div>
+	</>
+}
+
+RENDER:LIST_STATE(Request& context)
+{
+	<>
+		<div class="ws-list-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>"><? if(context.call["icon_class"].to_string() != "") { ?><i class="<?= context.call["icon_class"].to_string() ?>"></i><? } ?><span><?= context.call["text"].to_string() ?></span></div>
+	</>
+}
+
+RENDER:MOBILE_BAR(Request& context)
+{
+	<>
+		<div class="ws-mobile-bar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<button<?: context.call["button_id"].to_string() != "" ? " id=\"" + html_escape(context.call["button_id"].to_string()) + "\"" : "" ?> class="ws-mobile-toggle" title="Toggle sidebar" type="button">
+				<i class="<?= first(context.call["icon_class"].to_string(), "fas fa-bars") ?>"></i>
+			</button>
+			<span class="ws-mobile-title"><?= context.call["title"].to_string() ?></span>
+		</div>
+	</>
+}
+
+RENDER:PANEL_HEADER(Request& context)
+{
+	<>
+		<div class="ws-panel-header<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<div class="ws-panel-title-group">
+				<h2><?= context.call["title"].to_string() ?></h2>
+				<? if(context.call["subtitle"].to_string() != "") { ?><p class="ws-subtitle"><?= context.call["subtitle"].to_string() ?></p><? } ?>
+			</div>
+			<? if(context.call["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.call["actions_html"].to_string() ?></div><? } ?>
+		</div>
+	</>
+}
+
+RENDER:PANEL(Request& context)
+{
+	<>
+		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-panel<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<?: context.call["header_html"].to_string() ?>
+			<?: context.call["body_html"].to_string() ?>
+		</section>
+	</>
+}
+
+RENDER:SECTION_HEAD(Request& context)
+{
+	<>
+		<div class="ws-section-head<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<h3><?= context.call["title"].to_string() ?></h3>
+			<? if(context.call["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.call["actions_html"].to_string() ?></div><? } ?>
+		</div>
+	</>
+}
+
+RENDER:SECTION(Request& context)
+{
+	<>
+		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-section<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<?: context.call["header_html"].to_string() ?>
+			<?: context.call["body_html"].to_string() ?>
+		</section>
+	</>
+}
+
+RENDER:SIDEBAR_SHELL(Request& context)
+{
+	<>
+		<aside<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-sidebar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<?: context.call["top_html"].to_string() ?>
+			<?: context.call["body_html"].to_string() ?>
+		</aside>
+	</>
+}
+
+RENDER:SIDEBAR_TOOLBAR(Request& context)
+{
+	<>
+		<div class="ws-sidebar-top<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+			<?: context.call["action_html"].to_string() ?>
+			<div class="ws-search-wrap">
+				<i class="fas fa-search ws-search-icon"></i>
+				<input type="search"<?: context.call["search_input_id"].to_string() != "" ? " id=\"" + html_escape(context.call["search_input_id"].to_string()) + "\"" : "" ?> name="<?= first(context.call["search_input_name"].to_string(), "search") ?>" class="ws-search-input" placeholder="<?= first(context.call["search_placeholder"].to_string(), "Search...") ?>" autocomplete="off">
+			</div>
+		</div>
+	</>
+}
+
+RENDER:STATUS_PILL(Request& context)
+{
+	String variant = to_lower(first(context.call["variant"].to_string(), "neutral"));
+	<>
+		<span class="ws-status-pill ws-status-pill-<?= variant ?><?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>"><?= first(context.call["label"].to_string(), context.call["text"].to_string()) ?></span>
+	</>
+}

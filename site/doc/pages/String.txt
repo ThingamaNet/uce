@@ -1,0 +1,16 @@
+:sig
+String
+
+:desc
+Primary string type used throughout UCE.
+
+`String` is an alias for `std::string`.
+
+It is used for request data, headers, cookie values, file contents, query strings, JSON text, and WebSocket payloads.
+
+Because it is backed by `std::string`, it is binary-safe and may also contain raw bytes.
+
+For UTF-8-aware splitting, use helpers such as `split_utf8()` instead of assuming one byte equals one character.
+
+:see
+>types

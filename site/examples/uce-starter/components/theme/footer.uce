@@ -1,0 +1,21 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	if(context.var["starter"]["embed_mode"].to_string() != "")
+		return;
+
+	String text = first(starter_theme_value("footer_text", context), starter_cfg_string("site/name", context));
+	String inner_class = starter_theme_value("key", context) == "portal-light" ? "footer-inner" : "";
+
+	<>
+		<footer>
+			<? if(inner_class != "") { ?>
+				<div class="<?= inner_class ?>"><p><?= text ?></p></div>
+			<? } else { ?>
+				<div style="max-width: 1200px; margin: 0 auto; padding: 0 1rem;"><p><?= text ?></p></div>
+			<? } ?>
+		</footer>
+	</>
+}

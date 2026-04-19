@@ -1,0 +1,16 @@
+#load "../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_title"] = "Ajaxy";
+	<>
+		<h1>Ajax Demo</h1>
+		<div id="page2-section1">
+			<p>This is the content of Page 2. You can add more information here.</p>
+			<p>Sed at dolor leo. Morbi a tellus sed nisl dictum ultricies sit amet at purus. Nam mattis metus sed nunc egestas convallis.</p>
+			<br/>
+			<button onclick="$('#page2-section1').load('<?= starter_link("page2-section1", context) ?>')">Load new text</button>
+		</div>
+	</>
+}

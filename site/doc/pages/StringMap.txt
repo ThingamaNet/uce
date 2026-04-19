@@ -1,0 +1,22 @@
+:sig
+StringMap
+
+:desc
+Associative container mapping `String` keys to `String` values.
+
+`StringMap` is an alias for `std::map<String, String>`.
+
+It is commonly used for:
+`context.params`
+`context.get`
+`context.post`
+`context.cookies`
+`context.session`
+`context.header`
+
+Because it uses `std::map`, `map["key"]` will create an empty entry when that key does not already exist.
+
+Related helpers such as `parse_query()` and `encode_query()` convert between query strings and `StringMap` values.
+
+:see
+>types

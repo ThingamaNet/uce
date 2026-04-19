@@ -1,0 +1,10 @@
+RENDER(Request& context)
+{
+	String lang = first(context.call["lang"].to_string(), "plain");
+	<>
+		<section>
+			<p><strong>Code block:</strong> <?= lang ?></p>
+			<div><?: context.call["default_html"].to_string() ?></div>
+		</section>
+	</>
+}

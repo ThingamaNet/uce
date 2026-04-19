@@ -1,7 +1,0 @@
-#load "config/settings.uce"
-#load "lib/site.uce"
-
-RENDER()
-{
-	render_file("pages/page.html.uce");
-}

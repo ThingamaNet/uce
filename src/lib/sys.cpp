@@ -10,6 +10,45 @@
 #include <sys/file.h>
 #include "sys.h"
 
+String capture_backtrace_string(u32 max_frames, u32 skip_frames)
+{
+	if(max_frames == 0)
+		return("");
+
+	std::vector<void*> frames(max_frames);
+	size_t size = backtrace(frames.data(), max_frames);
+	if(size == 0)
+		return("");
+
+	char** symbols = backtrace_symbols(frames.data(), size);
+	if(!symbols)
+		return("");
+
+	String trace;
+	for(size_t i = skip_frames; i < size; i++)
+	{
+		trace += symbols[i];
+		trace += "\n";
+	}
+	free(symbols);
+	return(trace);
+}
+
+String signal_name(int sig)
+{
+	switch(sig)
+	{
+		case SIGABRT: return("SIGABRT");
+		case SIGBUS: return("SIGBUS");
+		case SIGFPE: return("SIGFPE");
+		case SIGILL: return("SIGILL");
+		case SIGINT: return("SIGINT");
+		case SIGSEGV: return("SIGSEGV");
+		case SIGTERM: return("SIGTERM");
+		default: return("");
+	}
+}
+
 String shell_exec(String cmd)
 {
 	//printf("(i) shell_exec(%s)\n", cmd.c_str());
@@ -410,15 +449,12 @@ StringMap memcache_get_multiple(u64 connection, StringList keys)
 
 void on_segfault(int sig)
 {
-	void *array[10];
-	size_t size;
-
-	// get void*'s for all entries on the stack
-	size = backtrace(array, 10);
-
-	// print out all the frames to stderr
-	fprintf(stderr, "SEG FAULT: %d:\n", sig);
-	backtrace_symbols_fd(array, size, STDERR_FILENO);
+	String trace = capture_backtrace_string(32, 1);
+	String sig_label = signal_name(sig);
+	if(sig_label != "")
+		fprintf(stderr, "SEG FAULT: %d (%s):\n%s", sig, sig_label.c_str(), trace.c_str());
+	else
+		fprintf(stderr, "SEG FAULT: %d:\n%s", sig, trace.c_str());
 	exit(1);
 }
 

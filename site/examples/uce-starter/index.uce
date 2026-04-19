@@ -1,0 +1,31 @@
+#load "lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+
+	DTree resolved = starter_resolve_view(context);
+
+	ob_start();
+	if(resolved["file"].to_string() != "")
+	{
+		if(resolved["param"].to_string() != "")
+			context.var["starter"]["route"]["param"] = resolved["param"];
+		render_file(resolved["file"].to_string(), context);
+	}
+	else
+	{
+		starter_not_found("The requested page does not exist.", context);
+		<>
+			<section class="card">
+				<h1>404 Not Found</h1>
+				<p><?= context.var["starter"]["error"].to_string() ?></p>
+			</section>
+		</>
+	}
+	String main_html = ob_get_close();
+
+	DTree shell_props;
+	shell_props["main_html"] = main_html;
+	render_component("components/theme/page_shell", shell_props, context);
+}

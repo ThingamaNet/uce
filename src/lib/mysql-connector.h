@@ -1,3 +1,5 @@
+#pragma once
+
 struct MySQLFieldInfo {
 	String name;
 	String table;

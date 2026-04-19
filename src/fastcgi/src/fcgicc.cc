@@ -38,6 +38,7 @@
 #include <stdexcept>
 
 #include <errno.h> // E*
+#include <fcntl.h>
 #include <unistd.h> // read, write, close, unlink
 #include <arpa/inet.h> // hton*
 #include <netinet/in.h> // sockaddr_in, INADDR_*
@@ -72,6 +73,16 @@ is_valid_close_code(u16 status_code)
 	if(status_code >= 3000 && status_code <= 4999)
 		return(true);
 	return(false);
+}
+
+static void
+set_socket_nonblocking(int socket_handle)
+{
+	int flags = fcntl(socket_handle, F_GETFL, 0);
+	if(flags == -1)
+		throw std::runtime_error("fcntl(F_GETFL) failed");
+	if(fcntl(socket_handle, F_SETFL, flags | O_NONBLOCK) == -1)
+		throw std::runtime_error("fcntl(F_SETFL) failed");
 }
 
 void
@@ -145,6 +156,7 @@ FastCGIServer::listen(unsigned tcp_port)
 		if (::listen(server_socket, 100))
 			throw std::runtime_error("listen() failed");
 
+		set_socket_nonblocking(server_socket);
 		server_sockets.push_back(server_socket);
 	} catch (...) {
 		close(server_socket);
@@ -185,6 +197,7 @@ FastCGIServer::listen(const std::string& local_path)
 			if (::listen(server_socket, 100))
 				throw std::runtime_error("listen() failed");
 
+			set_socket_nonblocking(server_socket);
 			server_sockets.push_back(server_socket);
 			listen_unlink.push_back(local_path);
 
@@ -208,8 +221,14 @@ FastCGIServer::send_output_buffer(Connection& con)
 	int write_result = write(con.client_socket,
 		con.output_buffer.data(),
 		con.output_buffer.size());
-	if (write_result == -1)
+	if(write_result == -1)
+	{
+		if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			return(0);
+		if(errno == ECONNRESET || errno == EPIPE)
+			return(-1);
 		throw std::runtime_error("write() failed");
+	}
 	con.output_buffer.erase(0, write_result);
 	return write_result;
 }
@@ -255,6 +274,8 @@ FastCGIServer::dispatch_websocket_message(Connection& connection, RequestID requ
 	it->second->resources.is_websocket = true;
 	it->second->resources.websocket_connection_id = connection.websocket_connection_id;
 	it->second->resources.websocket_scope = connection.websocket_scope;
+	it->second->resources.websocket_connection_state = &connection.websocket_state;
+	it->second->connection.set_reference(&connection.websocket_state);
 	it->second->resources.websocket_opcode = opcode;
 	it->second->resources.websocket_is_binary = (opcode == 0x2);
 	it->second->resources.websocket_is_text = (opcode == 0x1);
@@ -282,125 +303,152 @@ FastCGIServer::process(int timeout_ms)
 	for(auto con : client_sockets)
 	{
 		FD_SET(con.first, &fs_read);
-		if (!con.second->output_buffer.empty() || con.second->close_socket)
+		if(!con.second->output_buffer.empty() || con.second->close_socket)
 			FD_SET(con.first, &fs_write);
 		nfd = std::max(nfd, con.first);
 	}
 
-	int select_result = select(nfd + 1, &fs_read, &fs_write, NULL,
-		timeout_ms < 0 ? NULL : &tv);
-	if (select_result == -1)
-	if (errno == EINTR)
-		return;
-	else
+	int select_result = select(
+		nfd + 1,
+		&fs_read,
+		&fs_write,
+		NULL,
+		timeout_ms < 0 ? NULL : &tv
+	);
+	if(select_result == -1)
+	{
+		if(errno == EINTR)
+			return;
 		throw std::runtime_error("select() failed");
+	}
 
 	for(auto socket_handle : server_sockets)
-	if (FD_ISSET(socket_handle, &fs_read))
 	{
-		int client_socket = accept(socket_handle, NULL, NULL);
-		if (client_socket == -1)
-			throw std::runtime_error("accept() failed");
-		printf("Opening socket %i\n", client_socket);
-		client_sockets[client_socket] = new Connection();
-		client_sockets[client_socket]->client_socket = client_socket;
-		client_sockets[client_socket]->server_socket = socket_handle;
-		client_sockets[client_socket]->type = server_socket_types[socket_handle];
-		if(client_sockets[client_socket]->type == 'H')
+		if(!FD_ISSET(socket_handle, &fs_read))
+			continue;
+
+		for(;;)
 		{
-			FastCGIRequest* new_request = new FastCGIRequest();
-			new_request->resources.client_socket = client_socket;
-			new_request->resources.server_socket = socket_handle;
-			new_request->stats.time_init = microtime();
-			client_sockets[client_socket]->requests[client_socket] = new_request;
+			int client_socket = accept(socket_handle, NULL, NULL);
+			if(client_socket == -1)
+			{
+				if(errno == EAGAIN || errno == EWOULDBLOCK)
+					break;
+				if(errno == EINTR)
+					continue;
+				throw std::runtime_error("accept() failed");
+			}
+
+			set_socket_nonblocking(client_socket);
+			printf("Opening socket %i\n", client_socket);
+			client_sockets[client_socket] = new Connection();
+			client_sockets[client_socket]->client_socket = client_socket;
+			client_sockets[client_socket]->server_socket = socket_handle;
+			client_sockets[client_socket]->type = server_socket_types[socket_handle];
+			if(client_sockets[client_socket]->type == 'H')
+			{
+				FastCGIRequest* new_request = new FastCGIRequest();
+				new_request->resources.client_socket = client_socket;
+				new_request->resources.server_socket = socket_handle;
+				new_request->stats.time_init = microtime();
+				client_sockets[client_socket]->requests[client_socket] = new_request;
+			}
 		}
 	}
 
-	for (std::map<int, Connection*>::iterator it = client_sockets.begin();
+	for(std::map<int, Connection*>::iterator it = client_sockets.begin();
 		it != client_sockets.end();)
 	{
 		int read_socket = it->first;
+		Connection* connection = it->second;
 
-		if (FD_ISSET(read_socket, &fs_read))
+		if(FD_ISSET(read_socket, &fs_read))
 		{
 			int read_result = read(read_socket, buffer, sizeof(buffer));
-			if (read_result == -1)
-				if (errno == ECONNRESET)
+			if(read_result == -1)
+			{
+				if(errno == ECONNRESET)
 					goto close_socket;
-				else
+				if(errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 					throw std::runtime_error("read() on socket failed");
-				if (read_result == 0)
+			}
+			else if(read_result == 0)
+			{
+				if(connection->type == 'H' && connection->is_websocket)
 				{
-					if(it->second->type == 'H' && it->second->is_websocket)
-					{
-						it->second->close_socket = true;
-					}
-					else if(it->second->type == 'H' && it->second->input_buffer != "")
-					{
-						process_http_request(
-							*client_sockets[it->second->client_socket]->requests[it->second->client_socket],
-							it->second->input_buffer);
-						if(it->second->close_socket || !it->second->output_buffer.empty())
-							it->second->input_buffer = "";
-						else
-							it->second->close_socket = true;
-					}
+					connection->close_socket = true;
+				}
+				else if(connection->type == 'H' && connection->input_buffer != "")
+				{
+					process_http_request(
+						*client_sockets[connection->client_socket]->requests[connection->client_socket],
+						connection->input_buffer
+					);
+					if(connection->close_socket || !connection->output_buffer.empty())
+						connection->input_buffer = "";
 					else
-					{
-						it->second->close_socket = true;
+						connection->close_socket = true;
+				}
+				else
+				{
+					connection->close_socket = true;
 				}
 			}
 			else
 			{
-				it->second->input_buffer.append(buffer, read_result);
-					if(it->second->type == 'H')
+				connection->input_buffer.append(buffer, read_result);
+				if(connection->type == 'H')
+				{
+					if(connection->is_websocket)
 					{
-						if(it->second->is_websocket)
-						{
-							process_websocket_input(*it->second);
-						}
-						else
-						{
-							process_http_request(
-								*client_sockets[it->second->client_socket]->requests[it->second->client_socket],
-								it->second->input_buffer);
-							if(it->second->close_socket || !it->second->output_buffer.empty())
-								it->second->input_buffer = "";
-						}
+						process_websocket_input(*connection);
 					}
 					else
 					{
-						read_fgci(*it->second);
+						process_http_request(
+							*client_sockets[connection->client_socket]->requests[connection->client_socket],
+							connection->input_buffer
+						);
+						if(connection->close_socket || !connection->output_buffer.empty())
+							connection->input_buffer = "";
+					}
+				}
+				else
+				{
+					read_fgci(*connection);
 				}
 			}
 		}
 
-		if (!it->second->output_buffer.empty() &&
-				FD_ISSET(read_socket, &fs_write))
+		if(!connection->output_buffer.empty() && FD_ISSET(read_socket, &fs_write))
 		{
-			if(it->second->type == 'F')
-				write_fgci(*it->second);
-			send_output_buffer(*it->second);
+			if(connection->type == 'F')
+				write_fgci(*connection);
+			if(send_output_buffer(*connection) == -1)
+				goto close_socket;
 		}
 
-		if (it->second->close_socket && it->second->output_buffer.empty())
+		if(connection->close_socket && connection->output_buffer.empty())
 		{
 		close_socket:
 			printf("Closing socket %i\n", it->first);
 			int close_result = close(it->first);
-			if (close_result == -1 && errno != ECONNRESET)
+			if(close_result == -1 && errno != ECONNRESET)
 				throw std::runtime_error("close() failed");
-			Connection* connection = it->second;
+			Connection* doomed_connection = it->second;
 			client_sockets.erase(it++);
-			delete connection;
+			delete doomed_connection;
 			if(calls_until_termination != -1 && client_sockets.size() == 0)
 			{
 				calls_until_termination -= 1;
 				if(calls_until_termination <= 0)
 					exit(0);
 			}
-		} else
+		}
+		else
+		{
 			++it;
+		}
 	}
 }
 
@@ -528,6 +576,8 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 		request.resources.is_websocket = true;
 		request.resources.websocket_connection_id = connection->websocket_connection_id;
 		request.resources.websocket_scope = connection->websocket_scope;
+		request.resources.websocket_connection_state = &connection->websocket_state;
+		request.connection.set_reference(&connection->websocket_state);
 
 		connection->output_buffer +=
 			"HTTP/1.1 101 Switching Protocols\r\n"
@@ -682,14 +732,15 @@ FastCGIServer::process_websocket_input(Connection& connection)
 }
 
 bool
-FastCGIServer::websocket_send_to(String connection_id, String message)
+FastCGIServer::websocket_send_to(String connection_id, String message, bool binary)
 {
+	u8 opcode = binary ? 0x2 : 0x1;
 	for(auto& item : client_sockets)
 	{
 		Connection* connection = item.second;
 		if(connection->is_websocket && connection->websocket_connection_id == connection_id)
 		{
-			connection->output_buffer += ws_encode_frame(message);
+			connection->output_buffer += ws_encode_frame(message, opcode);
 			return(true);
 		}
 	}
@@ -697,9 +748,10 @@ FastCGIServer::websocket_send_to(String connection_id, String message)
 }
 
 u64
-FastCGIServer::websocket_broadcast(String scope, String message)
+FastCGIServer::websocket_broadcast(String scope, String message, bool binary)
 {
 	u64 sent = 0;
+	u8 opcode = binary ? 0x2 : 0x1;
 	for(auto& item : client_sockets)
 	{
 		Connection* connection = item.second;
@@ -707,7 +759,7 @@ FastCGIServer::websocket_broadcast(String scope, String message)
 			continue;
 		if(scope != "" && connection->websocket_scope != scope)
 			continue;
-		connection->output_buffer += ws_encode_frame(message);
+		connection->output_buffer += ws_encode_frame(message, opcode);
 		sent += 1;
 	}
 	return(sent);

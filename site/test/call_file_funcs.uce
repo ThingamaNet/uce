@@ -1,0 +1,6 @@
+// Minimal exported helper used by the `call_file()` demo page.
+
+EXPORT void test_func()
+{
+	print("HELLO FROM TEST FUNCTION");
+}

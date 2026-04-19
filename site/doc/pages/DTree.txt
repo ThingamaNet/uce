@@ -1,0 +1,27 @@
+:sig
+DTree
+
+:desc
+Dynamic tree/container type used throughout UCE for structured data.
+
+`DTree` can hold a `String`, `f64`, `bool`, pointer, or a nested map of child `DTree` values.
+
+Use `t["key"]` to access or create child entries. Use `push()` / `pop()` when treating it like an array-like container with numeric string keys.
+
+Common uses include:
+`json_decode()` / `json_encode()`
+`context.var`
+`context.call`
+`call_file()` return values
+
+Useful methods include:
+`to_string()`
+`to_json()`
+`get_type_name()`
+`set_bool()`
+`remove()`
+`clear()`
+`each()`
+
+:see
+>types

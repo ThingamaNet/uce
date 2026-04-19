@@ -72,6 +72,7 @@ public:
 		bool is_websocket = false;
 		String websocket_connection_id;
 		String websocket_scope;
+		DTree websocket_state;
 		String websocket_fragment_buffer;
 		u8 websocket_fragment_opcode = 0;
 		char type = 'F'; // F = FastCGI, H = HttpServer
@@ -91,8 +92,8 @@ public:
 	void fail_websocket_connection(Connection& connection, u16 status_code, String reason = "");
 	void close_websocket_connection(Connection& connection, u16 status_code = 1000, String reason = "");
 	void dispatch_websocket_message(Connection& connection, RequestID request_id, String payload, u8 opcode);
-	bool websocket_send_to(String connection_id, String message);
-	u64 websocket_broadcast(String scope, String message);
+	bool websocket_send_to(String connection_id, String message, bool binary = false);
+	u64 websocket_broadcast(String scope, String message, bool binary = false);
 	StringList websocket_connection_ids(String scope = "");
 	bool websocket_close(String connection_id, u16 status_code = 1000, String reason = "");
 	static void request_write_fgci(Connection&, RequestID, FastCGIRequest&);

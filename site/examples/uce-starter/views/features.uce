@@ -1,0 +1,13 @@
+#load "../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_title"] = "Features";
+	starter_register_css("views/marketing.css", context);
+	<>
+		<h1>Features</h1>
+		<p class="card">This page exists in the UCE port so the starter menu resolves cleanly as a full route, while still reusing the same marketing components as the home page.</p>
+	</>
+	print(component("../components/example/marketing_blocks:FEATURES_GRID", context));
+}

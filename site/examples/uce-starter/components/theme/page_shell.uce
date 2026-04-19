@@ -1,0 +1,117 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+
+	String page_type = first(context.var["starter"]["page_type"].to_string(), "html");
+	if(context.flags.status >= 300 && context.flags.status < 400)
+		return;
+
+	if(page_type == "blank")
+	{
+		print(context.call["main_html"].to_string());
+		return;
+	}
+
+	if(page_type == "json")
+	{
+		context.header["Content-Type"] = "application/json";
+		context.header["Cache-Control"] = "no-cache, no-store, must-revalidate";
+		if(context.var["starter"]["json"].get_type_name() == "array")
+		{
+			print(json_encode(context.var["starter"]["json"]));
+		}
+		else
+		{
+			print(context.call["main_html"].to_string());
+		}
+		return;
+	}
+
+	String theme_key = starter_theme_value("key", context);
+	bool embed_mode = context.var["starter"]["embed_mode"].to_string() == "1";
+	String body_class = embed_mode ? "embed-mode" : "";
+	if(theme_key == "portal-dark")
+		body_class = "portal-theme portal-dark-theme dark-theme" + String(embed_mode ? " embed-mode" : "");
+	else if(theme_key == "portal-light")
+		body_class = "portal-theme portal-light-theme" + String(embed_mode ? " embed-mode" : "");
+	else if(theme_key == "localfirst")
+		body_class = "admin-page localfirst-theme dark-theme" + String(embed_mode ? " embed-mode" : "");
+	else if(theme_key == "retro-gaming")
+		body_class = embed_mode ? "embed-mode" : "";
+
+	<>
+		<!doctype html>
+		<html class="<?= starter_html_class(context) ?>" lang="en" data-theme-key="<?= starter_theme_value("key", context) ?>">
+		<head>
+			<? render_component("page_shell:HEAD", context.call, context); ?>
+		</head>
+		<body<?: body_class != "" ? " class=\"" + html_escape(body_class) + "\"" : "" ?>>
+			<? if(theme_key == "retro-gaming") { ?><div class="retro-stars"></div><? } ?>
+			<? if(!embed_mode) { ?>
+				<?: component("../example/theme-switcher", context) ?>
+				<? if(theme_key != "localfirst") { ?>
+					<?: component("../basic/cookie-consent", context) ?>
+				<? } ?>
+			<? } ?>
+
+			<? if(theme_key == "localfirst") { ?>
+				<div class="admin-shell">
+					<nav class="admin-nav">
+						<div class="admin-nav-header">
+							<a class="admin-nav-title" href="<?= starter_link("", context) ?>">
+								<img class="admin-nav-logo-img" src="<?= starter_asset_url("themes/localfirst/img/local_first_logo.png", context) ?>" alt="<?= starter_cfg_string("site/name", context) ?>" />
+							</a>
+						</div>
+						<? starter_cfg("menu", context).each([&](DTree menu_item, String menu_key) {
+							if(menu_item["hidden"].to_string() == "1")
+								return;
+							String current_path = context.var["starter"]["route"]["l_path"].to_string();
+							bool active = menu_key != "" && (current_path == menu_key || current_path.rfind(menu_key + "/", 0) == 0);
+							?><a class="admin-nav-item<?= active ? " active" : "" ?>" href="<?= starter_menu_href(menu_key, menu_item, context) ?>"><?= menu_item["title"].to_string() ?></a><?
+						}); ?>
+					</nav>
+					<div class="admin-main">
+						<? if(!embed_mode) { ?>
+							<div class="admin-toolbar">
+								<?: component("account_links", context) ?>
+							</div>
+						<? } ?>
+						<div id="content" class="admin-content">
+							<?: context.call["main_html"].to_string() ?>
+						</div>
+					</div>
+				</div>
+			<? } else { ?>
+				<?: component("standard_nav", context) ?>
+				<div id="content"<?: embed_mode ? " class=\"embed-content\"" : "" ?>>
+					<?: context.call["main_html"].to_string() ?>
+				</div>
+				<?: component("footer", context) ?>
+			<? } ?>
+		</body>
+		</html>
+	</>
+}
+
+RENDER:HEAD(Request& context)
+{
+	starter_boot(context);
+	String title = first(context.var["starter"]["page_title"].to_string(), starter_cfg_string("site/default_page_title", context));
+	String description = first(starter_theme_value("meta_description", context), "UCE starter example");
+	String theme_color = first(starter_theme_value("theme_color", context), "#0f172a");
+	String icon = starter_asset_url(starter_theme_value("path", context) + "icon.png", context);
+
+	<>
+		<meta charset="utf-8">
+		<title><?= title + " | " + starter_cfg_string("site/name", context) ?></title>
+		<meta name="description" content="<?= description ?>">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="theme-color" content="<?= theme_color ?>">
+		<link rel="apple-touch-icon" href="<?= icon ?>" />
+		<link rel="icon" type="image/png" sizes="32x32" href="<?= icon ?>" />
+		<? starter_render_registered_css(context); ?>
+		<? starter_render_registered_js(context); ?>
+	</>
+}

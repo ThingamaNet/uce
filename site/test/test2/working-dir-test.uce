@@ -1,0 +1,6 @@
+
+
+RENDER(Request& context)
+{
+	print("Sub-Invoke Working dir: ", get_cwd(), "\n");
+}

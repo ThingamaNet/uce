@@ -1,10 +1,30 @@
 
+namespace {
+
+template <typename TreePtr>
+TreePtr dtree_resolve_reference(TreePtr tree)
+{
+	u32 depth = 0;
+	while(tree && tree->type == 'R' && depth < 16)
+	{
+		TreePtr target = reinterpret_cast<TreePtr>(tree->_ptr);
+		if(target == 0 || target == tree)
+			break;
+		tree = target;
+		depth += 1;
+	}
+	return(tree);
+}
+
+}
+
 void DTree::each(std::function <void (DTree t, String key)> f)
 {
-	switch(type)
+	const DTree& target = deref();
+	switch(target.type)
 	{
 		case('M'):
-			for (auto it = _map.begin(); it != _map.end(); ++it)
+			for (auto it = target._map.begin(); it != target._map.end(); ++it)
 			{
 				f(it->second, it->first);
 			}
@@ -17,43 +37,49 @@ void DTree::each(std::function <void (DTree t, String key)> f)
 
 bool DTree::is_array()
 {
-	return(type == 'M');
+	return(deref().type == 'M');
 }
 
 String DTree::to_string()
 {
-	switch(type)
+	const DTree& target = deref();
+	switch(target.type)
 	{
 		case('S'):
-			return(_String);
+			return(target._String);
 			break;
 		case('F'):
-			return(std::to_string(_float));
+			return(std::to_string(target._float));
 			break;
 		case('B'):
-			return(_bool ? "(true)" : "(false)");
+			return(target._bool ? "(true)" : "(false)");
 			break;
 		case('M'):
 			return("");
 			break;
 		case('P'):
-			return(std::to_string((u64)_ptr));
+			return(std::to_string((u64)target._ptr));
+			break;
+		case('R'):
+			return("");
 			break;
 	}
+	return("");
 }
 
 String DTree::to_json()
 {
-	switch(type)
+	const DTree& target = deref();
+	switch(target.type)
 	{
 		case('S'):
-			return(json_escape(_String));
+			return(json_escape(target._String));
 			break;
 		case('F'):
-			return(std::to_string(_float));
+			return(std::to_string(target._float));
 			break;
 		case('B'):
-			return(_bool ? "true" : "false");
+			return(target._bool ? "true" : "false");
 			break;
 		case('M'):
 			return("\"(array)\"");
@@ -61,12 +87,17 @@ String DTree::to_json()
 		case('P'):
 			return("\"(pointer)\"");
 			break;
+		case('R'):
+			return("\"(reference)\"");
+			break;
 	}
+	return("\"(unknown)\"");
 }
 
 String DTree::get_type_name()
 {
-	switch(type)
+	const DTree& target = deref();
+	switch(target.type)
 	{
 		case('S'):
 			return("String");
@@ -83,11 +114,62 @@ String DTree::get_type_name()
 		case('P'):
 			return("pointer");
 			break;
+		case('R'):
+			return("reference");
+			break;
 	}
+	return("unknown");
+}
+
+bool DTree::is_reference()
+{
+	return(type == 'R');
+}
+
+DTree* DTree::reference_target()
+{
+	if(type != 'R')
+		return(0);
+	DTree* target = dtree_resolve_reference(this);
+	if(target == 0 || target == this || target->type == 'R')
+		return(0);
+	return(target);
+}
+
+const DTree* DTree::reference_target() const
+{
+	if(type != 'R')
+		return(0);
+	const DTree* target = dtree_resolve_reference(this);
+	if(target == 0 || target == this || target->type == 'R')
+		return(0);
+	return(target);
+}
+
+DTree& DTree::deref()
+{
+	DTree* target = dtree_resolve_reference(this);
+	if(target == 0)
+		return(*this);
+	return(*target);
+}
+
+const DTree& DTree::deref() const
+{
+	const DTree* target = dtree_resolve_reference(this);
+	if(target == 0)
+		return(*this);
+	return(*target);
 }
 
 void DTree::set_type(char t)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set_type(t);
+		return;
+	}
 	if(type != t)
 	{
 		type = t;
@@ -103,30 +185,60 @@ void DTree::set_type(char t)
 
 void DTree::set(String s)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set(s);
+		return;
+	}
 	set_type('S');
 	_String = s;
 }
 
 void DTree::set(void* p)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set(p);
+		return;
+	}
 	set_type('P');
 	_ptr = p;
 }
 
 void DTree::set(f64 f)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set(f);
+		return;
+	}
 	set_type('F');
 	_float = f;
 }
 
 void DTree::set_bool(bool b)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set_bool(b);
+		return;
+	}
 	set_type('B');
 	_bool = b;
 }
 
 void DTree::set(DTree source)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set(source);
+		return;
+	}
 	set_type(source.type);
 	switch(type)
 	{
@@ -145,11 +257,20 @@ void DTree::set(DTree source)
 		case('P'):
 			_ptr = source._ptr;
 			break;
+		case('R'):
+			_ptr = source._ptr;
+			break;
 	}
 }
 
 void DTree::set(StringMap source)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set(source);
+		return;
+	}
 	set_type('M');
 	for (auto it = source.begin(); it != source.end(); ++it)
 	{
@@ -157,13 +278,25 @@ void DTree::set(StringMap source)
 	}
 }
 
+void DTree::set_reference(DTree* target)
+{
+	type = 'R';
+	_ptr = target;
+}
+
 DTree* DTree::key(String s)
 {
+	DTree* target = reference_target();
+	if(target)
+		return(target->key(s));
 	set_type('M');
 	return(&_map[s]);
 }
 
 DTree& DTree::operator [] (String s) {
+	DTree* target = reference_target();
+	if(target)
+		return((*target)[s]);
 	set_type('M');
 	return(_map[s]);
 }
@@ -176,6 +309,12 @@ void DTree::operator = (StringMap v) { set(v); }
 
 void DTree::push(DTree& child)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->push(child);
+		return;
+	}
 	set_type('M');
 	_map[std::to_string(_array_index)] = child;
 	_array_index += 1;
@@ -183,6 +322,9 @@ void DTree::push(DTree& child)
 
 DTree DTree::pop()
 {
+	DTree* target = reference_target();
+	if(target)
+		return(target->pop());
 	set_type('M');
 	auto last = _map.rbegin();
 	DTree result = last->second;
@@ -192,12 +334,24 @@ DTree DTree::pop()
 
 void DTree::remove(String s)
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->remove(s);
+		return;
+	}
 	set_type('M');
 	_map.erase(s);
 }
 
 void DTree::clear()
 {
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->clear();
+		return;
+	}
 	set_type('M');
 	_map.clear();
 }

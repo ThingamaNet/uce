@@ -1,0 +1,15 @@
+:sig
+String ws_message()
+
+:params
+return value : payload of the current WebSocket message
+
+:desc
+Returns the payload of the current WebSocket message being handled by `WS(Request& context)`.
+
+For text frames this is the decoded text payload. For binary frames this String contains the raw message bytes.
+
+Use `ws_is_binary()` or `ws_opcode()` to decide how the payload should be interpreted.
+
+:see
+>websocket

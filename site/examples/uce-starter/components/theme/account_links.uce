@@ -1,0 +1,30 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	DTree user = starter_current_user(context);
+	bool signed_in = user["email"].to_string() != "";
+	String wrapper_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-card" : "nav-account nav-menu";
+	String links_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-links" : "";
+	String name_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-name" : "account-name";
+
+	<>
+		<div class="<?= wrapper_class ?>">
+			<? if(signed_in) { ?>
+				<span class="<?= name_class ?>"><?= first(user["username"].to_string(), user["email"].to_string(), "Account") ?></span>
+				<? if(links_class != "") { ?><div class="<?= links_class ?>"><? } ?>
+				<a href="<?= starter_link("account/profile", context) ?>">Profile</a>
+				<a href="<?= starter_link("account/logout", context) ?>">Logout</a>
+				<? if(links_class != "") { ?></div><? } ?>
+			<? } else { ?>
+				<? if(links_class != "") { ?><div class="<?= links_class ?>"><? } ?>
+				<a href="<?= starter_link("account/login", context) ?>">Login</a>
+				<? if(starter_cfg("users/enable_signup", context).to_string() != "") { ?>
+					<a href="<?= starter_link("account/register", context) ?>">Register</a>
+				<? } ?>
+				<? if(links_class != "") { ?></div><? } ?>
+			<? } ?>
+		</div>
+	</>
+}

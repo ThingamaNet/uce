@@ -1,0 +1,28 @@
+:sig
+String component(String name, [DTree props], [Request& context])
+
+:desc
+Renders another `.uce` file as a component and returns the captured output as a `String`.
+
+`component()` resolves the target file relative to the current page and also tries the `components/` prefix automatically, mirroring the shorthand used by the web app starter example project.
+
+Component props are passed in `context.call`.
+
+Because `<?= ... ?>` HTML-escapes its value, embed component markup with `<?: component(...) ?>`, `print(component(...))`, or use `render_component(...)` for direct output.
+
+When `name` contains a colon, such as `components/card:BODY`, the part after the colon selects a named render handler exported from the component file through `RENDER:BODY(Request& context)`.
+
+The default handler is `RENDER(Request& context)`.
+
+Resolution order is:
+exact file name
+exact file name with `.uce`
+the same two forms under `components/`
+
+Example:
+`DTree props;`
+`props["title"] = "Status";`
+`&lt;&gt;&lt;?: component("workspace/panel", props, context) ?&gt;&lt;/&gt;`
+
+:see
+>ob

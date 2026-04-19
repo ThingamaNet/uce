@@ -1,0 +1,14 @@
+:sig
+bool component_exists(String name)
+
+:desc
+Checks whether a component file can be resolved from the current page context.
+
+Resolution tries the exact name first and then the `components/` shorthand form.
+
+If `name` contains a colon, only the file portion is used for existence checks.
+
+This is useful when a page wants to render an optional component if it is present without hard-failing when it is missing.
+
+:see
+>ob

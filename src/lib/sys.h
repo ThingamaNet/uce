@@ -1,3 +1,5 @@
+#pragma once
+
 #include <signal.h>
 
 String shell_exec(String cmd);
@@ -43,10 +45,12 @@ u8 ws_opcode();
 bool ws_is_binary();
 StringList ws_connections(String scope = "");
 u64 ws_connection_count(String scope = "");
-bool ws_send(String message, String scope = "");
-u64 ws_broadcast(String message, String scope = "");
-bool ws_send_to(String connection_id, String message);
+bool ws_send(String message, bool binary = false, String scope = "");
+bool ws_send_to(String connection_id, String message, bool binary = false);
 bool ws_close(String connection_id = "");
+
+String capture_backtrace_string(u32 max_frames = 32, u32 skip_frames = 0);
+String signal_name(int sig);
 
 String memcache_escape_key(String key);
 StringList memcache_escape_keys(StringList keys);

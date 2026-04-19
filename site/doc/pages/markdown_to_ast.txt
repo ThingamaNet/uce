@@ -1,0 +1,77 @@
+:sig
+DTree markdown_to_ast(String src)
+DTree markdown_to_ast(String src, DTree options)
+
+:params
+src : markdown source text
+options : optional markdown options tree
+return value : a `DTree` document AST
+
+:desc
+Parses Markdown source into a structured `DTree` document tree.
+
+The parser targets a practical GitHub-flavored subset by default:
+- ATX headings (`#`)
+- setext headings
+- paragraphs
+- blockquotes
+- ordered and unordered lists
+- task list items
+- fenced code blocks
+- tables
+- horizontal rules
+- emphasis / strong / strikethrough
+- links, images, autolinks, and code spans
+- `:::` directive blocks for component-based extensions
+
+The returned AST uses `type` plus node-specific fields such as `level`, `text`, `lang`, `href`, `src`, `name`, `argument`, `attrs`, and `children`.
+
+Top-level documents use:
+`type = "document"`
+`children = [...]`
+
+Common block nodes:
+`heading`
+`paragraph`
+`blockquote`
+`list`
+`list_item`
+`code_block`
+`table`
+`directive`
+`hr`
+
+Common inline nodes:
+`text`
+`code`
+`strong`
+`em`
+`strike`
+`link`
+`image`
+`raw_html`
+
+:Example
+`DTree options = json_decode("{\"components\":{\":::warning\":\"components/markdown/warning\"}}");`
+`DTree ast = markdown_to_ast(file_get_contents("README.md"), options);`
+`print(json_encode(ast));`
+
+:Options
+`options["gfm"]`
+Enables GitHub-style extras such as tables, task lists, strikethrough, and bare-URL autolinks.
+Defaults to true.
+
+`options["allow_html"]`
+Allows raw HTML passthrough nodes to be captured and rendered.
+Defaults to false.
+
+`options["components"]`
+Component hook map used later by `markdown_to_html()`.
+The parser preserves directive data needed by those hooks.
+
+:see
+markdown_to_html
+component
+render_component
+json_encode
+DTree

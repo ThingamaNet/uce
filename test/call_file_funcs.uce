@@ -1,6 +1,0 @@
-// some bullshit?
-
-EXPORT void test_func()
-{
-	print("HELLO FROM TEST FUNCTION");
-}

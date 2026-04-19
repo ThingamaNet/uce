@@ -1,0 +1,564 @@
+String starter_dirname(String path)
+{
+	if(path == "")
+		return("");
+	auto parts = split(path, "/");
+	if(parts.size() <= 1)
+		return("");
+	parts.pop_back();
+	String result = join(parts, "/");
+	if(result == "")
+		return("/");
+	return(result);
+}
+
+String starter_fs_join(String root, String relative)
+{
+	if(relative == "")
+		return(root);
+	if(relative[0] == '/')
+		return(relative);
+	if(root == "" || root == "/")
+		return(root + relative);
+	if(root[root.length() - 1] == '/')
+		return(root + relative);
+	return(root + "/" + relative);
+}
+
+String starter_safe_name(String raw)
+{
+	String result = "";
+	for(auto c : raw)
+	{
+		if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+			result.append(1, c);
+		else
+			result.append(1, '_');
+	}
+	return(result);
+}
+
+String starter_json_string(String raw)
+{
+	DTree value;
+	value = raw;
+	return(json_encode(value));
+}
+
+String starter_fs_root(Request& context)
+{
+	String root = context.var["starter"]["fs_root"].to_string();
+	if(root == "")
+		root = get_cwd();
+	return(root);
+}
+
+String starter_script_url(Request& context)
+{
+	String url = context.var["starter"]["script_url"].to_string();
+	if(url == "")
+		url = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
+	return(url);
+}
+
+String starter_base_url(Request& context)
+{
+	String base = context.var["starter"]["base_url"].to_string();
+	if(base == "")
+	{
+		base = starter_dirname(starter_script_url(context));
+		if(base == "")
+			base = "/";
+		if(base[base.length() - 1] != '/')
+			base.append(1, '/');
+	}
+	return(base);
+}
+
+String starter_fs_path(String relative, Request& context)
+{
+	return(starter_fs_join(starter_fs_root(context), relative));
+}
+
+DTree starter_cfg(String path, Request& context)
+{
+	DTree result = context.var["starter"]["config"];
+	for(auto segment : split(path, "/"))
+	{
+		if(segment == "")
+			continue;
+		result = result[segment];
+	}
+	return(result);
+}
+
+String starter_cfg_string(String path, Request& context)
+{
+	return(starter_cfg(path, context).to_string());
+}
+
+String starter_link(String path, Request& context);
+String starter_link(String path, StringMap params, Request& context);
+
+String starter_theme_value(String key, Request& context)
+{
+	return(starter_cfg("theme/" + key, context).to_string());
+}
+
+String starter_first_route_segment(Request& context)
+{
+	String query = context.params["QUERY_STRING"];
+	for(auto part : split(query, "&"))
+	{
+		if(part == "")
+			continue;
+		if(part.find("=") == String::npos)
+			return(uri_decode(part));
+	}
+	return("");
+}
+
+DTree starter_make_route(Request& context)
+{
+	DTree route;
+	String path = starter_first_route_segment(context);
+	path = trim(path);
+	while(path.length() > 0 && path[0] == '/')
+		path = path.substr(1);
+	while(path.length() > 0 && path[path.length() - 1] == '/')
+		path = path.substr(0, path.length() - 1);
+	if(path == "")
+		path = "index";
+	route["l_path"] = path;
+	route["page"] = nibble(path, "/");
+	if(route["page"].to_string() == "")
+		route["page"] = "index";
+	return(route);
+}
+
+DTree starter_resolve_view(Request& context, String base_dir = "views")
+{
+	DTree result;
+	DTree route = context.var["starter"]["route"];
+	String lpath = first(route["l_path"].to_string(), "index");
+	String base = trim(base_dir);
+	if(base != "" && base[base.length() - 1] == '/')
+		base = base.substr(0, base.length() - 1);
+
+	String exact = base + "/" + lpath + ".uce";
+	if(file_exists(exact))
+	{
+		result["file"] = exact;
+		return(result);
+	}
+
+	String dir_index = base + "/" + lpath + "/index.uce";
+	if(file_exists(dir_index))
+	{
+		result["file"] = dir_index;
+		return(result);
+	}
+
+	auto parts = split(lpath, "/");
+	if(parts.size() > 1)
+	{
+		String param = parts.back();
+		parts.pop_back();
+		String parent = join(parts, "/");
+		String parent_index = base + "/" + parent + "/index.uce";
+		if(file_exists(parent_index))
+		{
+			result["file"] = parent_index;
+			result["param"] = param;
+			return(result);
+		}
+	}
+
+	return(result);
+}
+
+DTree starter_default_config()
+{
+	DTree config;
+
+	config["site"]["name"] = "UCE Starter";
+	config["site"]["default_page_title"] = "Home";
+	config["site"]["timezone"] = "UTC";
+
+	config["users"]["enable_signup"].set_bool(true);
+	config["filebase"]["path"] = "/tmp/uce-starter-data";
+
+	config["theme"]["key"] = "portal-dark";
+	config["theme"]["options"]["light"]["label"] = "Starter Light";
+	config["theme"]["options"]["light"]["path"] = "themes/light/";
+	config["theme"]["options"]["light"]["mode"] = "light";
+	config["theme"]["options"]["light"]["description"] = "Original starter light theme kept for backward compatibility.";
+	config["theme"]["options"]["light"]["footer_text"] = "UCE Starter running with the Starter Light theme.";
+	config["theme"]["options"]["light"]["meta_description"] = "Starter Light theme for the UCE starter";
+	config["theme"]["options"]["light"]["theme_color"] = "#3b82f6";
+
+	config["theme"]["options"]["dark"]["label"] = "Starter Dark";
+	config["theme"]["options"]["dark"]["path"] = "themes/dark/";
+	config["theme"]["options"]["dark"]["mode"] = "dark";
+	config["theme"]["options"]["dark"]["description"] = "Original starter dark theme kept for backward compatibility.";
+	config["theme"]["options"]["dark"]["footer_text"] = "UCE Starter running with the Starter Dark theme.";
+	config["theme"]["options"]["dark"]["meta_description"] = "Starter Dark theme for the UCE starter";
+	config["theme"]["options"]["dark"]["theme_color"] = "#0f172a";
+
+	config["theme"]["options"]["portal-light"]["label"] = "AI Portal Light";
+	config["theme"]["options"]["portal-light"]["path"] = "themes/portal-light/";
+	config["theme"]["options"]["portal-light"]["mode"] = "light";
+	config["theme"]["options"]["portal-light"]["description"] = "Dense, corporate portal layout in a light palette.";
+	config["theme"]["options"]["portal-light"]["footer_text"] = "UCE Starter running with the AI Portal Light starter theme.";
+	config["theme"]["options"]["portal-light"]["meta_description"] = "AI Portal Light theme for the UCE starter";
+	config["theme"]["options"]["portal-light"]["theme_color"] = "#0f68ad";
+
+	config["theme"]["options"]["portal-dark"]["label"] = "AI Portal Dark";
+	config["theme"]["options"]["portal-dark"]["path"] = "themes/portal-dark/";
+	config["theme"]["options"]["portal-dark"]["mode"] = "dark";
+	config["theme"]["options"]["portal-dark"]["description"] = "Glassy dark portal shell and the current default starter theme.";
+	config["theme"]["options"]["portal-dark"]["footer_text"] = "UCE Starter running with the AI Portal Dark starter theme.";
+	config["theme"]["options"]["portal-dark"]["meta_description"] = "AI Portal Dark theme for the UCE starter";
+	config["theme"]["options"]["portal-dark"]["theme_color"] = "#0f172a";
+
+	config["theme"]["options"]["localfirst"]["label"] = "Local First";
+	config["theme"]["options"]["localfirst"]["path"] = "themes/localfirst/";
+	config["theme"]["options"]["localfirst"]["mode"] = "dark";
+	config["theme"]["options"]["localfirst"]["description"] = "llm2-derived admin shell with sidebar chrome.";
+	config["theme"]["options"]["localfirst"]["footer_text"] = "UCE Starter running with the Local First starter theme.";
+	config["theme"]["options"]["localfirst"]["meta_description"] = "Local First admin-shell theme for the UCE starter";
+	config["theme"]["options"]["localfirst"]["theme_color"] = "#020913";
+
+	config["theme"]["options"]["retro-gaming"]["label"] = "Retro Gaming";
+	config["theme"]["options"]["retro-gaming"]["path"] = "themes/retro-gaming/";
+	config["theme"]["options"]["retro-gaming"]["mode"] = "dark";
+	config["theme"]["options"]["retro-gaming"]["description"] = "CRT scanlines, pixel font, neon glow.";
+	config["theme"]["options"]["retro-gaming"]["footer_text"] = "INSERT COIN // UCE Starter running the Retro Gaming theme.";
+	config["theme"]["options"]["retro-gaming"]["meta_description"] = "Retro Gaming pixel theme for the UCE starter";
+	config["theme"]["options"]["retro-gaming"]["theme_color"] = "#0a0a1a";
+
+	config["menu"][""]["title"] = "Home";
+	config["menu"][""]["hidden"].set_bool(true);
+	config["menu"]["page1"]["title"] = "Components";
+	config["menu"]["features"]["title"] = "Features";
+	config["menu"]["page2"]["title"] = "Ajaxy";
+	config["menu"]["gauges"]["title"] = "Gauges";
+	config["menu"]["dashboard"]["title"] = "Dashboard";
+	config["menu"]["workspace"]["title"] = "Workspace";
+	config["menu"]["themes"]["title"] = "Themes";
+	config["menu"]["auth/demo"]["title"] = "Auth";
+
+	return(config);
+}
+
+void starter_set_status(Request& context, s32 code, String reason)
+{
+	context.response_code = "HTTP/1.1 " + std::to_string(code) + " " + reason;
+	context.flags.status = code;
+}
+
+void starter_register_css(String path, Request& context)
+{
+	context.var["starter"]["assets"]["css"][path] = path;
+}
+
+void starter_register_js(String path, Request& context)
+{
+	context.var["starter"]["assets"]["js"][path] = path;
+}
+
+String starter_asset_url(String path, Request& context)
+{
+	String url = starter_base_url(context) + path;
+	String fs_path = starter_fs_path(path, context);
+	if(file_exists(fs_path))
+		url += "?v=" + std::to_string((u64)file_mtime(fs_path));
+	return(url);
+}
+
+void starter_render_registered_css(Request& context)
+{
+	context.var["starter"]["assets"]["css"].each([&](DTree item, String key) {
+		String path = item.to_string();
+		if(path != "")
+		{
+			<><link rel="stylesheet" href="<?= starter_asset_url(path, context) ?>" /></>
+		}
+	});
+}
+
+void starter_render_registered_js(Request& context)
+{
+	context.var["starter"]["assets"]["js"].each([&](DTree item, String key) {
+		String path = item.to_string();
+		if(path != "")
+		{
+			<><script src="<?= starter_asset_url(path, context) ?>"></script></>
+		}
+	});
+}
+
+String starter_link(String path, Request& context)
+{
+	StringMap params;
+	return(starter_link(path, params, context));
+}
+
+String starter_link(String path, StringMap params, Request& context)
+{
+	String query = "";
+	path = trim(path);
+	if(path != "")
+		query = uri_encode(path);
+	String extra = encode_query(params);
+	if(query != "" && extra != "")
+		query += "&" + extra;
+	else if(query == "")
+		query = extra;
+	String url = starter_script_url(context);
+	if(query != "")
+		url += "?" + query;
+	return(url);
+}
+
+String starter_filebase_root(Request& context)
+{
+	String root = starter_cfg_string("filebase/path", context);
+	if(root == "")
+		root = "/tmp/uce-starter-data";
+	return(root);
+}
+
+String starter_hash_id(String raw)
+{
+	raw = to_lower(trim(raw));
+	return(gen_sha1("uce-starter:" + raw).substr(0, 12));
+}
+
+String starter_user_dir(String email, Request& context)
+{
+	String bucket = starter_hash_id(email);
+	return(starter_filebase_root(context) + "/users/" + bucket.substr(0, 2) + "/" + bucket);
+}
+
+String starter_user_file(String email, Request& context)
+{
+	return(starter_user_dir(email, context) + "/account.json");
+}
+
+String starter_password_hash(String password, String salt)
+{
+	String hash = "uce-starter:" + password + ":" + salt;
+	for(s32 i = 0; i < 2048; i++)
+		hash = gen_sha1(hash + ":" + std::to_string(i));
+	return(hash);
+}
+
+DTree starter_read_json_file(String file_name)
+{
+	DTree result;
+	if(!file_exists(file_name))
+		return(result);
+	String raw = trim(file_get_contents(file_name));
+	if(raw == "")
+		return(result);
+	return(json_decode(raw));
+}
+
+bool starter_write_json_file(String file_name, DTree data)
+{
+	mkdir(starter_dirname(file_name));
+	return(file_put_contents(file_name, json_encode(data)));
+}
+
+DTree starter_user_load(String email, Request& context)
+{
+	DTree user = starter_read_json_file(starter_user_file(email, context));
+	if(user.get_type_name() != "array")
+		return(DTree());
+	user["id"] = to_lower(trim(email));
+	return(user);
+}
+
+DTree starter_user_create(String email, String password, Request& context)
+{
+	DTree result;
+	email = to_lower(trim(email));
+	password = trim(password);
+	result["message"] = "";
+	result["result"].set_bool(false);
+
+	if(email == "" || password == "")
+	{
+		result["message"] = "email_and_password_required";
+		return(result);
+	}
+	if(email.find("@") == String::npos)
+	{
+		result["message"] = "invalid_email";
+		return(result);
+	}
+
+	DTree existing = starter_user_load(email, context);
+	if(existing.get_type_name() == "array" && existing["email"].to_string() != "")
+	{
+		result["message"] = "user_exists";
+		return(result);
+	}
+
+	String salt = gen_sha1(std::to_string((u64)time()) + ":" + std::to_string((u64)(microtime() * 1000000.0)) + ":" + make_session_id()).substr(0, 24);
+	DTree user;
+	user["email"] = email;
+	user["salt"] = salt;
+	user["password_hash"] = starter_password_hash(password, salt);
+	user["created"] = std::to_string((u64)time());
+	DTree role;
+	role = "user";
+	user["roles"].push(role);
+
+	starter_write_json_file(starter_user_file(email, context), user);
+	user["id"] = email;
+	result["result"].set_bool(true);
+	result["id"] = email;
+	result["profile"] = user;
+	return(result);
+}
+
+DTree starter_user_sign_in(String email, String password, Request& context)
+{
+	DTree result;
+	result["result"].set_bool(false);
+	email = to_lower(trim(email));
+	password = trim(password);
+
+	DTree user = starter_user_load(email, context);
+	if(user.get_type_name() != "array" || user["email"].to_string() == "")
+	{
+		result["message"] = "no_such_user";
+		return(result);
+	}
+	if(user["password_hash"].to_string() == "")
+	{
+		result["message"] = "no_password_set";
+		return(result);
+	}
+
+	String expected = starter_password_hash(password, user["salt"].to_string());
+	if(expected != user["password_hash"].to_string())
+	{
+		result["message"] = "invalid_password";
+		return(result);
+	}
+
+	session_start();
+	context.session["starter_user_id"] = email;
+	context.var["starter"]["current_user"] = user;
+	result["result"].set_bool(true);
+	result["profile"] = user;
+	return(result);
+}
+
+bool starter_is_signed_in(Request& context)
+{
+	if(context.var["starter"]["current_user"]["email"].to_string() != "")
+		return(true);
+	String user_id = context.session["starter_user_id"];
+	if(user_id == "")
+		return(false);
+	DTree user = starter_user_load(user_id, context);
+	if(user["email"].to_string() == "")
+	{
+		context.session.erase("starter_user_id");
+		return(false);
+	}
+	context.var["starter"]["current_user"] = user;
+	return(true);
+}
+
+DTree starter_current_user(Request& context)
+{
+	if(starter_is_signed_in(context))
+		return(context.var["starter"]["current_user"]);
+	return(DTree());
+}
+
+void starter_user_logout(Request& context)
+{
+	context.session.erase("starter_user_id");
+	context.var["starter"]["current_user"].clear();
+}
+
+void starter_redirect(String path, Request& context)
+{
+	starter_set_status(context, 302, "Found");
+	context.header["Location"] = starter_link(path, context);
+}
+
+void starter_not_found(String message, Request& context)
+{
+	starter_set_status(context, 404, "Not Found");
+	context.var["starter"]["error"] = message;
+	context.var["starter"]["page_title"] = "404 Not Found";
+}
+
+String starter_menu_href(String menu_key, DTree menu_item, Request& context)
+{
+	if(menu_item["external"].to_string() != "")
+		return("/" + menu_key);
+	return(starter_link(menu_key, context));
+}
+
+String starter_html_class(Request& context)
+{
+	String classes = "no-js";
+	if(starter_theme_value("mode", context) == "dark")
+		classes += " dark-theme";
+	return(classes);
+}
+
+void starter_boot(Request& context)
+{
+	if(context.var["starter"]["booted"].to_string() == "1")
+		return;
+
+	context.var["starter"]["booted"] = "1";
+	context.var["starter"]["fs_root"] = get_cwd();
+	context.var["starter"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
+
+	String base_url = starter_dirname(context.var["starter"]["script_url"].to_string());
+	if(base_url == "")
+		base_url = "/";
+	if(base_url[base_url.length() - 1] != '/')
+		base_url.append(1, '/');
+	context.var["starter"]["base_url"] = base_url;
+
+	DTree config = starter_default_config();
+	String requested_theme = first(context.get["theme"], context.cookies["starter_theme"], config["theme"]["key"].to_string());
+	if(config["theme"]["options"][requested_theme].to_string() == "" && config["theme"]["options"][requested_theme].get_type_name() != "array")
+		requested_theme = config["theme"]["key"].to_string();
+
+	config["theme"]["options"][requested_theme].each([&](DTree item, String key) {
+		config["theme"][key] = item;
+	});
+	config["theme"]["key"] = requested_theme;
+	context.var["starter"]["config"] = config;
+	context.var["starter"]["route"] = starter_make_route(context);
+	context.var["starter"]["page_type"] = "html";
+	context.var["starter"]["page_title"] = first(config["menu"][context.var["starter"]["route"]["l_path"].to_string()]["title"].to_string(), config["site"]["default_page_title"].to_string(), "Home");
+	context.var["starter"]["embed_mode"].set_bool(context.get["embed"] != "");
+
+	if(context.get["theme"] != "" && context.get["theme"] == requested_theme)
+	{
+		set_cookie("starter_theme", requested_theme, time() + (86400 * 180));
+		context.cookies["starter_theme"] = requested_theme;
+	}
+
+	session_start();
+	starter_is_signed_in(context);
+
+	starter_register_css(starter_theme_value("path", context) + "css/style.css", context);
+	starter_register_css("themes/common/fontawesome/css/all.min.css", context);
+	starter_register_js("js/u-query.js", context);
+	starter_register_js("js/morphdom.js", context);
+	starter_register_js("js/site.js", context);
+}

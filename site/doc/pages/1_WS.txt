@@ -1,0 +1,26 @@
+:sig
+WS(Request& context)
+
+:desc
+Defines the WebSocket message handler for the current `.ws.uce` page.
+
+The same page may expose both `RENDER(Request& context)` and `WS(Request& context)`. `RENDER(Request& context)` serves the initial HTTP response, while `WS(Request& context)` is called whenever a complete WebSocket message arrives for that page.
+
+UCE reassembles fragmented messages before calling `WS(Request& context)`. Text and binary frames are both delivered. Use `context.call`, `context.connection`, `ws_opcode()`, and `ws_is_binary()` to inspect the current message.
+
+`context.connection` is a broker-owned `DTree` for the current socket. It starts empty for a new client and persists across later `WS(Request& context)` calls on that same connection.
+
+The current message data is available in `context.call`:
+
+context.call["message"] : current message payload
+
+context.call["connection_id"] : sender connection ID
+
+context.call["scope"] : current endpoint scope
+
+context.call["opcode"] : WebSocket opcode of the current message
+
+context.call["document_uri"] : request URI of the current endpoint
+
+:see
+>websocket

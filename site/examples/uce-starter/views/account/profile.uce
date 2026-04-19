@@ -1,0 +1,26 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	if(!starter_is_signed_in(context))
+	{
+		starter_redirect("account/login", context);
+		return;
+	}
+	context.var["starter"]["page_title"] = "Profile";
+	DTree user = starter_current_user(context);
+	String roles = "";
+	user["roles"].each([&](DTree role, String key) {
+		if(roles != "")
+			roles += ", ";
+		roles += role.to_string();
+	});
+	<>
+		<h1>Profile</h1>
+		<p>Email: <?= user["email"].to_string() ?></p>
+		<p>Roles: <?= roles ?></p>
+		<p>Created: <?= date("%Y-%m-%dT%H:%M:%S", int_val(user["created"].to_string())) ?></p>
+		<p><a href="<?= starter_link("account/logout", context) ?>">Logout</a></p>
+	</>
+}

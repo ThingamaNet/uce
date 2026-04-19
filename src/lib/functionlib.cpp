@@ -77,9 +77,9 @@ String replace(String s, String search, String replace_with)
 
 String trim(String raw)
 {
-	u32 len = raw.length();
-	u32 start_pos = 0;
-	u32 end_pos = len - 1;
+	s64 len = raw.length();
+	s64 start_pos = 0;
+	s64 end_pos = len - 1;
 	if(len == 0 || (len == 1 && isspace(raw[0])))
 		return("");
 	while(start_pos < len && isspace(raw[start_pos]))
@@ -610,7 +610,13 @@ void ob_close()
 	delete context->ob;
 	context->ob_stack.pop_back();
 	if(context->ob_stack.size() == 0)
+	{
 		ob_start();
+	}
+	else
+	{
+		context->ob = context->ob_stack.back();
+	}
 }
 
 String ob_get()

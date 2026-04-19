@@ -1,0 +1,24 @@
+:sig
+RENDER(Request& context)
+
+:desc
+Defines the main HTTP render handler for the current `.uce` page.
+
+When a page is requested over HTTP, the runtime loads the target file and calls its `RENDER(Request& context)` function.
+
+Pages may also export additional named render handlers with `RENDER:NAME(Request& context)`.
+
+Named render handlers are not used for the page's direct HTTP entrypoint. They are intended for component-style sub-rendering through helpers such as `component("components/card:BODY", props, context)` or `render_component("components/card:BODY", props, context)`.
+
+The default page entrypoint is always the plain `RENDER(Request& context)` handler.
+
+The request environment is passed explicitly through `context`, including params, cookies, post data, session state, headers, uploaded files, and the current `context.call` tree.
+
+For a normal direct page request, `context.call` starts empty.
+
+If the page is invoked from another UCE file via `render_file(file_name, context)`, the callee receives that same `context`.
+
+Pages intended to serve WebSocket traffic may expose both `RENDER(Request& context)` and `WS(Request& context)`. In that case `RENDER(Request& context)` serves the initial HTTP response and `WS(Request& context)` handles subsequent WebSocket messages.
+
+:see
+>ob
