@@ -1,13 +1,15 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	starter_boot(context);
-	DTree user = starter_current_user(context);
+	StarterUser users(context);
+	DTree user = users.current();
 	bool signed_in = user["email"].to_string() != "";
-	String wrapper_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-card" : "nav-account nav-menu";
-	String links_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-links" : "";
-	String name_class = starter_theme_value("key", context) == "localfirst" ? "admin-account-name" : "account-name";
+	String theme_key = context.cfg.get_by_path("theme/key").to_string();
+	String wrapper_class = theme_key == "localfirst" ? "admin-account-card" : "nav-account nav-menu";
+	String links_class = theme_key == "localfirst" ? "admin-account-links" : "";
+	String name_class = theme_key == "localfirst" ? "admin-account-name" : "account-name";
 
 	<>
 		<div class="<?= wrapper_class ?>">
@@ -20,7 +22,7 @@ RENDER(Request& context)
 			<? } else { ?>
 				<? if(links_class != "") { ?><div class="<?= links_class ?>"><? } ?>
 				<a href="<?= starter_link("account/login", context) ?>">Login</a>
-				<? if(starter_cfg("users/enable_signup", context).to_string() != "") { ?>
+				<? if(context.cfg.get_by_path("users/enable_signup").to_string() != "") { ?>
 					<a href="<?= starter_link("account/register", context) ?>">Register</a>
 				<? } ?>
 				<? if(links_class != "") { ?></div><? } ?>

@@ -80,7 +80,8 @@ String html_escape(String s);
 String html_escape(u64 a);
 String html_escape(f64 a);
 
-String json_encode(DTree t);
+String json_encode(String s, char quote_char = '"');
+String json_encode(DTree t, char quote_char = '"');
 DTree json_decode(String s);
 
 String var_dump(StringMap map, String prefix = "", String postfix = "\n");
@@ -92,5 +93,6 @@ String ob_get();
 String ob_get_close();
 
 String safe_name(String raw);
+String ascii_safe_name(String raw);
 
 #define is_bit_set(var,pos) ((var) & (1<<(pos)))

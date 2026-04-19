@@ -1,9 +1,11 @@
 String Functions
 
+ascii_safe_name
 concat
 filter
 first
 join
+json_encode
 nibble
 print
 split

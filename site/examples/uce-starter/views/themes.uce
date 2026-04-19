@@ -5,7 +5,7 @@ RENDER(Request& context)
 	starter_boot(context);
 	context.var["starter"]["page_title"] = "Themes";
 	starter_register_css("views/themes.css", context);
-	String current_theme = starter_theme_value("key", context);
+	String current_theme = context.cfg.get_by_path("theme/key").to_string();
 
 	<>
 		<div class="theme-gallery-shell">
@@ -15,7 +15,7 @@ RENDER(Request& context)
 				<p>The gallery renders the same preview content in each theme family. This makes it easier to judge shell fit, typography, token balance, and embed behavior.</p>
 			</section>
 			<div class="theme-gallery-grid">
-				<? starter_cfg("theme/options", context).each([&](DTree theme_info, String theme_key) {
+				<? context.cfg.get_by_path("theme/options").each([&](DTree theme_info, String theme_key) {
 					StringMap params;
 					params["theme"] = theme_key;
 					String preview_href = starter_link("theme-preview", params, context);

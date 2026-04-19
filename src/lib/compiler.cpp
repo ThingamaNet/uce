@@ -146,6 +146,18 @@ String preprocess_named_render_syntax(String content)
 					line = indent + "EXPORT void render_" + safe_name(render_name) + render_signature;
 			}
 		}
+		else if(trimmed.rfind("COMPONENT:", 0) == 0)
+		{
+			String signature = trimmed.substr(10);
+			auto open_paren_pos = signature.find("(");
+			if(open_paren_pos != String::npos)
+			{
+				String render_name = trim(signature.substr(0, open_paren_pos));
+				String render_signature = signature.substr(open_paren_pos);
+				if(render_name != "")
+					line = indent + "EXPORT void component_render_" + safe_name(render_name) + render_signature;
+			}
+		}
 
 		result += line + line_break;
 		current_line = "";
@@ -285,6 +297,7 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	//setup_unit_paths(context, su, file_name);
 
 	su->on_render = 0;
+	su->on_component = 0;
 	su->on_websocket = 0;
 	su->on_setup = 0;
 	su->compiler_messages = "";
@@ -307,6 +320,8 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
 		su->on_render = (request_ref_handler)dlsym(su->so_handle, "render");
+		dlerror();
+		su->on_component = (request_ref_handler)dlsym(su->so_handle, "component_render");
 		dlerror();
 		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, "websocket");
 		dlerror();
@@ -466,6 +481,34 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 
 }
 
+namespace {
+
+struct UnitInvocationScope
+{
+	Request* context = 0;
+	String previous_working_directory;
+	String previous_unit_file;
+
+	UnitInvocationScope(Request* context, SharedUnit* su)
+	{
+		this->context = context;
+		previous_working_directory = get_cwd();
+		previous_unit_file = context->resources.current_unit_file;
+		set_cwd(su->src_path);
+		context->resources.current_unit_file = su->file_name;
+	}
+
+	~UnitInvocationScope()
+	{
+		if(!context)
+			return;
+		context->resources.current_unit_file = previous_unit_file;
+		set_cwd(previous_working_directory);
+	}
+};
+
+}
+
 String component_normalize_path(String name)
 {
 	name = trim(name);
@@ -477,26 +520,30 @@ String component_normalize_path(String name)
 void component_parse_target(String target, String& file_name, String& render_name)
 {
 	target = trim(target);
-	render_name = "render";
+	render_name = "";
 	auto render_split_pos = target.find(":");
 	if(render_split_pos != String::npos)
 	{
 		render_name = trim(target.substr(render_split_pos + 1));
 		target = trim(target.substr(0, render_split_pos));
-		if(render_name == "")
-			render_name = "render";
 	}
 	file_name = target;
 }
 
-String component_resolve_path(String name)
+String component_resolve_path(String name, Request* request_context = 0)
 {
+	String target_name = trim(name);
 	String file_name;
 	String render_name;
-	component_parse_target(name, file_name, render_name);
+	component_parse_target(target_name, file_name, render_name);
 
 	if(file_name == "")
-		return("");
+	{
+		if(target_name.rfind(":", 0) == 0 && request_context && request_context->resources.current_unit_file != "")
+			file_name = request_context->resources.current_unit_file;
+		else
+			return("");
+	}
 
 	StringList candidates;
 	auto push_candidate = [&] (String candidate) {
@@ -530,7 +577,7 @@ String component_resolve_path(String name)
 	return("");
 }
 
-String render_handler_symbol(String render_name)
+String page_render_handler_symbol(String render_name)
 {
 	render_name = trim(render_name);
 	if(render_name == "" || render_name == "render")
@@ -538,11 +585,35 @@ String render_handler_symbol(String render_name)
 	return("render_" + safe_name(render_name));
 }
 
-request_ref_handler get_render_handler(SharedUnit* su, String render_name)
+String component_handler_symbol(String render_name)
 {
-	String symbol = render_handler_symbol(render_name);
+	render_name = trim(render_name);
+	if(render_name == "")
+		return("component_render");
+	return("component_render_" + safe_name(render_name));
+}
+
+request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
+{
+	String symbol = page_render_handler_symbol(render_name);
 	if(symbol == "render")
 		return(su->on_render);
+
+	auto it = su->api_functions.find(symbol);
+	if(it != su->api_functions.end())
+		return((request_ref_handler)it->second);
+
+	auto handler = (request_ref_handler)dlsym(su->so_handle, symbol.c_str());
+	dlerror();
+	su->api_functions[symbol] = (void*)handler;
+	return(handler);
+}
+
+request_ref_handler get_component_handler(SharedUnit* su, String render_name)
+{
+	String symbol = component_handler_symbol(render_name);
+	if(symbol == "component_render")
+		return(su->on_component);
 
 	auto it = su->api_functions.find(symbol);
 	if(it != su->api_functions.end())
@@ -567,7 +638,7 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 		return(false);
 	}
 
-	auto handler = get_render_handler(su, render_name);
+	auto handler = get_page_render_handler(su, render_name);
 	if(!handler)
 	{
 		if(error_out)
@@ -580,11 +651,41 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 		return(false);
 	}
 
-	String prev_wd = get_cwd();
-	set_cwd(su->src_path);
+	UnitInvocationScope invoke_scope(context, su);
 	su->on_setup(context);
 	handler(*context);
-	set_cwd(prev_wd);
+	return(true);
+}
+
+bool compiler_invoke_component(Request* context, String file_name, String render_name, String* error_out = 0)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(!su)
+		return(false);
+
+	if(!su->on_setup)
+	{
+		if(error_out)
+			*error_out = "internal error: set_current_request() not defined in " + file_name;
+		return(false);
+	}
+
+	auto handler = get_component_handler(su, render_name);
+	if(!handler)
+	{
+		if(error_out)
+		{
+			if(trim(render_name) == "")
+				*error_out = "no COMPONENT() entry point";
+			else
+				*error_out = "no COMPONENT:" + render_name + "() entry point";
+		}
+		return(false);
+	}
+
+	UnitInvocationScope invoke_scope(context, su);
+	su->on_setup(context);
+	handler(*context);
 	return(true);
 }
 
@@ -618,11 +719,9 @@ void compiler_invoke_websocket(Request* context, String file_name)
 		return;
 	}
 
-	String prev_wd = get_cwd();
-	set_cwd(su->src_path);
+	UnitInvocationScope invoke_scope(context, su);
 	su->on_setup(context);
 	su->on_websocket(*context);
-	set_cwd(prev_wd);
 }
 
 void render_file(String file_name)
@@ -638,7 +737,7 @@ void render_file(String file_name, Request& context)
 
 String component_resolve(String name)
 {
-	return(component_resolve_path(name));
+	return(component_resolve_path(name, context));
 }
 
 bool component_exists(String name)
@@ -674,10 +773,10 @@ void render_component(String name, DTree props, Request& context)
 	String render_name;
 	component_parse_target(name, file_name, render_name);
 
-	String resolved_name = component_resolve_path(file_name);
+	String resolved_name = component_resolve_path(name, &context);
 	if(resolved_name == "")
 	{
-		print(component_error_banner("component not found: " + file_name));
+		print(component_error_banner("component not found: " + trim(name)));
 		return;
 	}
 
@@ -685,7 +784,7 @@ void render_component(String name, DTree props, Request& context)
 	context.call = props;
 
 	String error_message = "";
-	if(!compiler_invoke_render(&context, resolved_name, render_name, &error_message) && error_message != "")
+	if(!compiler_invoke_component(&context, resolved_name, render_name, &error_message) && error_message != "")
 		print(component_error_banner(error_message));
 
 	context.call = previous_call;
@@ -747,11 +846,9 @@ DTree* call_file(String file_name, String function_name, DTree* call_param)
 			}
 			else
 			{
-				String prev_wd = get_cwd();
-				set_cwd(su->src_path);
+				UnitInvocationScope invoke_scope(context, su);
 				su->on_setup(context);
 				result = f(call_param);
-				set_cwd(prev_wd);
 			}
 		}
 	}

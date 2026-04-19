@@ -24,10 +24,10 @@ RENDER(Request& context)
 		</div>
 		<div class="card">
 			<h2>Current Session Status</h2>
-			<? if(context.session["starter_user_id"] != "") { ?>
+			<? if(context.session[StarterUser::session_key()] != "") { ?>
 				<div class="success-card">
 					<h3>Logged In</h3>
-					<p>User ID: <?= context.session["starter_user_id"] ?></p>
+					<p>User ID: <?= context.session[StarterUser::session_key()] ?></p>
 				</div>
 			<? } else { ?>
 				<div class="component-card">

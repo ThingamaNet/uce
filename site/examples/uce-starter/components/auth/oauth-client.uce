@@ -1,6 +1,6 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	String title = first(context.call["title"].to_string(), "Sign in with OAuth");
 	String subtitle = first(context.call["subtitle"].to_string(), "Choose your preferred authentication method");
@@ -42,7 +42,7 @@ RENDER(Request& context)
 			</div>
 			<? services.each([&](DTree service, String service_key) {
 				String client_id = context.call[service_key + "_client_id"].to_string();
-				String handler_name = starter_safe_name(service_key);
+				String handler_name = ascii_safe_name(service_key);
 				String service_name = service["name"].to_string();
 				String scope = service["scope"].to_string();
 				String auth_url = service["auth_url"].to_string();
@@ -63,7 +63,7 @@ RENDER(Request& context)
 							if (button) button.style.display = 'none';
 							if (loading) loading.style.display = 'block';
 
-							const clientId = <?: starter_json_string(client_id) ?>;
+							const clientId = <?: json_encode(client_id) ?>;
 							if (!clientId || clientId.indexOf('YOUR_') === 0) {
 								alert('<?= service_name ?> OAuth is not configured yet.');
 								if (button) button.style.display = '';
@@ -74,21 +74,21 @@ RENDER(Request& context)
 							const state = btoa(Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2)).replace(/[^a-zA-Z0-9]/g, '');
 							const params = new URLSearchParams({
 								client_id: clientId,
-								redirect_uri: <?: starter_json_string(callback_url) ?>,
-								scope: <?: starter_json_string(scope) ?>,
+								redirect_uri: <?: json_encode(callback_url) ?>,
+								scope: <?: json_encode(scope) ?>,
 								response_type: 'code',
 								state: state
 							});
 
 							sessionStorage.setItem('oauth_state', state);
-							sessionStorage.setItem('oauth_service', <?: starter_json_string(service_key) ?>);
+							sessionStorage.setItem('oauth_service', <?: json_encode(service_key) ?>);
 
-							fetch(<?: starter_json_string(store_url) ?>, {
+							fetch(<?: json_encode(store_url) ?>, {
 								method: 'POST',
 								headers: {'Content-Type': 'application/json'},
-								body: JSON.stringify({oauth_service: <?: starter_json_string(service_key) ?>, oauth_state: state})
+								body: JSON.stringify({oauth_service: <?: json_encode(service_key) ?>, oauth_state: state})
 							}).catch(console.error).finally(() => {
-								window.location.href = <?: starter_json_string(auth_url) ?> + '?' + params.toString();
+								window.location.href = <?: json_encode(auth_url) ?> + '?' + params.toString();
 							});
 						};
 					</script>

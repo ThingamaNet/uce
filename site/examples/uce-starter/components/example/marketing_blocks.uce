@@ -42,7 +42,7 @@ void marketing_default_features(DTree& features)
 	features.push(item);
 }
 
-RENDER:HERO_SECTION(Request& context)
+COMPONENT:HERO_SECTION(Request& context)
 {
 	String title = first(context.call["title"].to_string(), "Welcome to the Present");
 	String subtitle = first(context.call["subtitle"].to_string(), "Experience no-quite-modern web development with our cutting-edge framework");
@@ -192,7 +192,7 @@ RENDER:HERO_SECTION(Request& context)
 	</>
 }
 
-RENDER:FEATURES_GRID(Request& context)
+COMPONENT:FEATURES_GRID(Request& context)
 {
 	DTree features = context.call["features"];
 	marketing_default_features(features);
@@ -286,7 +286,7 @@ RENDER:FEATURES_GRID(Request& context)
 	</>
 }
 
-RENDER:STATS_SECTION(Request& context)
+COMPONENT:STATS_SECTION(Request& context)
 {
 	DTree stats = context.call["stats"];
 	if(stats.get_type_name() != "array" || stats["0"]["label"].to_string() == "")
@@ -362,7 +362,7 @@ RENDER:STATS_SECTION(Request& context)
 	</>
 }
 
-RENDER:BRANDS_SHOWCASE(Request& context)
+COMPONENT:BRANDS_SHOWCASE(Request& context)
 {
 	DTree logos = context.call["logos"];
 	if(logos.get_type_name() != "array" || logos["0"]["name"].to_string() == "")
@@ -408,7 +408,7 @@ RENDER:BRANDS_SHOWCASE(Request& context)
 	</>
 }
 
-RENDER:TESTIMONIALS(Request& context)
+COMPONENT:TESTIMONIALS(Request& context)
 {
 	DTree testimonials = context.call["testimonials"];
 	if(testimonials.get_type_name() != "array" || testimonials["0"]["name"].to_string() == "")
@@ -471,7 +471,7 @@ RENDER:TESTIMONIALS(Request& context)
 	</>
 }
 
-RENDER:PRICING_TABLE(Request& context)
+COMPONENT:PRICING_TABLE(Request& context)
 {
 	DTree plans = context.call["plans"];
 	if(plans.get_type_name() != "array" || plans["0"]["name"].to_string() == "")
@@ -544,7 +544,7 @@ RENDER:PRICING_TABLE(Request& context)
 	</>
 }
 
-RENDER:CTA_SECTION(Request& context)
+COMPONENT:CTA_SECTION(Request& context)
 {
 	String title = first(context.call["title"].to_string(), "Ready to Get Started?");
 	String subtitle = first(context.call["subtitle"].to_string(), "Join thousands of developers building amazing applications with our framework.");

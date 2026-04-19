@@ -1,6 +1,6 @@
 #load "../../lib/app.uce"
 
-RENDER:PROGRESSBAR(Request& context)
+COMPONENT:PROGRESSBAR(Request& context)
 {
 	starter_register_js("components/gauges/common.js", context);
 	starter_register_css("themes/common/css/gauges.css", context);
@@ -96,13 +96,13 @@ RENDER:PROGRESSBAR(Request& context)
 					});
 				}
 			};
-			ProgressbarComponents.start_listen(<?= json_encode(context.call) ?>);
+			ProgressbarComponents.start_listen(<?: json_encode(context.call) ?>);
 			</script>
 		<? } ?>
 	</>
 }
 
-RENDER:NEEDLEGAUGE(Request& context)
+COMPONENT:NEEDLEGAUGE(Request& context)
 {
 	starter_register_css("themes/common/css/gauges.css", context);
 	String gauge_id = first(context.call["id"].to_string(), "needlegauge-" + std::to_string((u64)time()));
@@ -167,7 +167,7 @@ RENDER:NEEDLEGAUGE(Request& context)
 	</>
 }
 
-RENDER:ARCGAUGE(Request& context)
+COMPONENT:ARCGAUGE(Request& context)
 {
 	starter_register_js("components/gauges/common.js", context);
 	starter_register_css("themes/common/css/gauges.css", context);

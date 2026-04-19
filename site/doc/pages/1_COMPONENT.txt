@@ -1,0 +1,36 @@
+:sig
+COMPONENT(Request& context)
+
+:desc
+Defines the default component entrypoint for the current `.uce` file.
+
+`component()` and `render_component()` invoke `COMPONENT(Request& context)` by default. Named component entrypoints use `COMPONENT:NAME(Request& context)`.
+
+This keeps page rendering and component rendering separate:
+
+- direct HTTP requests call `RENDER(Request& context)`
+- WebSocket messages call `WS(Request& context)`
+- component helpers call `COMPONENT(Request& context)` or `COMPONENT:NAME(Request& context)`
+
+A file intended only for component reuse can define `COMPONENT()` without defining `RENDER()`.
+
+Inside component handlers, props arrive through `context.call`.
+
+When you call `component(":NAME", props, context)` or `render_component(":NAME", props, context)`, the runtime resolves `:NAME` against the current `.uce` file instead of requiring the file name again.
+
+Examples:
+`COMPONENT(Request& context)`
+`{`
+`    &lt;&gt;&lt;section&gt;&lt;?: component(":BODY", context.call, context) ?&gt;&lt;/section&gt;&lt;/&gt;`
+`}`
+
+`COMPONENT:BODY(Request& context)`
+`{`
+`    &lt;&gt;&lt;p&gt;&lt;?= context.call["body"] ?&gt;&lt;/p&gt;&lt;/&gt;`
+`}`
+
+:see
+>component
+>render_component
+>1_RENDER
+>1_WS

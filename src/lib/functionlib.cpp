@@ -359,6 +359,11 @@ String html_escape(f64 a)
 	return(std::to_string(a));
 }
 
+String json_encode(String s, char quote_char)
+{
+	return(json_escape(s, quote_char));
+}
+
 u64 int_val(String s, u32 base)
 {
 	return(strtol(s.c_str(), 0, base));
@@ -386,7 +391,7 @@ String nibble(String& haystack, String delim)
 	}
 }
 
-String json_encode(DTree t)
+String json_encode(DTree t, char quote_char)
 {
 	String result = "";
 	if(t.is_array())
@@ -397,7 +402,7 @@ String json_encode(DTree t)
 			if(count > 0)
 				result += ", ";
 			count += 1;
-			result += json_escape(key) + ": " + json_encode(item);
+			result += json_escape(key, quote_char) + ": " + json_encode(item, quote_char);
 		});
 		result += "}";
 	}
@@ -632,6 +637,11 @@ String ob_get_close()
 }
 
 String safe_name(String raw)
+{
+	return(ascii_safe_name(raw));
+}
+
+String ascii_safe_name(String raw)
 {
 	String result = "";
 	for(auto c : raw)

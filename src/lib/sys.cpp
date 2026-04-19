@@ -129,6 +129,19 @@ String dirname(String fn)
 	return(result);
 }
 
+String path_join(String base, String child)
+{
+	if(base == "")
+		return(child);
+	if(child == "")
+		return(base);
+	if(child[0] == '/')
+		return(child);
+	if(base[base.length() - 1] == '/')
+		return(base + child);
+	return(base + "/" + child);
+}
+
 bool mkdir(String path)
 {
 	shell_exec(String("mkdir -p ")+" "+shell_escape(path));

@@ -28,6 +28,9 @@ Name of the session cookie
 :DTree var
 Variable user-defined data
 
+:DTree cfg
+Request-local configuration tree. Apps can keep structured configuration here and traverse it with `context.cfg.get_by_path("path/to/value")`.
+
 :DTree call
 Invocation or message-local structured data
 
@@ -42,6 +45,9 @@ Headers to be sent back to the browser
 
 :StringList set_cookies;
 Cookies that should be sent back to the browser
+
+:context.set_status(s32 code[, String reason])
+Sets the HTTP status line and updates `context.flags.status`. When `reason` is omitted, UCE uses a built-in standard reason phrase for common status codes.
 
 :u64 random_seed
 The current request's "random" noise generator seed
@@ -63,5 +69,4 @@ Invokes another UCE file using the current or supplied request context
 
 :see
 >types
-
 

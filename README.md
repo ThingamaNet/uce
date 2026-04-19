@@ -60,14 +60,23 @@ UCE pages now use explicit request handlers instead of implicit globals:
 Useful related runtime patterns:
 
 - `render_file(String file_name)` or `render_file(String file_name, Request& context)` to invoke another page
+- `context.cfg` for request-local structured configuration
 - `context.call` for invocation or message-local structured input
 - `context.connection` for broker-owned per-WebSocket-connection state shared across `WS(Request& context)` calls
 - `context.params`, `context.get`, `context.post`, `context.cookies`, `context.session`, and `context.header` for request/response state
+- `context.set_status(code[, reason])` to set the HTTP response status
 
-Named component-style render handlers are also supported:
+Useful helpers for that data model now include:
+
+- `DTree::get_by_path("a/b/c")` for path-style config traversal without creating missing keys
+- `json_encode(String)` for emitting JavaScript-safe string literals directly
+- `ascii_safe_name(String)` for conservative ASCII identifier normalization
+- `path_join(base, child)` for filesystem-style path assembly
+
+Named component handlers are also supported:
 
 ```cpp
-RENDER:BODY(Request& context)
+COMPONENT:BODY(Request& context)
 {
 	<>
 		<p><?= context.call["body"].to_string() ?></p>
@@ -114,7 +123,9 @@ When you want returned component markup inside a literal block, prefer:
 
 because `<?= ... ?>` HTML-escapes the returned markup. For direct output from C++ code, use `render_component(...)`.
 
-Components may expose additional named handlers with `RENDER:NAME(Request& context)`. The default handler remains the ordinary `RENDER(Request& context)`.
+Components expose `COMPONENT(Request& context)` as their default entrypoint and may expose additional named handlers with `COMPONENT:NAME(Request& context)`.
+
+The component helpers call only `COMPONENT...` handlers. A file meant purely for component use can define `COMPONENT()` without defining `RENDER()`, which keeps direct page entry and component entry cleanly separated. Inside a component file, `component(":NAME", props, context)` and `render_component(":NAME", props, context)` target another named component handler in that same file.
 
 ## WebSockets
 

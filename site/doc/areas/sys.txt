@@ -11,6 +11,7 @@ file_put_contents
 get_cwd
 ls
 mkdir
+path_join
 set_cwd
 shell_escape
 shell_exec

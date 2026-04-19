@@ -1,10 +1,10 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	starter_boot(context);
-	String current_theme = starter_theme_value("key", context);
-	String current_label = first(starter_theme_value("label", context), current_theme);
+	String current_theme = context.cfg.get_by_path("theme/key").to_string();
+	String current_label = first(context.cfg.get_by_path("theme/label").to_string(), current_theme);
 	String route_path = context.var["starter"]["route"]["l_path"].to_string();
 
 	<>
@@ -108,7 +108,7 @@ RENDER(Request& context)
 			<div id="theme-menu" class="theme-menu" hidden>
 				<div class="theme-menu-title">Available Themes</div>
 				<div class="theme-menu-list">
-					<? starter_cfg("theme/options", context).each([&](DTree theme_info, String theme_key) {
+					<? context.cfg.get_by_path("theme/options").each([&](DTree theme_info, String theme_key) {
 						StringMap params;
 						params["theme"] = theme_key;
 						String href = starter_link(route_path == "index" ? "" : route_path, params, context);

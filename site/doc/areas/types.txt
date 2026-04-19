@@ -1,5 +1,7 @@
 Types
 
 DTree
+get_by_path
+set_status
 String
 StringMap

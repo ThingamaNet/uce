@@ -1,6 +1,6 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	starter_boot(context);
 

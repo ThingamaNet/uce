@@ -1,10 +1,15 @@
 :sig
+String json_encode(String s)
 String json_encode(DTree t)
 
 :params
+s : string to encode as a JSON string literal
 t : DTree object to be serialized
 return value : string containing the JSON result
 
 :desc
-Serializes a DTree structure 't' into a String in JSON notation.
+Serializes either a `String` or a `DTree` into JSON notation.
 
+When passed a `String`, `json_encode()` returns a quoted and escaped JSON string literal.
+
+When passed a `DTree`, scalar values are serialized directly and nested map values are emitted as JSON objects.

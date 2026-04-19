@@ -1,0 +1,15 @@
+:sig
+String path_join(String base, String child)
+
+:params
+base : parent path
+child : child path or absolute override
+return value : combined path
+
+:desc
+Joins two filesystem-style path fragments with a single `/` when needed.
+
+If `child` is empty, `base` is returned. If `child` already starts with `/`, it is returned unchanged. This makes `path_join()` a better fit for app-level path assembly than open-coded string concatenation.
+
+:see
+>sys

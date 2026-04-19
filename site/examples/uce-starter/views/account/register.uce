@@ -4,9 +4,10 @@ RENDER(Request& context)
 {
 	starter_boot(context);
 	context.var["starter"]["page_title"] = "Register";
+	StarterUser users(context);
 	DTree result;
 	if(context.params["REQUEST_METHOD"] == "POST")
-		result = starter_user_create(context.post["email"], context.post["password"], context);
+		result = users.create(context.post["email"], context.post["password"]);
 
 	<>
 		<h1>Register</h1>

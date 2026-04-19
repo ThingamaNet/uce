@@ -1,4 +1,4 @@
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	String lang = first(context.call["lang"].to_string(), "plain");
 	<>

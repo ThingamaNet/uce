@@ -18,7 +18,7 @@ RENDER(Request& context)
 					<div class="window-dot green"></div>
 					<span class="mono-text">marketing_blocks.uce</span>
 				</div>
-				<pre class="code-block"><code>RENDER:HERO_SECTION(Request&amp; context)
+				<pre class="code-block"><code>COMPONENT:HERO_SECTION(Request&amp; context)
 {
     String title = first(context.call["title"].to_string(), "Welcome");
     &lt;&gt;

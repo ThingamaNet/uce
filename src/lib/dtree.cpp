@@ -67,13 +67,13 @@ String DTree::to_string()
 	return("");
 }
 
-String DTree::to_json()
+String DTree::to_json(char quote_char)
 {
 	const DTree& target = deref();
 	switch(target.type)
 	{
 		case('S'):
-			return(json_escape(target._String));
+			return(json_escape(target._String, quote_char));
 			break;
 		case('F'):
 			return(std::to_string(target._float));
@@ -119,6 +119,41 @@ String DTree::get_type_name()
 			break;
 	}
 	return("unknown");
+}
+
+DTree DTree::get_by_path(String path, String delim)
+{
+	const DTree* current = &deref();
+	if(path == "")
+		return(*current);
+	size_t start = 0;
+	while(start <= path.length())
+	{
+		size_t end = path.find(delim, start);
+		String segment;
+		if(end == String::npos)
+			segment = path.substr(start);
+		else
+			segment = path.substr(start, end - start);
+		if(segment == "")
+		{
+			if(end == String::npos)
+				break;
+			start = end + delim.length();
+			continue;
+		}
+		current = &current->deref();
+		if(current->type != 'M')
+			return(DTree());
+		auto it = current->_map.find(segment);
+		if(it == current->_map.end())
+			return(DTree());
+		current = &it->second;
+		if(end == String::npos)
+			break;
+		start = end + delim.length();
+	}
+	return(current->deref());
 }
 
 bool DTree::is_reference()
@@ -374,16 +409,21 @@ String var_dump(DTree map, String prefix, String postfix)
 	return(result);
 }
 
-String json_escape(String s)
+String json_escape(String s, char quote_char)
 {
 	//return(String("\"")+s+"\"");
 	String result;
 	u32 i = 0;
-	result.append(1, '"');
+	result.append(1, quote_char);
 	while(i < s.length())
 	{
 		char c = s[i];
-		switch(c)
+		if(c == quote_char)
+		{
+			result.append(1, '\\');
+			result.append(1, quote_char);
+		}
+		else switch(c)
 		{
 			case('\t'):
 				result.append("\\t");
@@ -412,6 +452,6 @@ String json_escape(String s)
 		}
 		i += 1;
 	}
-	result.append(1, '"');
+	result.append(1, quote_char);
 	return(result);
 }

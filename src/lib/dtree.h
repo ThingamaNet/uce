@@ -1,6 +1,6 @@
 #pragma once
 
-String json_escape(String s);
+String json_escape(String s, char quote_char = '"');
 
 struct DTree {
 
@@ -16,8 +16,9 @@ struct DTree {
 	void each(std::function <void (DTree t, String key)> f);
 	bool is_array();
 	String to_string();
-	String to_json();
+	String to_json(char quote_char = '"');
 	String get_type_name();
+	DTree get_by_path(String path, String delim = "/");
 	bool is_reference();
 	DTree* reference_target();
 	const DTree* reference_target() const;

@@ -10,9 +10,11 @@ Component props are passed in `context.call`.
 
 Because `<?= ... ?>` HTML-escapes its value, embed component markup with `<?: component(...) ?>`, `print(component(...))`, or use `render_component(...)` for direct output.
 
-When `name` contains a colon, such as `components/card:BODY`, the part after the colon selects a named render handler exported from the component file through `RENDER:BODY(Request& context)`.
+When `name` contains a colon, such as `components/card:BODY`, the part after the colon selects a named component handler exported from the component file through `COMPONENT:BODY(Request& context)`.
 
-The default handler is `RENDER(Request& context)`.
+The default handler is `COMPONENT(Request& context)`.
+
+When `name` starts with a colon, such as `:BODY`, the target resolves against the current `.uce` file so component files can call their own named handlers without repeating the file name.
 
 Resolution order is:
 exact file name

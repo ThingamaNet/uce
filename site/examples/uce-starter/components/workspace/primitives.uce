@@ -1,6 +1,6 @@
 #load "../../lib/app.uce"
 
-RENDER:APP_FRAME(Request& context)
+COMPONENT:APP_FRAME(Request& context)
 {
 	starter_register_css("themes/common/css/workspace.css", context);
 	starter_register_js("js/u-workspace-shell.js", context);
@@ -16,7 +16,7 @@ RENDER:APP_FRAME(Request& context)
 	</>
 }
 
-RENDER:EMPTY_STATE(Request& context)
+COMPONENT:EMPTY_STATE(Request& context)
 {
 	<>
 		<div class="ws-empty-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -28,14 +28,14 @@ RENDER:EMPTY_STATE(Request& context)
 	</>
 }
 
-RENDER:LIST_STATE(Request& context)
+COMPONENT:LIST_STATE(Request& context)
 {
 	<>
 		<div class="ws-list-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>"><? if(context.call["icon_class"].to_string() != "") { ?><i class="<?= context.call["icon_class"].to_string() ?>"></i><? } ?><span><?= context.call["text"].to_string() ?></span></div>
 	</>
 }
 
-RENDER:MOBILE_BAR(Request& context)
+COMPONENT:MOBILE_BAR(Request& context)
 {
 	<>
 		<div class="ws-mobile-bar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -47,7 +47,7 @@ RENDER:MOBILE_BAR(Request& context)
 	</>
 }
 
-RENDER:PANEL_HEADER(Request& context)
+COMPONENT:PANEL_HEADER(Request& context)
 {
 	<>
 		<div class="ws-panel-header<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -60,7 +60,7 @@ RENDER:PANEL_HEADER(Request& context)
 	</>
 }
 
-RENDER:PANEL(Request& context)
+COMPONENT:PANEL(Request& context)
 {
 	<>
 		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-panel<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -70,7 +70,7 @@ RENDER:PANEL(Request& context)
 	</>
 }
 
-RENDER:SECTION_HEAD(Request& context)
+COMPONENT:SECTION_HEAD(Request& context)
 {
 	<>
 		<div class="ws-section-head<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -80,7 +80,7 @@ RENDER:SECTION_HEAD(Request& context)
 	</>
 }
 
-RENDER:SECTION(Request& context)
+COMPONENT:SECTION(Request& context)
 {
 	<>
 		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-section<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -90,7 +90,7 @@ RENDER:SECTION(Request& context)
 	</>
 }
 
-RENDER:SIDEBAR_SHELL(Request& context)
+COMPONENT:SIDEBAR_SHELL(Request& context)
 {
 	<>
 		<aside<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-sidebar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -100,7 +100,7 @@ RENDER:SIDEBAR_SHELL(Request& context)
 	</>
 }
 
-RENDER:SIDEBAR_TOOLBAR(Request& context)
+COMPONENT:SIDEBAR_TOOLBAR(Request& context)
 {
 	<>
 		<div class="ws-sidebar-top<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
@@ -113,7 +113,7 @@ RENDER:SIDEBAR_TOOLBAR(Request& context)
 	</>
 }
 
-RENDER:STATUS_PILL(Request& context)
+COMPONENT:STATUS_PILL(Request& context)
 {
 	String variant = to_lower(first(context.call["variant"].to_string(), "neutral"));
 	<>

@@ -14,7 +14,7 @@ RENDER(Request& context)
 	}
 	else
 	{
-		starter_set_status(context, 400, "Bad Request");
+		context.set_status(400, "Bad Request");
 		context.var["starter"]["json"]["status"] = "error";
 		context.var["starter"]["json"]["message"] = "Invalid input";
 	}

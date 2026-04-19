@@ -3,13 +3,14 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	if(!starter_is_signed_in(context))
+	StarterUser users(context);
+	if(!users.is_signed_in())
 	{
 		starter_redirect("account/login", context);
 		return;
 	}
 	context.var["starter"]["page_title"] = "Profile";
-	DTree user = starter_current_user(context);
+	DTree user = users.current();
 	String roles = "";
 	user["roles"].each([&](DTree role, String key) {
 		if(roles != "")

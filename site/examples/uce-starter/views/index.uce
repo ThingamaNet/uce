@@ -71,7 +71,7 @@ RENDER(Request& context)
 			<h2>Theme Families</h2>
 			<p>Compare the starter’s built-in theme families and jump to the live gallery.</p>
 			<div class="theme-grid">
-				<? starter_cfg("theme/options", context).each([&](DTree theme, String key) {
+				<? context.cfg.get_by_path("theme/options").each([&](DTree theme, String key) {
 					if(key != "portal-light" && key != "portal-dark" && key != "localfirst")
 						return;
 					StringMap theme_params;

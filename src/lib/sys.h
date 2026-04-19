@@ -6,6 +6,7 @@ String shell_exec(String cmd);
 String shell_escape(String raw);
 String basename(String fn);
 String dirname(String fn);
+String path_join(String base, String child);
 bool mkdir(String path);
 bool file_exists(String path);
 String file_get_contents(String file_name);

@@ -74,7 +74,7 @@ DTree data_format_value(DTree value, DTree row, DTree column)
 	return(result);
 }
 
-RENDER:SUMMARY_METRICS(Request& context)
+COMPONENT:SUMMARY_METRICS(Request& context)
 {
 	String title = context.call["title"].to_string();
 	String subtitle = context.call["subtitle"].to_string();
@@ -103,7 +103,7 @@ RENDER:SUMMARY_METRICS(Request& context)
 	</>
 }
 
-RENDER:TIMESERIES_CHART(Request& context)
+COMPONENT:TIMESERIES_CHART(Request& context)
 {
 	starter_register_js("js/u-format.js", context);
 	starter_register_js("js/u-timeseries-chart.js", context);
@@ -132,21 +132,21 @@ RENDER:TIMESERIES_CHART(Request& context)
 		<script>
 		(function () {
 			if (typeof UTimeSeriesChart === 'undefined') return;
-			var chart = new UTimeSeriesChart(<?: starter_json_string(canvas_id) ?>, {
-				xAxisLabel: <?: starter_json_string(x_axis_label) ?>,
-				yAxisLeftLabel: <?: starter_json_string(y_axis_left_label) ?>,
-				yAxisRightLabel: <?: starter_json_string(y_axis_right_label) ?>,
-				yAxisLeftFormat: <?: starter_json_string(y_axis_left_format) ?>,
-				yAxisRightFormat: <?: starter_json_string(y_axis_right_format) ?>
+			var chart = new UTimeSeriesChart(<?: json_encode(canvas_id) ?>, {
+				xAxisLabel: <?: json_encode(x_axis_label) ?>,
+				yAxisLeftLabel: <?: json_encode(y_axis_left_label) ?>,
+				yAxisRightLabel: <?: json_encode(y_axis_right_label) ?>,
+				yAxisLeftFormat: <?: json_encode(y_axis_left_format) ?>,
+				yAxisRightFormat: <?: json_encode(y_axis_right_format) ?>
 			});
 			chart.setData(<?= json_encode(context.call["series"]) ?>, <?= json_encode(context.call["x_labels"]) ?>);
-			window[<?: starter_json_string("chart_" + chart_id) ?>] = chart;
+			window[<?: json_encode("chart_" + chart_id) ?>] = chart;
 		}());
 		</script>
 	</>
 }
 
-RENDER:SORTABLE_TABLE(Request& context)
+COMPONENT:SORTABLE_TABLE(Request& context)
 {
 	starter_register_js("js/u-format.js", context);
 	starter_register_js("js/u-sortable-table.js", context);
@@ -205,13 +205,13 @@ RENDER:SORTABLE_TABLE(Request& context)
 		<script>
 		(function () {
 			if (typeof USortableTable === 'undefined') return;
-			USortableTable.init(<?: starter_json_string(table_id) ?>, <?= json_encode(init_options) ?>);
+			USortableTable.init(<?: json_encode(table_id) ?>, <?= json_encode(init_options) ?>);
 		}());
 		</script>
 	</>
 }
 
-RENDER:DATA_TABLE(Request& context)
+COMPONENT:DATA_TABLE(Request& context)
 {
 	String table_id = first(context.call["id"].to_string(), "data-grid-" + std::to_string((u64)time()));
 	starter_register_js("js/ag-grid/ag-grid-community.min.js", context);
@@ -259,15 +259,15 @@ RENDER:DATA_TABLE(Request& context)
 		(function () {
 			if (typeof agGrid === 'undefined') return;
 			const gridOptions = <?= json_encode(grid_options) ?>;
-			new agGrid.Grid(document.getElementById(<?: starter_json_string(table_id) ?>), gridOptions);
-			document.getElementById(<?: starter_json_string(table_id + "-search") ?>)?.addEventListener('input', function () {
+			new agGrid.Grid(document.getElementById(<?: json_encode(table_id) ?>), gridOptions);
+			document.getElementById(<?: json_encode(table_id + "-search") ?>)?.addEventListener('input', function () {
 				gridOptions.api.setQuickFilter(this.value);
 			});
-			document.getElementById(<?: starter_json_string(table_id + "-clear-filters") ?>)?.addEventListener('click', function () {
+			document.getElementById(<?: json_encode(table_id + "-clear-filters") ?>)?.addEventListener('click', function () {
 				gridOptions.api.setFilterModel(null);
 				gridOptions.api.setQuickFilter('');
 			});
-			document.getElementById(<?: starter_json_string(table_id + "-export-csv") ?>)?.addEventListener('click', function () {
+			document.getElementById(<?: json_encode(table_id + "-export-csv") ?>)?.addEventListener('click', function () {
 				gridOptions.api.exportDataAsCsv();
 			});
 		}());

@@ -7,7 +7,7 @@ RENDER(Request& context)
 
 	DTree named_props;
 	named_props["title"] = "Named Render Example";
-	named_props["body"] = "This content is rendered through the RENDER:BODY(Request& context) entry point.";
+	named_props["body"] = "This content is rendered through the COMPONENT:BODY(Request& context) entry point.";
 
 	<>
 		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
@@ -23,11 +23,11 @@ RENDER(Request& context)
 			component_resolve("components/card"):
 			<code><?= component_resolve("components/card") ?></code>
 		</p>
-		<h2>Default Render</h2>
+		<h2>Default Component</h2>
 		<div>
 			<?: component("components/card", card_props, context) ?>
 		</div>
-		<h2>Named Render</h2>
+		<h2>Named Component</h2>
 		<? render_component("components/card:BODY", named_props, context); ?>
 	</>
 }

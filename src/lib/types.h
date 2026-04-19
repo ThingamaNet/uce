@@ -80,6 +80,7 @@ struct SharedUnit {
 
 	request_handler on_setup;
 	request_ref_handler on_render;
+	request_ref_handler on_component;
 	request_ref_handler on_websocket;
 
 	String compiler_messages;
@@ -128,6 +129,7 @@ struct Request {
 	StringMap session;
 
 	DTree var;
+	DTree cfg;
 	DTree call;
 	DTree connection;
 
@@ -181,10 +183,12 @@ struct Request {
 		u8 websocket_opcode = 0;
 		bool websocket_is_binary = false;
 		bool websocket_is_text = false;
+		String current_unit_file = "";
 		std::string params_buffer;
 	} resources;
 
 	void ob_start();
+	void set_status(s32 code, String reason = "");
 
 	~Request();
 

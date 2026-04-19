@@ -1,22 +1,22 @@
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
 	<>
 		<section style="border:1px solid #ccc;padding:1em;margin:1em 0;">
-			<? render_component("card:TITLE", context.call, context); ?>
-			<? render_component("card:BODY", context.call, context); ?>
+			<? render_component(":TITLE", context.call, context); ?>
+			<? render_component(":BODY", context.call, context); ?>
 		</section>
 	</>
 }
 
-RENDER:TITLE(Request& context)
+COMPONENT:TITLE(Request& context)
 {
 	<>
 		<h3><?= first(context.call["title"].to_string(), "Component Title") ?></h3>
 	</>
 }
 
-RENDER:BODY(Request& context)
+COMPONENT:BODY(Request& context)
 {
 	<>
 		<p><?= first(context.call["body"].to_string(), "Component Body") ?></p>

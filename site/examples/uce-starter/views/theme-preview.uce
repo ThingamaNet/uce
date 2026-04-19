@@ -5,9 +5,9 @@ RENDER(Request& context)
 	starter_boot(context);
 	context.var["starter"]["page_title"] = "Theme Preview";
 	starter_register_css("views/themes.css", context);
-	String current_theme_key = starter_theme_value("key", context);
-	String theme_label = first(starter_theme_value("label", context), current_theme_key);
-	String theme_mode = starter_theme_value("mode", context);
+	String current_theme_key = context.cfg.get_by_path("theme/key").to_string();
+	String theme_label = first(context.cfg.get_by_path("theme/label").to_string(), current_theme_key);
+	String theme_mode = context.cfg.get_by_path("theme/mode").to_string();
 	StringMap theme_params;
 	theme_params["theme"] = current_theme_key;
 

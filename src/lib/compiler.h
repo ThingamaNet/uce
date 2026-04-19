@@ -1,6 +1,7 @@
 #pragma once
 
 #define RENDER(X) extern "C" void render(Request& context)
+#define COMPONENT(X) extern "C" void component_render(Request& context)
 #define WS(X) extern "C" void websocket(Request& context)
 #define EXPORT extern "C"
 

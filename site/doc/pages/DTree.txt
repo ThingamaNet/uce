@@ -18,6 +18,7 @@ Useful methods include:
 `to_string()`
 `to_json()`
 `get_type_name()`
+`get_by_path()`
 `set_bool()`
 `remove()`
 `clear()`

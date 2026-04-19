@@ -1,0 +1,15 @@
+:sig
+void context.set_status(s32 code, String reason = "")
+
+:params
+code : HTTP status code
+reason : optional reason phrase override
+
+:desc
+Sets the current request status line and mirrors the numeric status into `context.flags.status`.
+
+When `reason` is omitted, UCE fills in a standard reason phrase for common HTTP status codes such as `200`, `302`, `400`, `404`, and `500`.
+
+:see
+0_context
+>types

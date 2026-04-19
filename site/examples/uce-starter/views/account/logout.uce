@@ -3,6 +3,6 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	starter_user_logout(context);
+	StarterUser(context).logout();
 	starter_redirect("account/login", context);
 }
