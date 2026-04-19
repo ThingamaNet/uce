@@ -1,0 +1,27 @@
+:sig
+DTree unit_info(String path = "")
+
+:params
+path : optional UCE unit path. If empty, uses the current executing unit.
+return value : metadata tree for the resolved unit, or an empty tree if the unit cannot be resolved
+
+:desc
+Returns runtime metadata for a UCE compilation unit.
+
+The returned tree includes:
+
+- normalized paths and generated artifact paths
+- compile status, compile error status, runtime error status, and a combined `error_status`
+- request and invocation counters
+- best, worst, last, and average render time
+- compile counters plus best, worst, last, and average compile time
+- file mtimes, stale status, load status, and exported API declarations
+
+If `path` is relative, it is resolved relative to the current executing unit.
+
+Because unit metadata lives in process memory alongside `SharedUnit`, request and timing counters reflect the current runtime process, not an aggregate across every worker process.
+
+:see
+units_list
+unit_compile
+0_context

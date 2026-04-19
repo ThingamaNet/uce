@@ -1,7 +1,7 @@
 URI Functions
 
 encode_query
-make_session_id
+session_id_create
 parse_query
 uri_decode
 uri_encode

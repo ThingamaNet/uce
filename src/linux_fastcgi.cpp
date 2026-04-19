@@ -7,6 +7,7 @@ ServerState server_state;
 
 FastCGIServer server;
 pid_t http_worker_pid = 0;
+pid_t proactive_compiler_pid = 0;
 bool worker_accepts_http = false;
 static sigjmp_buf request_fault_jmp;
 static volatile sig_atomic_t request_fault_active = 0;
@@ -134,7 +135,7 @@ String normalize_ws_scope(String scope)
 		return(current_ws_scope());
 	if(scope[0] == '/')
 		return(scope);
-	return(expand_path(scope, get_cwd()));
+	return(expand_path(scope, cwd_get()));
 }
 
 String ws_message()
@@ -235,7 +236,7 @@ int handle_complete(FastCGIRequest& request) {
 	Request* previous_context = set_active_request(request);
 	server_state.request_count += 1;
 	request.server = &server_state;
-	request.stats.time_start = microtime();
+	request.stats.time_start = time_precise();
 	//request.stats.mem_alloc = 0;
 	//request.stats.mem_high = 0;
     request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
@@ -307,7 +308,7 @@ int handle_complete(FastCGIRequest& request) {
 
 	for( auto &f : request.uploaded_files)
 	{
-		unlink(f.tmp_name);
+		file_unlink(f.tmp_name);
 	}
 
 	if(failure_title == "" && request.session_id.length() > 0)
@@ -333,7 +334,7 @@ int handle_websocket_message(FastCGIRequest& request, const String& message, u8 
 	event_request.resources = request.resources;
 	if(event_request.resources.websocket_connection_state)
 		event_request.connection.set_reference(event_request.resources.websocket_connection_state);
-	event_request.stats.time_init = microtime();
+	event_request.stats.time_init = time_precise();
 	event_request.stats.time_start = event_request.stats.time_init;
 	event_request.random_index = 0;
 	event_request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&event_request.stats.time_start));
@@ -387,19 +388,156 @@ void on_terminate(int sig)
 	exit(1);
 }
 
-void listen_for_connections()
+void clear_shared_unit_cache(ServerState& state)
 {
-	if(precompile_jobs.size() > 0)
+	for(auto& it : state.units)
+		delete it.second;
+	state.units.clear();
+}
+
+void close_inherited_server_sockets()
+{
+	for(auto socket_handle : server.server_sockets)
+		close(socket_handle);
+	server.server_sockets.clear();
+	server.server_socket_types.clear();
+}
+
+bool proactive_compile_queue_has(StringList& queue, String file_name)
+{
+	return(std::find(queue.begin(), queue.end(), file_name) != queue.end());
+}
+
+void proactive_compile_queue_push(StringList& queue, String file_name)
+{
+	if(file_name == "" || proactive_compile_queue_has(queue, file_name))
+		return;
+	queue.push_back(file_name);
+}
+
+void run_proactive_compiler()
+{
+	Request background_context;
+	StringList compile_queue;
+	f64 check_interval = float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]);
+	f64 failure_retry_interval = 0;
+	f64 next_scan_at = 0;
+	std::map<String, f64> retry_after;
+	if(check_interval < 1)
+		check_interval = 1;
+	failure_retry_interval = std::max(check_interval, 60.0);
+
+	my_pid = getpid();
+	context = &background_context;
+	background_context.server = &server_state;
+
+	close_inherited_server_sockets();
+	signal(SIGSEGV, on_segfault);
+	signal(SIGABRT, on_segfault);
+	signal(SIGBUS, on_segfault);
+	signal(SIGILL, on_segfault);
+	signal(SIGFPE, on_segfault);
+	signal(SIGPIPE, SIG_IGN);
+	setpriority(PRIO_PROCESS, 0, 10);
+
+	auto known_units = compiler_list_known_units(&background_context);
+	auto site_units = compiler_scan_site_units(&background_context);
+	known_units.insert(known_units.end(), site_units.begin(), site_units.end());
+	compiler_set_known_units(&background_context, known_units);
+	next_scan_at = time_precise();
+
+	for(;;)
 	{
-		context = new Request();
-		context->server = &server_state;
-		for(auto s : precompile_jobs)
+		if(compile_queue.size() == 0 && time_precise() >= next_scan_at)
 		{
-			printf("- worker [%i] precompile %s\n", getpid(), s.c_str());
-			get_shared_unit(context, s, false);
+			auto tracked_units = compiler_list_known_units(&background_context);
+			StringList existing_units;
+
+			for(auto& file_name : tracked_units)
+			{
+				bool source_missing = false;
+				auto retry_it = retry_after.find(file_name);
+				bool retry_allowed = (retry_it == retry_after.end() || time_precise() >= retry_it->second);
+				if(compiler_unit_needs_recompile(&background_context, file_name, &source_missing) && retry_allowed)
+					proactive_compile_queue_push(compile_queue, file_name);
+				if(source_missing)
+				{
+					printf("(i) proactive compiler forget removed unit %s\n", file_name.c_str());
+					retry_after.erase(file_name);
+					continue;
+				}
+				existing_units.push_back(file_name);
+			}
+
+			if(existing_units.size() != tracked_units.size())
+				compiler_set_known_units(&background_context, existing_units);
+
+			next_scan_at = time_precise() + check_interval;
 		}
+
+		if(compile_queue.size() > 0)
+		{
+			auto file_name = compile_queue.front();
+			compile_queue.erase(compile_queue.begin());
+			bool source_missing = false;
+			auto retry_it = retry_after.find(file_name);
+			if(retry_it != retry_after.end() && time_precise() < retry_it->second)
+				continue;
+			if(compiler_unit_needs_recompile(&background_context, file_name, &source_missing))
+			{
+				printf("(i) proactive compile %s\n", file_name.c_str());
+				auto su = get_shared_unit(&background_context, file_name, false);
+				if(su && su->compiler_messages == "")
+					retry_after.erase(file_name);
+				else
+					retry_after[file_name] = time_precise() + failure_retry_interval;
+			}
+			else if(source_missing)
+			{
+				printf("(i) proactive compiler forget removed unit %s\n", file_name.c_str());
+				compiler_untrack_known_unit(&background_context, file_name);
+				retry_after.erase(file_name);
+			}
+			else
+			{
+				retry_after.erase(file_name);
+			}
+			clear_shared_unit_cache(server_state);
+			usleep(250000);
+			continue;
+		}
+
+		usleep(250000);
+	}
+}
+
+bool proactive_compiler_alive()
+{
+	return(proactive_compiler_pid > 0 && task_kill(proactive_compiler_pid, 0) == 0);
+}
+
+void ensure_proactive_compiler()
+{
+	if(float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]) <= 0)
+		return;
+
+	if(proactive_compiler_alive())
+		return;
+
+	pid_t p = fork();
+	if(p == 0)
+	{
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
+		run_proactive_compiler();
+		exit(0);
 	}
 
+	proactive_compiler_pid = p;
+	printf("(P) proactive compiler spawned: PID %i\n", p);
+}
+
+void listen_for_connections()
+{
 	signal(SIGSEGV, on_segfault);
 	signal(SIGABRT, on_segfault);
 	signal(SIGBUS, on_segfault);
@@ -431,7 +569,7 @@ void init_base_process()
 	printf("(P) Starting parent server PID:%i\n", getpid());
 
 	server_state.config = make_server_settings();
-	server_state.config["COMPILER_SYS_PATH"] = get_cwd();
+	server_state.config["COMPILER_SYS_PATH"] = cwd_get();
 	printf("Compiler base path: %s\n", server_state.config["COMPILER_SYS_PATH"].c_str());
 
 	server_state.config["COMPILE_SCRIPT"] =
@@ -461,52 +599,20 @@ void init_base_process()
 	srand(time());
 }
 
-StringList init_precompile(u32& precompile_jobs_per_worker)
-{
-	StringList precompile_jobs_pending;
-	if(server_state.config["PRECOMPILE_FILES_IN"] != "" && int_val(server_state.config["WORKER_COUNT"]) >= 2)
-	{
-		if(server_state.config["PRECOMPILE_FILES_IN"][0] != '/')
-			server_state.config["PRECOMPILE_FILES_IN"] = expand_path(server_state.config["PRECOMPILE_FILES_IN"]);
-		precompile_jobs_pending = split(trim(shell_exec(
-			"find " +
-			shell_escape(server_state.config["PRECOMPILE_FILES_IN"]) +
-			" -iname '*.uce' ")), "\n");
-		precompile_jobs_per_worker = 1 + (precompile_jobs_pending.size() / (int_val(server_state.config["WORKER_COUNT"]) -1));
-	}
-	return(precompile_jobs_pending);
-}
-
 int main(int argc, char** argv)
 {
-	StringList precompile_jobs_pending;
-	u32 precompile_jobs_per_worker = 1;
-
 	init_base_process();
-	precompile_jobs_pending = init_precompile(precompile_jobs_per_worker);
-
-	s32 worker_spawn_count = 0;
+	ensure_proactive_compiler();
 
 	for(;;)
 	{
+		if(!proactive_compiler_alive())
+			proactive_compiler_pid = 0;
+		if(!termination_signal_received)
+			ensure_proactive_compiler();
+
 		while(workers.size() < int_val(server_state.config["WORKER_COUNT"]))
 		{
-			worker_spawn_count++;
-			precompile_jobs.clear();
-			// spawn workers with precompile jobs if necessary but
-			// leave the first worker alone so it can start responding
-			// to requests right away
-			if(precompile_jobs_pending.size() > 0 && worker_spawn_count > 1)
-			{
-				for(u32 i = 0; i < precompile_jobs_per_worker; i++)
-				{
-					if(precompile_jobs_pending.size() > 0)
-					{
-						precompile_jobs.push_back(precompile_jobs_pending.back());
-						precompile_jobs_pending.pop_back();
-					}
-				}
-			}
 			if(!termination_signal_received)
 			{
 				worker_accepts_http = (http_worker_pid == 0 || workers.count(http_worker_pid) == 0);

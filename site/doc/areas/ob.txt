@@ -1,7 +1,7 @@
 Output / Invocation Functions
 
 1_RENDER
-call_file
+unit_call
 component
 component_exists
 component_resolve
@@ -11,5 +11,6 @@ ob_get
 ob_get_close
 ob_start
 print
-render_component
-render_file
+component_render
+unit_load
+unit_render

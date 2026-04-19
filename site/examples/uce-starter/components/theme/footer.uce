@@ -3,18 +3,19 @@
 COMPONENT(Request& context)
 {
 	starter_boot(context);
-	if(context.var["starter"]["embed_mode"].to_string() != "")
+	bool embed_mode = starter_page_embed_mode(context);
+	if(embed_mode)
 		return;
 
 	String text = first(context.cfg.get_by_path("theme/footer_text").to_string(), context.cfg.get_by_path("site/name").to_string());
-	String inner_class = context.cfg.get_by_path("theme/key").to_string() == "portal-light" ? "footer-inner" : "";
+	String inner_class = first(context.call["inner_class"].to_string(), context.cfg.get_by_path("theme/key").to_string() == "portal-light" ? "footer-inner" : "");
 
 	<>
 		<footer>
 			<? if(inner_class != "") { ?>
 				<div class="<?= inner_class ?>"><p><?= text ?></p></div>
 			<? } else { ?>
-				<div style="max-width: 1200px; margin: 0 auto; padding: 0 1rem;"><p><?= text ?></p></div>
+				<div><p><?= text ?></p></div>
 			<? } ?>
 		</footer>
 	</>

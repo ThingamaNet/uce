@@ -1,5 +1,5 @@
 :sig
-void render_component(String name, [DTree props], [Request& context])
+void component_render(String name, [DTree props], [Request& context])
 
 :desc
 Renders another `.uce` file as a component and writes the result directly to the current output buffer.
@@ -10,12 +10,12 @@ Component props are passed through `context.call`, and `name:COMPONENTFUNC` may 
 
 When `name` starts with `:`, the runtime resolves that named handler against the current `.uce` file.
 
-Use `render_component()` when you want to write component output directly from C++ code instead of capturing it as a `String`.
+Use `component_render()` when you want to write component output directly from C++ code instead of capturing it as a `String`.
 
 Example:
 `DTree props;`
 `props["body"] = "Hello";`
-`render_component("components/card:BODY", props, context);`
+`component_render("components/card:BODY", props, context);`
 
 :see
 >ob

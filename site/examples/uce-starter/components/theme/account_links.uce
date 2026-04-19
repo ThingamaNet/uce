@@ -7,9 +7,9 @@ COMPONENT(Request& context)
 	DTree user = users.current();
 	bool signed_in = user["email"].to_string() != "";
 	String theme_key = context.cfg.get_by_path("theme/key").to_string();
-	String wrapper_class = theme_key == "localfirst" ? "admin-account-card" : "nav-account nav-menu";
-	String links_class = theme_key == "localfirst" ? "admin-account-links" : "";
-	String name_class = theme_key == "localfirst" ? "admin-account-name" : "account-name";
+	String wrapper_class = first(context.call["wrapper_class"].to_string(), theme_key == "localfirst" ? "admin-account-card" : "nav-account nav-menu");
+	String links_class = first(context.call["links_wrapper_class"].to_string(), theme_key == "localfirst" ? "admin-account-links" : "");
+	String name_class = first(context.call["name_class"].to_string(), theme_key == "localfirst" ? "admin-account-name" : "account-name");
 
 	<>
 		<div class="<?= wrapper_class ?>">

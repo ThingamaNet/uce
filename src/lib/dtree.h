@@ -8,13 +8,15 @@ struct DTree {
 
 	String 	_String;
 	f64 	_float;
-	s64 	_array_index;
+	s64 	_array_index = 0;
 	bool	_bool;
+	bool	_list_mode = false;
 	void*	_ptr;
 	std::map<String, DTree> _map;
 
 	void each(std::function <void (DTree t, String key)> f);
 	bool is_array();
+	bool is_list() const;
 	String to_string();
 	String to_json(char quote_char = '"');
 	String get_type_name();
@@ -31,6 +33,7 @@ struct DTree {
 	void set_bool(bool b);
 	void set(DTree source);
 	void set(StringMap source);
+	void set_array();
 	void set_reference(DTree* target);
 	DTree* key(String s);
 	DTree& operator [] (String s);

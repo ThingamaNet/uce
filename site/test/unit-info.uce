@@ -1,0 +1,22 @@
+RENDER(Request& context)
+{
+	DTree payload;
+
+	if(context.get["compile"] != "")
+		payload["compile_ok"].set_bool(unit_compile(context.get["compile"]));
+
+	payload["current"] = unit_info();
+
+	DTree units;
+	units.set_array();
+	for(auto& unit_path : units_list())
+	{
+		DTree item;
+		item = unit_path;
+		units.push(item);
+	}
+	payload["units"] = units;
+
+	context.header["Content-Type"] = "application/json; charset=utf-8";
+	print(json_encode(payload));
+}

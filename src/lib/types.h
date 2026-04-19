@@ -76,15 +76,39 @@ struct SharedUnit {
 	String bin_file_name;
 	String pre_file_name;
 
-	void* so_handle;
+	void* so_handle = 0;
 
-	request_handler on_setup;
-	request_ref_handler on_render;
-	request_ref_handler on_component;
-	request_ref_handler on_websocket;
+	request_handler on_setup = 0;
+	request_ref_handler on_render = 0;
+	request_ref_handler on_component = 0;
+	request_ref_handler on_websocket = 0;
 
 	String compiler_messages;
-	time_t last_compiled;
+	String compile_status = "unknown";
+	String compile_error_status = "";
+	String runtime_error_status = "";
+	time_t last_compiled = 0;
+	time_t last_loaded = 0;
+	time_t last_rendered = 0;
+	time_t last_error = 0;
+
+	u64 request_count = 0;
+	u64 invoke_count = 0;
+	u64 runtime_error_count = 0;
+
+	u64 compile_count = 0;
+	u64 compile_success_count = 0;
+	u64 compile_failure_count = 0;
+
+	f64 last_compile_duration = 0;
+	f64 total_compile_duration = 0;
+	f64 best_compile_duration = 0;
+	f64 worst_compile_duration = 0;
+
+	f64 last_render_duration = 0;
+	f64 total_render_duration = 0;
+	f64 best_render_duration = 0;
+	f64 worst_render_duration = 0;
 
 	bool opt_so_optional = false;
 
@@ -100,6 +124,7 @@ struct UploadedFile {
 struct ServerState {
 
 	std::map<String, SharedUnit*> units;
+	std::map<String, bool> known_unit_files;
 	StringMap config;
 	u32 request_count = 0;
 
@@ -120,7 +145,7 @@ void compiler_invoke(Request* context, String file_name);
 
 struct Request {
 
-	ServerState* server;
+	ServerState* server = 0;
 
 	StringMap params;
 	StringMap get;
@@ -141,11 +166,11 @@ struct Request {
 	StringMap header;
 	StringList set_cookies;
 
-	u64 random_seed;
-	u64 random_index;
+	u64 random_seed = 0;
+	u64 random_index = 0;
 
 	std::vector<ByteStream*> ob_stack;
-	ByteStream* ob;
+	ByteStream* ob = 0;
 
 	String in;
 	String out;
@@ -161,10 +186,10 @@ struct Request {
 	} flags;
 
 	struct Stats {
-		u32 bytes_written;
-		f64 time_init;
-		f64 time_start;
-		f64 time_end;
+		u32 bytes_written = 0;
+		f64 time_init = 0;
+		f64 time_start = 0;
+		f64 time_end = 0;
 		u64 mem_high = 0;
 		u64 mem_alloc = 0;
 		u32 invoke_count = 0;

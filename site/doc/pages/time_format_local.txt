@@ -1,5 +1,5 @@
 :sig
-String gmdate(String format = "", u64 timestamp = 0)
+String time_format_local(String format = "", u64 timestamp = 0)
 
 :params
 format : formatting string specifying the date format
@@ -7,7 +7,7 @@ timestamp : optional timestamp value, defaults to current time
 return value : a formatted date
 
 :desc
-Returns a formatted date in the GMT/UTC timezone. This is based on the Linux date() command. The formatting string supports the following sequences:
+Returns a formatted date. This is based on the Linux date() command. The formatting string supports the following sequences:
 :pre
        %%     a literal %
 

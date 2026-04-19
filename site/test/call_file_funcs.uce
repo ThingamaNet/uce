@@ -1,6 +1,7 @@
-// Minimal exported helper used by the `call_file()` demo page.
+// Minimal exported helper used by the `unit_call()` demo page.
 
-EXPORT void test_func()
+EXPORT DTree* test_func(DTree* call_param)
 {
 	print("HELLO FROM TEST FUNCTION");
+	return(0);
 }

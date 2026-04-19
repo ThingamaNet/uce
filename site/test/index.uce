@@ -1,57 +1,81 @@
 
 
+void render_card(String url, String title, String desc)
+{
+	<><a class="test-card" href="<?= url ?>">
+		<strong><?= title ?></strong>
+		<span><?= desc ?></span>
+	</a></>
+}
+
 RENDER(Request& context)
 {
 	DTree p;
 	p.set(context.params);
 
-	<>
+	<><html>
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1"></meta>
 		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+	</head>
+	<body>
 		<h1>
-			<a href="index.uce">UCE Test</a>:
-			Index
+			<a href="index.uce">UCE Test Suite</a>
+			<a class="docs-link" href="../doc/index.uce">API Docs &rarr;</a>
 		</h1>
-		<ul>
-			<li><a href="../doc/index.uce">Help Docs</a></li>
-			<li><a href="hello.uce">Hello</a></li>
-			<li><a href="post.uce">Form Post</a></li>
-			<li><a href="post-multipart.uce">Form Multipart Post</a></li>
-			<li><a href="working-dir.uce">Working Directory</a></li>
-			<li><a href="uri.uce">URI</a></li>
-			<li><a href="cookie.uce">Cookies</a></li>
-			<li><a href="session.uce">Session</a></li>
-			<li><a href="str_replace.uce">String replace</a></li>
-			<li><a href="dtree.uce">DTree</a></li>
-			<li><a href="json.uce">JSON</a></li>
-			<li><a href="memcached.uce">Memcached</a></li>
-			<li><a href="mysql.uce">MySQL Connector</a></li>
-			<li><a href="fileio.uce">File I/O</a></li>
-			<li><a href="shell.uce">Shell</a></li>
-			<li><a href="file_append.uce">File Append</a></li>
-			<li><a href="random.uce">RNG/Noise</a></li>
-			<li><a href="task.uce">Task</a></li>
-			<li><a href="task_repeat.uce">Task repeat</a></li>
-			<li><a href="utf8.uce">UTF-8</a></li>
-			<li><a href="call_file.uce">call_file()</a></li>
-			<li><a href="parse_time.uce">parse_time()</a></li>
-			<li><a href="header.uce">header</a></li>
-			<li><a href="components.uce">Components</a></li>
-			<li><a href="markdown.uce">Markdown</a></li>
-			<li><a href="error-reporting.uce">Error reporting</a></li>
-			<li><a href="websockets.ws.uce">WebSockets</a></li>
-		</ul>
-		<pre><?
-			print("Worker PID: ", my_pid, "\n");
-			print("Parent PID: ", parent_pid, " \n");
-			print("Output buffer size: ", context.ob->str().length(), " \n");
-			print("Request #", context.server->request_count, "\n");
-		?></pre>
-		<pre><?= (var_dump(p)) ?></pre>
-		<div><?
-			print("Output buffer size: ", context.ob->str().length(), " \n");
-		?></div>
-	</>
+		<div class="test-grid">
+			<div class="grid-heading">Basics</div>
+			<? render_card("hello.uce", "Hello World", "Basic output and server time"); ?>
+			<? render_card("working-dir.uce", "Working Directory", "Server paths and cwd"); ?>
+			<? render_card("header.uce", "Headers", "HTTP response headers"); ?>
+			<? render_card("error-reporting.uce", "Error Reporting", "Error handling and output"); ?>
 
-	//context.flags.log_request = false;
+			<div class="grid-heading">Data Types &amp; Parsing</div>
+			<? render_card("dtree.uce", "DTree", "Dynamic hierarchical data tree"); ?>
+			<? render_card("json.uce", "JSON", "Parse and encode JSON data"); ?>
+			<? render_card("string.uce", "String", "String operations"); ?>
+			<? render_card("str_replace.uce", "String Replace", "Search and replace in strings"); ?>
+			<? render_card("utf8.uce", "UTF-8", "Unicode string handling"); ?>
+			<? render_card("random.uce", "RNG / Noise", "Random generation and noise"); ?>
+			<? render_card("parse_time.uce", "time_parse()", "Date and time parsing"); ?>
+
+			<div class="grid-heading">HTTP &amp; Forms</div>
+			<? render_card("post.uce", "Form POST", "URL-encoded form submission"); ?>
+			<? render_card("post-multipart.uce", "Multipart POST", "File upload and multipart forms"); ?>
+			<? render_card("uri.uce", "URI", "URI encoding and decoding"); ?>
+			<? render_card("cookie.uce", "Cookies", "Read and write browser cookies"); ?>
+			<? render_card("session.uce", "Session", "Server-side session state"); ?>
+
+			<div class="grid-heading">Storage &amp; I/O</div>
+			<? render_card("fileio.uce", "File I/O", "Read and write files"); ?>
+			<? render_card("file_append.uce", "File Append", "Append data to files"); ?>
+			<? render_card("shell.uce", "Shell", "Execute shell commands"); ?>
+			<? render_card("memcached.uce", "Memcached", "Memcached key-value store"); ?>
+			<? render_card("mysql.uce", "MySQL", "MySQL database connector"); ?>
+
+			<div class="grid-heading">Advanced</div>
+			<? render_card("call_file.uce", "unit_call()", "Dynamic file inclusion"); ?>
+			<? render_card("components.uce", "Components", "Reusable component system"); ?>
+			<? render_card("markdown.uce", "Markdown", "Markdown parsing with components"); ?>
+			<? render_card("script.uce", "Script", "UCE script integration"); ?>
+			<? render_card("task.uce", "Task", "Background task execution"); ?>
+			<? render_card("task_repeat.uce", "Task Repeat", "Recurring task scheduling"); ?>
+			<? render_card("websockets.ws.uce", "WebSockets", "Real-time WebSocket chat"); ?>
+		</div>
+		<div class="system-info">
+			<h3>System Info</h3>
+			<pre><?
+				print("Worker PID: ", my_pid, "\n");
+				print("Parent PID: ", parent_pid, "\n");
+				print("Output buffer size: ", context.ob->str().length(), "\n");
+				print("Request #", context.server->request_count, "\n");
+			?></pre>
+		</div>
+		<details>
+			<summary>Request Parameters</summary>
+			<pre><?= (var_dump(p)) ?></pre>
+		</details>
+	</body>
+	</html></>
 
 }

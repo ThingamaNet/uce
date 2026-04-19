@@ -95,6 +95,6 @@ This makes directive components a good fit for alerts, callouts, cards, embeds, 
 :see
 markdown_to_ast
 component
-render_component
+component_render
 json_decode
 String

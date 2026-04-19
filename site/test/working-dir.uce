@@ -10,8 +10,8 @@ RENDER(Request& context)
 			Working Directory
 		</h1>
 		<pre><?
-			print("Base WD: " + get_cwd() + "\n");
-			render_file("test2/working-dir-test.uce", context);
+			print("Base WD: " + cwd_get() + "\n");
+			unit_render("test2/working-dir-test.uce", context);
 		?></pre>
 		<pre><?= var_dump(context.params) ?></pre>
 	</>

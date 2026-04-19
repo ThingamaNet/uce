@@ -1,5 +1,328 @@
 #include "compiler.h"
+#include <algorithm>
+#include <filesystem>
 #include <sys/file.h>
+
+namespace {
+
+struct SharedUnitFilesystemState
+{
+	bool source_exists = false;
+	time_t source_time = 0;
+	time_t compiled_time = 0;
+	time_t setup_template_time = 0;
+	time_t required_time = 0;
+};
+
+String compiler_registry_file_name(Request* context)
+{
+	return(context->server->config["BIN_DIRECTORY"] + "/known-uce-files.txt");
+}
+
+String compiler_registry_lock_file_name(Request* context)
+{
+	return(compiler_registry_file_name(context) + ".lock");
+}
+
+int compiler_open_lock_file(String file_name)
+{
+	int fdlock = open(file_name.c_str(), O_RDWR | O_CREAT, 0666);
+	if(fdlock == -1)
+		printf("(!) Could not open lock file %s\n", file_name.c_str());
+	return(fdlock);
+}
+
+void compiler_close_lock_file(int fdlock)
+{
+	if(fdlock == -1)
+		return;
+	flock(fdlock, LOCK_UN);
+	close(fdlock);
+}
+
+String compiler_normalize_unit_path(Request* context, String file_name)
+{
+	file_name = trim(file_name);
+	if(file_name == "")
+		return("");
+	if(file_name[0] != '/')
+		file_name = expand_path(file_name, context->server->config["COMPILER_SYS_PATH"]);
+	return(file_name);
+}
+
+bool compiler_is_known_unit_file(String file_name)
+{
+	return(file_name.length() >= 4 && file_name.substr(file_name.length() - 4) == ".uce");
+}
+
+StringList compiler_normalize_unit_list(Request* context, StringList files)
+{
+	StringList normalized;
+	for(auto& file_name : files)
+	{
+		auto normalized_name = compiler_normalize_unit_path(context, trim(file_name));
+		if(normalized_name != "" && compiler_is_known_unit_file(normalized_name))
+			normalized.push_back(normalized_name);
+	}
+	std::sort(normalized.begin(), normalized.end());
+	normalized.erase(std::unique(normalized.begin(), normalized.end()), normalized.end());
+	return(normalized);
+}
+
+StringList compiler_read_known_units_unlocked(Request* context)
+{
+	auto content = trim(file_get_contents(compiler_registry_file_name(context)));
+	if(content == "")
+		return(StringList());
+	return(compiler_normalize_unit_list(context, split(content, "\n")));
+}
+
+void compiler_write_known_units_unlocked(Request* context, StringList files)
+{
+	files = compiler_normalize_unit_list(context, files);
+	if(files.size() == 0)
+	{
+		file_put_contents(compiler_registry_file_name(context), "");
+		return;
+	}
+	file_put_contents(compiler_registry_file_name(context), join(files, "\n") + "\n");
+}
+
+template <typename TCallback>
+auto compiler_with_registry_lock(Request* context, TCallback callback) -> decltype(callback())
+{
+	auto lock_file_name = compiler_registry_lock_file_name(context);
+	int fdlock = compiler_open_lock_file(lock_file_name);
+	if(fdlock != -1)
+		flock(fdlock, LOCK_EX);
+	auto result = callback();
+	compiler_close_lock_file(fdlock);
+	return(result);
+}
+
+SharedUnitFilesystemState inspect_shared_unit_filesystem(Request* context, SharedUnit* su)
+{
+	SharedUnitFilesystemState state;
+	state.source_exists = file_exists(su->file_name);
+	if(state.source_exists)
+		state.source_time = file_mtime(su->file_name);
+	state.setup_template_time = file_mtime(
+		context->server->config["COMPILER_SYS_PATH"] + "/" +
+		context->server->config["SETUP_TEMPLATE"]);
+	state.required_time = std::max(state.source_time, state.setup_template_time);
+	state.compiled_time = file_mtime(su->so_name);
+	return(state);
+}
+
+bool shared_unit_cache_is_stale(Request* context, SharedUnit* su)
+{
+	if(!su)
+		return(true);
+
+	auto state = inspect_shared_unit_filesystem(context, su);
+	if(!state.source_exists)
+		return(true);
+	if(state.compiled_time == 0)
+		return(true);
+	if(state.compiled_time < state.required_time)
+		return(true);
+	if(su->last_compiled != 0 && state.compiled_time != su->last_compiled)
+		return(true);
+	return(false);
+}
+
+void release_shared_unit_cache_entry(Request* context, String file_name)
+{
+	auto it = context->server->units.find(file_name);
+	if(it == context->server->units.end())
+		return;
+	delete it->second;
+	context->server->units.erase(it);
+}
+
+String compiler_current_unit_path(Request* context)
+{
+	if(!context)
+		return("");
+	return(first(
+		context->resources.current_unit_file,
+		context->params["SCRIPT_FILENAME"]
+	));
+}
+
+String compiler_resolve_unit_path(Request* context, String file_name, String current_path = "")
+{
+	if(!context)
+		return("");
+
+	file_name = trim(file_name);
+	if(file_name == "")
+		file_name = compiler_current_unit_path(context);
+
+	if(file_name == "")
+		return("");
+
+	if(current_path == "")
+	{
+		auto current_unit_file = compiler_current_unit_path(context);
+		if(current_unit_file != "")
+			current_path = dirname(current_unit_file);
+		else
+			current_path = cwd_get();
+	}
+
+	if(file_name[0] != '/')
+		file_name = expand_path(file_name, current_path);
+
+	return(compiler_normalize_unit_path(context, file_name));
+}
+
+f64 compiler_average(f64 total, u64 count)
+{
+	if(count == 0)
+		return(0);
+	return(total / (f64)count);
+}
+
+void compiler_record_compile_result(SharedUnit* su, f64 duration, bool success, String status, String error_status = "")
+{
+	su->compile_count += 1;
+	su->last_compile_duration = duration;
+	su->total_compile_duration += duration;
+	if(su->best_compile_duration == 0 || duration < su->best_compile_duration)
+		su->best_compile_duration = duration;
+	if(duration > su->worst_compile_duration)
+		su->worst_compile_duration = duration;
+
+	if(success)
+	{
+		su->compile_success_count += 1;
+		su->compile_status = status;
+		su->compile_error_status = "";
+	}
+	else
+	{
+		su->compile_failure_count += 1;
+		su->compile_status = status;
+		su->compile_error_status = error_status;
+		su->last_error = time();
+	}
+}
+
+void compiler_begin_render_result(SharedUnit* su, bool count_request)
+{
+	su->invoke_count += 1;
+	if(count_request)
+		su->request_count += 1;
+	su->last_rendered = time();
+}
+
+void compiler_record_render_result(SharedUnit* su, f64 duration, bool success, String error_status = "")
+{
+	su->last_render_duration = duration;
+	su->total_render_duration += duration;
+	if(su->best_render_duration == 0 || duration < su->best_render_duration)
+		su->best_render_duration = duration;
+	if(duration > su->worst_render_duration)
+		su->worst_render_duration = duration;
+
+	if(success)
+	{
+		su->runtime_error_status = "";
+	}
+	else
+	{
+		su->runtime_error_count += 1;
+		su->runtime_error_status = error_status;
+		su->last_error = time();
+	}
+}
+
+String compiler_error_status(SharedUnit* su)
+{
+	if(!su)
+		return("");
+	if(trim(su->compile_error_status) != "")
+		return(su->compile_error_status);
+	return(su->runtime_error_status);
+}
+
+String compiler_status_from_filesystem(const SharedUnitFilesystemState& state, SharedUnit* su = 0)
+{
+	if(!state.source_exists)
+		return("missing_source");
+	if(state.compiled_time == 0)
+		return("not_compiled");
+	if(state.compiled_time < state.required_time)
+		return("stale");
+	if(su && su->so_handle)
+		return("loaded");
+	return("compiled");
+}
+
+StringList compiler_unit_exports(SharedUnit* su)
+{
+	StringList exports;
+	if(su && su->api_declarations.size() > 0)
+		exports = su->api_declarations;
+	for(auto it = exports.begin(); it != exports.end();)
+	{
+		*it = trim(*it);
+		if(*it == "")
+		{
+			it = exports.erase(it);
+			continue;
+		}
+		++it;
+	}
+	return(exports);
+}
+
+String compiler_unit_exports_text(SharedUnit* su)
+{
+	if(!su || su->api_file_name == "")
+		return("");
+	return(trim(file_get_contents(su->api_file_name)));
+}
+
+void compiler_tree_push_string(DTree& tree, String value)
+{
+	DTree item;
+	item = value;
+	tree.push(item);
+}
+
+void compiler_tree_push_strings(DTree& tree, StringList values)
+{
+	tree.set_array();
+	for(auto& value : values)
+		compiler_tree_push_string(tree, value);
+}
+
+void compiler_tree_set_bool(DTree& tree, String key, bool value)
+{
+	tree[key].set_bool(value);
+}
+
+bool compiler_is_request_entry_unit(Request* context, SharedUnit* su)
+{
+	if(!context || !su)
+		return(false);
+	auto request_file = compiler_normalize_unit_path(context, context->params["SCRIPT_FILENAME"]);
+	return(request_file != "" && request_file == su->file_name);
+}
+
+bool compiler_can_write_response(Request* context)
+{
+	return(
+		context &&
+		context->params["REQUEST_METHOD"] != "" &&
+		context->ob &&
+		context->ob_stack.size() > 0
+	);
+}
+
+}
 
 String process_text_literal(Request* context, SharedUnit* su, String content)
 {
@@ -98,6 +421,46 @@ String process_text_literal(Request* context, SharedUnit* su, String content)
 							pc.append(HT_END + code_buffer + HT_START);
 						}
 					}
+					else if(c == '<' && c1 == '>')
+					{
+						// Nested <> markup block inside code
+						String sub_buffer = "";
+						u32 sub_depth = 0;
+						u32 j = i + 2;
+						while(j < content.length())
+						{
+							char jc = content[j];
+							char jc1 = (j + 1 < content.length()) ? content[j + 1] : '\0';
+							char jc2 = (j + 2 < content.length()) ? content[j + 2] : '\0';
+							if(jc == '<' && jc1 == '/' && jc2 == '>')
+							{
+								if(sub_depth > 0)
+								{
+									sub_depth--;
+									sub_buffer.append("</>");
+									j += 3;
+								}
+								else
+								{
+									j += 3;
+									break;
+								}
+							}
+							else if(jc == '<' && jc1 == '>')
+							{
+								sub_depth++;
+								sub_buffer.append("<>");
+								j += 2;
+							}
+							else
+							{
+								sub_buffer.append(1, jc);
+								j++;
+							}
+						}
+						i = j - 1; // -1 because outer for loop increments
+						code_buffer.append(process_text_literal(context, su, sub_buffer));
+					}
 					else
 					{
 						code_buffer.append(1, c);
@@ -143,7 +506,7 @@ String preprocess_named_render_syntax(String content)
 				String render_name = trim(signature.substr(0, open_paren_pos));
 				String render_signature = signature.substr(open_paren_pos);
 				if(render_name != "")
-					line = indent + "EXPORT void render_" + safe_name(render_name) + render_signature;
+					line = indent + "EXPORT void __unit_render_" + safe_name(render_name) + render_signature;
 			}
 		}
 		else if(trimmed.rfind("COMPONENT:", 0) == 0)
@@ -155,7 +518,7 @@ String preprocess_named_render_syntax(String content)
 				String render_name = trim(signature.substr(0, open_paren_pos));
 				String render_signature = signature.substr(open_paren_pos);
 				if(render_name != "")
-					line = indent + "EXPORT void component_render_" + safe_name(render_name) + render_signature;
+					line = indent + "EXPORT void __unit_component_" + safe_name(render_name) + render_signature;
 			}
 		}
 
@@ -185,6 +548,7 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 	String token = "";
 	String html_buffer = "";
 	u8 mode = 0;
+	u32 depth = 0;
 	bool inside_quote = false;
 	u32 source_length = content.length();
 	String current_line = "";
@@ -198,9 +562,26 @@ String preprocess_shared_unit_char_wise(Request* context, SharedUnit* su, String
 		{
 			if(c == '<' && c1 == '/' && c2 == '>')
 			{
-				i += 2;
-				pc.append(process_text_literal(context, su, html_buffer));
-				mode = 0;
+				if(depth > 0)
+				{
+					depth -= 1;
+					token.append("</>");
+					html_buffer.append("</>");
+					i += 2;
+				}
+				else
+				{
+					i += 2;
+					pc.append(process_text_literal(context, su, html_buffer));
+					mode = 0;
+				}
+			}
+			else if(c == '<' && c1 == '>')
+			{
+				depth += 1;
+				token.append("<>");
+				html_buffer.append("<>");
+				i += 1;
 			}
 			else
 			{
@@ -300,14 +681,21 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	su->on_component = 0;
 	su->on_websocket = 0;
 	su->on_setup = 0;
+	su->so_handle = 0;
 	su->compiler_messages = "";
 
 	if(!file_exists(su->so_name))
 	{
 		if(su->opt_so_optional)
+		{
+			su->compile_status = "not_compiled";
 			return;
+		}
 		//printf("(i) unit file not found: %s\n", su->so_name.c_str());
 		su->compiler_messages = "unit file not found";
+		su->compile_status = "not_compiled";
+		su->compile_error_status = su->compiler_messages;
+		su->last_error = time();
 		return;
 	}
 
@@ -315,15 +703,18 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	if(su->so_handle)
 	{
 		su->last_compiled = file_mtime(su->so_name);
+		su->last_loaded = time();
+		su->compile_status = "loaded";
+		su->compile_error_status = "";
 		char *error;
 		su->on_setup = (request_handler)dlsym(su->so_handle, "set_current_request");
 		if ((error = dlerror()) != NULL)
 			printf("Error - %s in %s\n", error, su->file_name.c_str());
-		su->on_render = (request_ref_handler)dlsym(su->so_handle, "render");
+		su->on_render = (request_ref_handler)dlsym(su->so_handle, "__unit_render");
 		dlerror();
-		su->on_component = (request_ref_handler)dlsym(su->so_handle, "component_render");
+		su->on_component = (request_ref_handler)dlsym(su->so_handle, "__unit_component");
 		dlerror();
-		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, "websocket");
+		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, "__unit_websocket");
 		dlerror();
 		su->api_declarations = split(file_get_contents(su->api_file_name), "\n");
 		//else
@@ -331,6 +722,10 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	}
 	else
 	{
+		su->compiler_messages = "could not open " + su->so_name;
+		su->compile_status = "load_error";
+		su->compile_error_status = su->compiler_messages;
+		su->last_error = time();
 		printf("Error loading unit %s, could not open %s\n", su->file_name.c_str(), su->so_name.c_str());
 	}
 }
@@ -350,11 +745,13 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 {
 	//setup_unit_paths(context, su, file_name);
-	f64 comp_start = microtime();
+	f64 comp_start = time_precise();
 
 	if(!file_exists(su->file_name))
 	{
 		su->compiler_messages = "source file not found (" + su->file_name + ")";
+		compiler_untrack_known_unit(context, su->file_name);
+		compiler_record_compile_result(su, time_precise() - comp_start, false, "missing_source", su->compiler_messages);
 		return;
 	}
 
@@ -374,76 +771,89 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 
 	if(su->compiler_messages.length() > 0)
 	{
+		compiler_record_compile_result(su, time_precise() - comp_start, false, "compile_error", su->compiler_messages);
 		printf("%s \n", su->compiler_messages.c_str());
 	}
 	else
 	{
 		load_shared_unit(context, su, file_name);
+		compiler_record_compile_result(
+			su,
+			time_precise() - comp_start,
+			(su->so_handle != 0),
+			(su->so_handle ? "loaded" : "load_error"),
+			compiler_error_status(su)
+		);
 		printf("(i) compiled unit %s in %f s\n",
 			(su->pre_path + "/" + su->pre_file_name).c_str(),
-			microtime() - comp_start);
+			time_precise() - comp_start);
 	}
+}
+
+SharedUnit* compiler_get_shared_unit_internal(Request* context, String file_name, bool opt_so_optional, bool force_recompile)
+{
+	file_name = compiler_normalize_unit_path(context, file_name);
+
+	auto existing = context->server->units.find(file_name);
+	bool cache_mode_matches = (
+		existing != context->server->units.end() &&
+		existing->second->opt_so_optional == opt_so_optional
+	);
+	if(!force_recompile && existing != context->server->units.end() && cache_mode_matches && !shared_unit_cache_is_stale(context, existing->second))
+		return(existing->second);
+
+	if(existing != context->server->units.end())
+		release_shared_unit_cache_entry(context, file_name);
+
+	SharedUnit* su = new SharedUnit();
+	setup_unit_paths(context, su, file_name);
+	su->opt_so_optional = opt_so_optional;
+
+	int fdlock = compiler_open_lock_file(su->so_name + ".lock");
+	if(fdlock != -1)
+		flock(fdlock, LOCK_EX);
+
+	existing = context->server->units.find(file_name);
+	cache_mode_matches = (
+		existing != context->server->units.end() &&
+		existing->second->opt_so_optional == opt_so_optional
+	);
+	if(existing != context->server->units.end() && (force_recompile || !cache_mode_matches || shared_unit_cache_is_stale(context, existing->second)))
+		release_shared_unit_cache_entry(context, file_name);
+	existing = context->server->units.find(file_name);
+	cache_mode_matches = (
+		existing != context->server->units.end() &&
+		existing->second->opt_so_optional == opt_so_optional
+	);
+	if(!force_recompile && existing != context->server->units.end() && cache_mode_matches && !shared_unit_cache_is_stale(context, existing->second))
+	{
+		compiler_close_lock_file(fdlock);
+		delete su;
+		return(existing->second);
+	}
+
+	auto state = inspect_shared_unit_filesystem(context, su);
+	bool do_recompile = force_recompile || !state.source_exists || state.compiled_time == 0 || state.compiled_time < state.required_time;
+	if(do_recompile)
+	{
+		compile_shared_unit(context, su, file_name);
+	}
+	else
+	{
+		load_shared_unit(context, su, file_name);
+		if(!su->so_handle)
+			compile_shared_unit(context, su, file_name);
+	}
+
+	compiler_close_lock_file(fdlock);
+
+	context->server->units[file_name] = su;
+	return(su);
 }
 
 SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_optional)
 {
-	SharedUnit* su = context->server->units[file_name];
-	auto mod_time = file_mtime(file_name);
-	auto setup_template_time = file_mtime(
-		context->server->config["COMPILER_SYS_PATH"] + "/" +
-		context->server->config["SETUP_TEMPLATE"]);
-	if(setup_template_time > mod_time)
-		mod_time = setup_template_time;
-	auto compiled_time = su ? file_mtime(su->so_name) : 0;
-	bool do_recompile = false;
-	if(su && (compiled_time < mod_time || mod_time == 0))
-	{
-		delete su;
-		su = 0;
-		do_recompile = true;
-	}
-	else if(su && (su->last_compiled < mod_time))
-	{
-		delete su;
-		su = 0;
-		do_recompile = false;
-	}
-	if(!su)
-	{
-		su = new SharedUnit();
-		setup_unit_paths(context, su, file_name);
-		su->opt_so_optional = opt_so_optional;
-		if(compiled_time != 0)
-		{
-			// if we didn't decide to force recompile yet, we need to check
-			// (this case should only happen if the SU cache for that entry is cold
-			//  but the SO itself exists _AND_ is stale)
-			su->last_compiled = compiled_time;
-			if(su->last_compiled < mod_time || mod_time == 0)
-				do_recompile = true;
-		}
-
-		int fdlock = open((su->so_name+".lock").c_str(), O_RDWR | O_CREAT, 0666 );
-		int fl_excl = flock(fdlock, LOCK_EX);
-
-		if(do_recompile)
-		{
-			compile_shared_unit(context, su, file_name);
-		}
-		else
-		{
-			load_shared_unit(context, su, file_name);
-			if(!su->so_handle)
-				compile_shared_unit(context, su, file_name);
-		}
-
-		flock(fdlock, LOCK_UN);
-		close(fdlock);
-		remove((su->so_name+".lock").c_str());
-
-		context->server->units[file_name] = su;
-	}
-	return(su);
+	return(compiler_get_shared_unit_internal(context, file_name, opt_so_optional, false));
 }
 
 SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path, bool opt_so_optional)
@@ -451,10 +861,13 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 
 	context->stats.invoke_count++;
 
-	if(file_name[0] != '/')
-	{
-		file_name = expand_path(file_name, current_path);
-	}
+	file_name = compiler_resolve_unit_path(context, file_name, current_path);
+	if(file_name == "")
+		return(0);
+	if(file_exists(file_name))
+		compiler_track_known_unit(context, file_name);
+	else
+		compiler_untrack_known_unit(context, file_name);
 
 	//printf("(i) load '%s'\n", file_name.c_str());
 
@@ -464,14 +877,17 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 	if(!su)
 	{
 		printf("Error loading unit %s\n", file_name.c_str());
-		print("Error loading unit: "+file_name);
+		if(compiler_can_write_response(context))
+			print("Error loading unit: " + file_name);
 		return(0);
 	}
 	else if(su->compiler_messages.length() > 0)
 	{
-		if(context->stats.invoke_count == 1)
+		printf("%s\n", su->compiler_messages.c_str());
+		if(compiler_can_write_response(context) && context->stats.invoke_count == 1)
 			context->header["Content-Type"] = "text/plain";
-		print(su->compiler_messages);
+		if(compiler_can_write_response(context))
+			print(su->compiler_messages);
 		return(0);
 	}
 	else
@@ -479,6 +895,234 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 		return(su);
 	}
 
+}
+
+String compiler_site_directory(Request* context)
+{
+	String site_directory = first(
+		context->server->config["PRECOMPILE_FILES_IN"],
+		context->server->config["SITE_DIRECTORY"],
+		"site"
+	);
+	return(compiler_normalize_unit_path(context, site_directory));
+}
+
+StringList compiler_scan_site_units(Request* context)
+{
+	StringList files;
+	auto site_directory = compiler_site_directory(context);
+	if(site_directory == "" || !file_exists(site_directory))
+		return(files);
+
+	std::error_code walk_error;
+	auto options = std::filesystem::directory_options::skip_permission_denied;
+	for(auto it = std::filesystem::recursive_directory_iterator(site_directory, options, walk_error);
+		it != std::filesystem::recursive_directory_iterator();
+		it.increment(walk_error))
+	{
+		if(walk_error)
+		{
+			printf("(!) proactive scan warning in %s: %s\n",
+				site_directory.c_str(),
+				walk_error.message().c_str());
+			walk_error.clear();
+			continue;
+		}
+
+		std::error_code entry_error;
+		if(!it->is_regular_file(entry_error))
+			continue;
+		if(entry_error)
+			continue;
+		auto path = it->path().string();
+		if(path.length() >= 4 && path.substr(path.length() - 4) == ".uce")
+			files.push_back(path);
+	}
+	return(compiler_normalize_unit_list(context, files));
+}
+
+StringList compiler_list_known_units(Request* context)
+{
+	auto files = compiler_with_registry_lock(context, [&]() {
+		return(compiler_read_known_units_unlocked(context));
+	});
+	context->server->known_unit_files.clear();
+	for(auto& file_name : files)
+		context->server->known_unit_files[file_name] = true;
+	return(files);
+}
+
+void compiler_set_known_units(Request* context, StringList files)
+{
+	files = compiler_normalize_unit_list(context, files);
+	compiler_with_registry_lock(context, [&]() {
+		compiler_write_known_units_unlocked(context, files);
+		return(0);
+	});
+	context->server->known_unit_files.clear();
+	for(auto& file_name : files)
+		context->server->known_unit_files[file_name] = true;
+}
+
+void compiler_track_known_unit(Request* context, String file_name)
+{
+	file_name = compiler_normalize_unit_path(context, file_name);
+	if(file_name == "" || !compiler_is_known_unit_file(file_name) || context->server->known_unit_files[file_name])
+		return;
+
+	compiler_with_registry_lock(context, [&]() {
+		auto files = compiler_read_known_units_unlocked(context);
+		files.push_back(file_name);
+		compiler_write_known_units_unlocked(context, files);
+		return(0);
+	});
+	context->server->known_unit_files[file_name] = true;
+}
+
+void compiler_untrack_known_unit(Request* context, String file_name)
+{
+	file_name = compiler_normalize_unit_path(context, file_name);
+	if(file_name == "")
+		return;
+
+	compiler_with_registry_lock(context, [&]() {
+		auto files = compiler_read_known_units_unlocked(context);
+		files.erase(std::remove(files.begin(), files.end(), file_name), files.end());
+		compiler_write_known_units_unlocked(context, files);
+		return(0);
+	});
+	context->server->known_unit_files.erase(file_name);
+}
+
+bool compiler_unit_needs_recompile(Request* context, String file_name, bool* source_missing)
+{
+	file_name = compiler_normalize_unit_path(context, file_name);
+	SharedUnit su;
+	setup_unit_paths(context, &su, file_name);
+	auto state = inspect_shared_unit_filesystem(context, &su);
+	if(source_missing)
+		*source_missing = !state.source_exists;
+	if(!state.source_exists)
+		return(false);
+	if(state.compiled_time == 0)
+		return(true);
+	return(state.compiled_time < state.required_time);
+}
+
+DTree unit_info(String path)
+{
+	DTree info;
+	if(!context)
+		return(info);
+
+	String resolved_path = compiler_resolve_unit_path(context, path);
+	if(resolved_path == "")
+		return(info);
+
+	SharedUnit* su = 0;
+	auto it = context->server->units.find(resolved_path);
+	if(it != context->server->units.end())
+	{
+		su = it->second;
+	}
+	else
+	{
+		auto known_units = compiler_list_known_units(context);
+		if(std::find(known_units.begin(), known_units.end(), resolved_path) == known_units.end() && !file_exists(resolved_path))
+			return(info);
+	}
+
+	SharedUnit temp_unit;
+	if(!su)
+	{
+		su = &temp_unit;
+		setup_unit_paths(context, su, resolved_path);
+	}
+
+	auto fs_state = inspect_shared_unit_filesystem(context, su);
+	auto exports_text = compiler_unit_exports_text(su);
+	auto exports = compiler_unit_exports(su);
+	if(exports.size() == 0 && exports_text != "")
+		exports = split(exports_text, "\n");
+
+	info["path"] = resolved_path;
+	info["file_name"] = su->file_name;
+	info["src_path"] = su->src_path;
+	info["bin_path"] = su->bin_path;
+	info["pre_path"] = su->pre_path;
+	info["src_file_name"] = su->src_file_name;
+	info["bin_file_name"] = su->bin_file_name;
+	info["pre_file_name"] = su->pre_file_name;
+	info["so_name"] = su->so_name;
+	info["api_file_name"] = su->api_file_name;
+	info["compile_status"] = (su->compile_status != "unknown" ? su->compile_status : compiler_status_from_filesystem(fs_state, su));
+	info["compile_error_status"] = su->compile_error_status;
+	info["runtime_error_status"] = su->runtime_error_status;
+	info["error_status"] = compiler_error_status(su);
+	info["compiler_messages"] = su->compiler_messages;
+	info["last_compiled"] = (f64)su->last_compiled;
+	info["last_loaded"] = (f64)su->last_loaded;
+	info["last_rendered"] = (f64)su->last_rendered;
+	info["last_error"] = (f64)su->last_error;
+	info["request_count"] = (f64)su->request_count;
+	info["invoke_count"] = (f64)su->invoke_count;
+	info["runtime_error_count"] = (f64)su->runtime_error_count;
+	info["compile_count"] = (f64)su->compile_count;
+	info["compile_success_count"] = (f64)su->compile_success_count;
+	info["compile_failure_count"] = (f64)su->compile_failure_count;
+	info["last_compile_time"] = su->last_compile_duration;
+	info["average_compile_time"] = compiler_average(su->total_compile_duration, su->compile_count);
+	info["best_compile_time"] = su->best_compile_duration;
+	info["worst_compile_time"] = su->worst_compile_duration;
+	info["last_render_time"] = su->last_render_duration;
+	info["average_render_time"] = compiler_average(su->total_render_duration, su->invoke_count);
+	info["best_render_time"] = su->best_render_duration;
+	info["worst_render_time"] = su->worst_render_duration;
+	info["source_mtime"] = (f64)fs_state.source_time;
+	info["compiled_mtime"] = (f64)fs_state.compiled_time;
+	info["setup_template_mtime"] = (f64)fs_state.setup_template_time;
+	info["required_mtime"] = (f64)fs_state.required_time;
+	compiler_tree_set_bool(info, "known", context->server->known_unit_files[resolved_path]);
+	compiler_tree_set_bool(info, "current_unit", resolved_path == compiler_current_unit_path(context));
+	compiler_tree_set_bool(info, "loaded", su->so_handle != 0);
+	compiler_tree_set_bool(info, "source_exists", fs_state.source_exists);
+	compiler_tree_set_bool(info, "compiled_exists", fs_state.compiled_time != 0);
+	compiler_tree_set_bool(info, "stale", fs_state.source_exists && fs_state.compiled_time != 0 && fs_state.compiled_time < fs_state.required_time);
+	compiler_tree_set_bool(info, "has_render", su->on_render != 0);
+	compiler_tree_set_bool(info, "has_component", su->on_component != 0);
+	compiler_tree_set_bool(info, "has_websocket", su->on_websocket != 0);
+	compiler_tree_set_bool(info, "has_setup", su->on_setup != 0);
+	compiler_tree_set_bool(info, "has_error", trim(compiler_error_status(su)) != "");
+
+	compiler_tree_push_strings(info["exports"], exports);
+	info["exports_text"] = exports_text;
+
+	return(info);
+}
+
+StringList units_list()
+{
+	if(!context)
+		return(StringList());
+
+	auto known_units = compiler_list_known_units(context);
+	for(auto& it : context->server->units)
+		known_units.push_back(it.first);
+	return(compiler_normalize_unit_list(context, known_units));
+}
+
+bool unit_compile(String path)
+{
+	if(!context)
+		return(false);
+
+	String resolved_path = compiler_resolve_unit_path(context, path);
+	if(resolved_path == "")
+		return(false);
+
+	compiler_track_known_unit(context, resolved_path);
+	auto su = compiler_get_shared_unit_internal(context, resolved_path, false, true);
+	return(su && trim(su->compiler_messages) == "" && su->so_handle != 0);
 }
 
 namespace {
@@ -492,9 +1136,9 @@ struct UnitInvocationScope
 	UnitInvocationScope(Request* context, SharedUnit* su)
 	{
 		this->context = context;
-		previous_working_directory = get_cwd();
+		previous_working_directory = cwd_get();
 		previous_unit_file = context->resources.current_unit_file;
-		set_cwd(su->src_path);
+		cwd_set(su->src_path);
 		context->resources.current_unit_file = su->file_name;
 	}
 
@@ -503,7 +1147,7 @@ struct UnitInvocationScope
 		if(!context)
 			return;
 		context->resources.current_unit_file = previous_unit_file;
-		set_cwd(previous_working_directory);
+		cwd_set(previous_working_directory);
 	}
 };
 
@@ -569,7 +1213,7 @@ String component_resolve_path(String name, Request* request_context = 0)
 		seen[candidate] = true;
 		String resolved = candidate;
 		if(resolved[0] != '/')
-			resolved = expand_path(resolved, get_cwd());
+			resolved = expand_path(resolved, cwd_get());
 		if(file_exists(resolved))
 			return(resolved);
 	}
@@ -581,22 +1225,22 @@ String page_render_handler_symbol(String render_name)
 {
 	render_name = trim(render_name);
 	if(render_name == "" || render_name == "render")
-		return("render");
-	return("render_" + safe_name(render_name));
+		return("__unit_render");
+	return("__unit_render_" + safe_name(render_name));
 }
 
 String component_handler_symbol(String render_name)
 {
 	render_name = trim(render_name);
 	if(render_name == "")
-		return("component_render");
-	return("component_render_" + safe_name(render_name));
+		return("__unit_component");
+	return("__unit_component_" + safe_name(render_name));
 }
 
 request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 {
 	String symbol = page_render_handler_symbol(render_name);
-	if(symbol == "render")
+	if(symbol == "__unit_render")
 		return(su->on_render);
 
 	auto it = su->api_functions.find(symbol);
@@ -612,7 +1256,7 @@ request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 request_ref_handler get_component_handler(SharedUnit* su, String render_name)
 {
 	String symbol = component_handler_symbol(render_name);
-	if(symbol == "component_render")
+	if(symbol == "__unit_component")
 		return(su->on_component);
 
 	auto it = su->api_functions.find(symbol);
@@ -653,7 +1297,24 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 
 	UnitInvocationScope invoke_scope(context, su);
 	su->on_setup(context);
-	handler(*context);
+	f64 render_start = time_precise();
+	bool count_request = compiler_is_request_entry_unit(context, su);
+	compiler_begin_render_result(su, count_request);
+	try
+	{
+		handler(*context);
+		compiler_record_render_result(su, time_precise() - render_start, true);
+	}
+	catch(...)
+	{
+		compiler_record_render_result(
+			su,
+			time_precise() - render_start,
+			false,
+			"uncaught exception during render"
+		);
+		throw;
+	}
 	return(true);
 }
 
@@ -685,7 +1346,23 @@ bool compiler_invoke_component(Request* context, String file_name, String render
 
 	UnitInvocationScope invoke_scope(context, su);
 	su->on_setup(context);
-	handler(*context);
+	f64 render_start = time_precise();
+	compiler_begin_render_result(su, false);
+	try
+	{
+		handler(*context);
+		compiler_record_render_result(su, time_precise() - render_start, true);
+	}
+	catch(...)
+	{
+		compiler_record_render_result(
+			su,
+			time_precise() - render_start,
+			false,
+			"uncaught exception during component render"
+		);
+		throw;
+	}
 	return(true);
 }
 
@@ -721,16 +1398,33 @@ void compiler_invoke_websocket(Request* context, String file_name)
 
 	UnitInvocationScope invoke_scope(context, su);
 	su->on_setup(context);
-	su->on_websocket(*context);
+	f64 render_start = time_precise();
+	bool count_request = compiler_is_request_entry_unit(context, su);
+	compiler_begin_render_result(su, count_request);
+	try
+	{
+		su->on_websocket(*context);
+		compiler_record_render_result(su, time_precise() - render_start, true);
+	}
+	catch(...)
+	{
+		compiler_record_render_result(
+			su,
+			time_precise() - render_start,
+			false,
+			"uncaught exception during websocket handler"
+		);
+		throw;
+	}
 }
 
-void render_file(String file_name)
+void unit_render(String file_name)
 {
-	//printf("(i) render_file(%s)\n", file_name.c_str());
+	//printf("(i) unit_render(%s)\n", file_name.c_str());
 	compiler_invoke(context, file_name);
 }
 
-void render_file(String file_name, Request& context)
+void unit_render(String file_name, Request& context)
 {
 	compiler_invoke(&context, file_name);
 }
@@ -750,24 +1444,24 @@ String component_error_banner(String message)
 	return("<div class=\"banner\">" + html_escape(message) + "</div>");
 }
 
-void render_component(String name)
+void component_render(String name)
 {
 	DTree props;
-	render_component(name, props, *context);
+	component_render(name, props, *context);
 }
 
-void render_component(String name, Request& context)
+void component_render(String name, Request& context)
 {
 	DTree props;
-	render_component(name, props, context);
+	component_render(name, props, context);
 }
 
-void render_component(String name, DTree props)
+void component_render(String name, DTree props)
 {
-	render_component(name, props, *context);
+	component_render(name, props, *context);
 }
 
-void render_component(String name, DTree props, Request& context)
+void component_render(String name, DTree props, Request& context)
 {
 	String file_name;
 	String render_name;
@@ -810,11 +1504,11 @@ String component(String name, DTree props)
 String component(String name, DTree props, Request& context)
 {
 	ob_start();
-	render_component(name, props, context);
+	component_render(name, props, context);
 	return(ob_get_close());
 }
 
-SharedUnit* load_file(String file_name)
+SharedUnit* unit_load(String file_name)
 {
 	auto su = compiler_load_shared_unit(context, file_name, "", false);
 	if(su && su->so_handle)
@@ -827,9 +1521,9 @@ SharedUnit* load_file(String file_name)
 	}
 }
 
-DTree* call_file(String file_name, String function_name, DTree* call_param)
+DTree* unit_call(String file_name, String function_name, DTree* call_param)
 {
-	DTree* result;
+	DTree* result = 0;
 	auto su = compiler_load_shared_unit(context, file_name, "", false);
 	if(su && su->so_handle)
 	{
@@ -842,7 +1536,7 @@ DTree* call_file(String file_name, String function_name, DTree* call_param)
 			auto f = (dtree_call_handler)dlsym(su->so_handle, function_name.c_str());
 			if(!f)
 			{
-				print("Error: call_file() function '", function_name, "' not found");
+				print("Error: unit_call() function '", function_name, "' not found");
 			}
 			else
 			{
@@ -854,7 +1548,7 @@ DTree* call_file(String file_name, String function_name, DTree* call_param)
 	}
 	else
 	{
-		print("Error: call_file() could not load unit file '", file_name, "'");
+		print("Error: unit_call() could not load unit file '", file_name, "'");
 	}
 	return(result);
 }

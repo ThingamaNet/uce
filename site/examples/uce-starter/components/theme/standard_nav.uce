@@ -3,9 +3,20 @@
 COMPONENT(Request& context)
 {
 	starter_boot(context);
+	String nav_class = context.call["nav_class"].to_string();
+	if(nav_class == "" && (context.cfg.get_by_path("theme/key").to_string() == "portal-dark" || context.cfg.get_by_path("theme/key").to_string() == "dark" || context.cfg.get_by_path("theme/key").to_string() == "retro-gaming"))
+		nav_class = "nav-shell";
+
+	DTree account_props;
+	if(context.call["account_wrapper_class"].to_string() != "")
+		account_props["wrapper_class"] = context.call["account_wrapper_class"];
+	if(context.call["links_wrapper_class"].to_string() != "")
+		account_props["links_wrapper_class"] = context.call["links_wrapper_class"];
+	if(context.call["name_class"].to_string() != "")
+		account_props["name_class"] = context.call["name_class"];
 
 	<>
-		<nav<?: context.cfg.get_by_path("theme/key").to_string() == "portal-dark" || context.cfg.get_by_path("theme/key").to_string() == "dark" || context.cfg.get_by_path("theme/key").to_string() == "retro-gaming" ? " class=\"nav-shell\"" : "" ?>>
+		<nav<?: nav_class != "" ? " class=\"" + html_escape(nav_class) + "\"" : "" ?>>
 			<div class="nav-menu">
 				<a href="<?= starter_link("", context) ?>"><?= context.cfg.get_by_path("site/name").to_string() ?></a>
 				<? context.cfg.get_by_path("menu").each([&](DTree menu_item, String menu_key) {
@@ -14,7 +25,7 @@ COMPONENT(Request& context)
 					?><a href="<?= starter_menu_href(menu_key, menu_item, context) ?>"><?= menu_item["title"].to_string() ?></a><?
 				}); ?>
 			</div>
-			<?: component("account_links", context) ?>
+			<?: component("account_links", account_props, context) ?>
 		</nav>
 	</>
 }

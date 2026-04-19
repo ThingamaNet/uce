@@ -1,5 +1,5 @@
 Sessions
 
-make_session_id
+session_id_create
 session_destroy
 session_start

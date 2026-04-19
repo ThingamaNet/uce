@@ -1,5 +1,5 @@
 :sig
-void set_cwd(String path)
+void cwd_set(String path)
 
 :params
 path : the new working directory

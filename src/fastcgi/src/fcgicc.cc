@@ -102,7 +102,7 @@ FastCGIServer::shutdown()
 
 	for (std::vector<std::string>::iterator it = listen_unlink.begin();
 		it != listen_unlink.end(); ++it)
-		unlink(it->c_str());
+		file_unlink(*it);
 
 	for (std::map<int, Connection*>::iterator it = client_sockets.begin();
 		it != client_sockets.end(); ++it)
@@ -188,7 +188,7 @@ FastCGIServer::listen(const std::string& local_path)
 
 		std::memcpy(sa.sun_path, local_path.data(), size);
 
-		unlink(local_path.c_str());
+		file_unlink(local_path);
 		try {
 			if (bind(server_socket, (struct sockaddr*)&sa,
 				sizeof(sa) - (sizeof(sa.sun_path) - size - 1)) == -1)
@@ -204,7 +204,7 @@ FastCGIServer::listen(const std::string& local_path)
 			printf("(P) listening to #%i socket %s\n", server_socket, local_path.c_str());
 
 		} catch (...) {
-			unlink(local_path.c_str());
+			file_unlink(local_path);
 			throw;
 		}
 
@@ -350,7 +350,7 @@ FastCGIServer::process(int timeout_ms)
 				FastCGIRequest* new_request = new FastCGIRequest();
 				new_request->resources.client_socket = client_socket;
 				new_request->resources.server_socket = socket_handle;
-				new_request->stats.time_init = microtime();
+				new_request->stats.time_init = time_precise();
 				client_sockets[client_socket]->requests[client_socket] = new_request;
 			}
 		}
@@ -467,7 +467,7 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 			request.params["SCRIPT_FILENAME"] = request.params["HTTP_SCRIPT_FILENAME"];
 		else if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
 		{
-			String document_root = first(request.params["DOCUMENT_ROOT"], get_cwd());
+			String document_root = first(request.params["DOCUMENT_ROOT"], cwd_get());
 			if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
 				document_root.resize(document_root.length()-1);
 			request.params["DOCUMENT_ROOT"] = document_root;
@@ -899,7 +899,7 @@ FastCGIServer::read_fgci(Connection& connection)
 			FastCGIRequest* new_request = new FastCGIRequest();
 			new_request->resources.client_socket = connection.client_socket;
 			new_request->resources.server_socket = connection.server_socket;
-			new_request->stats.time_init = microtime();
+			new_request->stats.time_init = time_precise();
 			connection.requests[request_id] = new_request;
 
 			break;
@@ -1019,7 +1019,7 @@ FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* conne
 	}
 	request.ob_stack.clear();
 	request.flags.output_closed = true;
-	request.stats.time_end = microtime();
+	request.stats.time_end = time_precise();
 	if(request.flags.log_request)
 		printf("(r) pid:%i\t%s\t%0.6fs\tfps:%0.0f\tout:%0.1fkB\tmem:%0.0f/%0.0fkB\n",
 			my_pid,

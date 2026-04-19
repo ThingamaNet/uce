@@ -74,7 +74,7 @@ The loaded file is resolved relative to the current source file unless the path 
 - `#load` is recognized only when the current line starts with `#load ` at column 1.
 - `EXPORT` harvesting likewise only triggers when the current line starts with `EXPORT` at column 1 and is followed by whitespace.
 - Relative `#load` paths are expanded against the including unit's source directory.
-- `render_file()` and `call_file()` are runtime APIs; `#load` is a compile-time include/composition feature.
+- `unit_render()` and `unit_call()` are runtime APIs; `#load` is a compile-time include/composition feature.
 
 :Limitations
 - This pass is character-wise, not a full parser.
@@ -92,7 +92,7 @@ The loaded file is resolved relative to the current source file unless the path 
 
 :see
 load
-render_file
-call_file
+unit_render
+unit_call
 0_context
 1_COMPONENT

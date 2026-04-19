@@ -14,7 +14,7 @@ The request environment is passed explicitly through `context`, including params
 
 For a normal direct page request, `context.call` starts empty.
 
-If the page is invoked from another UCE file via `render_file(file_name, context)`, the callee receives that same `context`.
+If the page is invoked from another UCE file via `unit_render(file_name, context)`, the callee receives that same `context`.
 
 Pages intended to serve WebSocket traffic may expose both `RENDER(Request& context)` and `WS(Request& context)`. Files may also define `COMPONENT()` handlers when they intentionally need both page and component behavior in one unit. In that case `RENDER(Request& context)` serves the direct HTTP response, `WS(Request& context)` handles subsequent WebSocket messages, and `COMPONENT()` remains available only through the component helpers.
 

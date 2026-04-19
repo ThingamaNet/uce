@@ -16,7 +16,7 @@ DTree chat_event(Request& context, String type, String body)
 	event["connection_id"] = ws_connection_id();
 	event["scope"] = first(context.params["DOCUMENT_URI"], ws_scope());
 	event["online"] = (f64)ws_connection_count();
-	event["at"] = gmdate("%H:%M:%S");
+	event["at"] = time_format_utc("%H:%M:%S");
 	event["name"] = context.connection["name"].to_string();
 	event["message_count"] = context.connection["message_count"];
 	return(event);
@@ -171,7 +171,7 @@ WS(Request& context)
 
 	if(type == "join")
 	{
-		context.connection["joined_at"] = gmdate("%Y-%m-%d %H:%M:%S");
+		context.connection["joined_at"] = time_format_utc("%Y-%m-%d %H:%M:%S");
 		context.connection["last_type"] = type;
 		ws_send(json_encode(chat_event(context, "join", name + " joined the room")));
 		return;

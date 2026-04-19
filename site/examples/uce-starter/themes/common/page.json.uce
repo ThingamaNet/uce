@@ -1,0 +1,14 @@
+#load "../../lib/app.uce"
+
+COMPONENT(Request& context)
+{
+	starter_boot(context);
+	context.header["Content-Type"] = "application/json";
+	context.header["Cache-Control"] = "no-cache, no-store, must-revalidate";
+	if(context.call["json"].get_type_name() == "array")
+		print(json_encode(context.call["json"]));
+	else if(context.var["starter"]["json"].get_type_name() == "array")
+		print(json_encode(context.var["starter"]["json"]));
+	else
+		print(starter_page_main_html(context));
+}

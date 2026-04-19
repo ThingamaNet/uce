@@ -1,5 +1,5 @@
 :sig
-String get_cwd()
+String cwd_get()
 
 :params
 return value : the current working directory

@@ -1,0 +1,67 @@
+
+// Returns whether haystack contains needle (case-sensitive, both should be pre-lowercased)
+bool str_contains(String haystack, String needle)
+{
+	return replace(haystack, needle, "\x01") != haystack;
+}
+
+RENDER(Request& context)
+{
+	String q = to_lower(trim(context.get["q"]));
+
+	if(q.length() < 2)
+	{
+		return;
+	}
+
+	u32 count = 0;
+
+	for(auto file_name : ls("pages/"))
+	{
+		String ft = nibble(file_name, ".");
+		String name = ft;
+		String badge = "";
+
+		if(ft.substr(0, 2) == "0_")
+		{
+			nibble(name, "_");
+			badge = "struct";
+		}
+		else if(ft.substr(0, 2) == "1_")
+		{
+			nibble(name, "_");
+			badge = "directive";
+		}
+
+		String content = file_get_contents("pages/" + ft + ".txt");
+
+		if(str_contains(to_lower(name), q) || str_contains(to_lower(content), q))
+		{
+			// Find first content line that contains the query for a snippet
+			String snippet = "";
+			for(auto line : split(content, "\n"))
+			{
+				String t = trim(line);
+				if(t.length() > 4 && t.substr(0, 1) != ":" && str_contains(to_lower(t), q))
+				{
+					snippet = t;
+					if(snippet.length() > 100)
+						snippet = snippet.substr(0, 100) + "…";
+					break;
+				}
+			}
+
+			<><div class="func-item search-hit">
+				<a href="index.uce?p=<?= uri_encode(ft) ?>"><?= html_escape(name) ?><? if(badge != "") { ?><span class="badge"><?= badge ?></span><? } ?></a>
+				<? if(snippet != "") { ?><div class="search-snippet"><?= html_escape(snippet) ?></div><? } ?>
+			</div></>
+
+			count += 1;
+		}
+	}
+
+	if(count == 0)
+	{
+		<><p class="no-results">No results for "<strong><?= html_escape(q) ?></strong>"</p></>
+	}
+}

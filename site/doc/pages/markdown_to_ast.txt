@@ -72,6 +72,6 @@ The parser preserves directive data needed by those hooks.
 :see
 markdown_to_html
 component
-render_component
+component_render
 json_encode
 DTree

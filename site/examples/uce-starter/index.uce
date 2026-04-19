@@ -11,7 +11,7 @@ RENDER(Request& context)
 	{
 		if(resolved["param"].to_string() != "")
 			context.var["starter"]["route"]["param"] = resolved["param"];
-		render_file(resolved["file"].to_string(), context);
+		unit_render(resolved["file"].to_string(), context);
 	}
 	else
 	{
@@ -24,8 +24,6 @@ RENDER(Request& context)
 		</>
 	}
 	String main_html = ob_get_close();
-
-	DTree shell_props;
-	shell_props["main_html"] = main_html;
-	render_component("components/theme/page_shell", shell_props, context);
+	context.var["starter"]["fragments"]["main"] = main_html;
+	starter_render_page(context);
 }

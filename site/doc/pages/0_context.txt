@@ -64,9 +64,8 @@ Whether the request should be logged
 	f64 stats.time_start
 	f64 stats.time_end
 
-:render_file(String file_name, [Request& context])
+:unit_render(String file_name, [Request& context])
 Invokes another UCE file using the current or supplied request context
 
 :see
 >types
-

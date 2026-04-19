@@ -1,5 +1,5 @@
 :sig
-u64 parse_time(String time_string)
+u64 time_parse(String time_string)
 
 :params
 time_string : a string containing a date and/or time in text form

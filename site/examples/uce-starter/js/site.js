@@ -1,9 +1,19 @@
 var enable_debug = true;
 
+var starterReady = (typeof $ !== 'undefined' && $.ready)
+    ? $.ready.bind($)
+    : function(callback) {
+        if (document.readyState !== 'loading') {
+            callback();
+        } else {
+            document.addEventListener('DOMContentLoaded', callback);
+        }
+    };
+
 var UI = {
 
     smoothScrollToNamedAnchors: function() {
-        $('a[href^="#"]').each(anchor => {
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
@@ -18,7 +28,8 @@ var UI = {
     },
 
 	enablePageTransitions: function() {
-		$(document.body).append(`<style>
+		var style = document.createElement('style');
+		style.textContent = `
 			::view-transition-old(root),
 			::view-transition-new(root) {
 			animation-duration: 0.25s;
@@ -40,7 +51,8 @@ var UI = {
 			@keyframes fade-in {
 			from { opacity: 0; }
 			to { opacity: 1; }
-			}</style>`);
+			}`;
+		document.body.appendChild(style);
 
 		document.addEventListener('click', e => {
 			const link = e.target.closest('a[href]');
@@ -62,4 +74,4 @@ var UI = {
 
 }
 
-$.ready(UI.init);
+starterReady(UI.init);

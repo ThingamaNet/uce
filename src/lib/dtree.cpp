@@ -16,6 +16,20 @@ TreePtr dtree_resolve_reference(TreePtr tree)
 	return(tree);
 }
 
+bool dtree_key_is_index(String key, s64 expected_index = -1)
+{
+	if(key == "")
+		return(false);
+	for(auto c : key)
+	{
+		if(!isdigit(c))
+			return(false);
+	}
+	if(expected_index >= 0)
+		return(key == std::to_string(expected_index));
+	return(true);
+}
+
 }
 
 void DTree::each(std::function <void (DTree t, String key)> f)
@@ -38,6 +52,23 @@ void DTree::each(std::function <void (DTree t, String key)> f)
 bool DTree::is_array()
 {
 	return(deref().type == 'M');
+}
+
+bool DTree::is_list() const
+{
+	const DTree& target = deref();
+	if(target.type != 'M')
+		return(false);
+	if(target._map.size() == 0)
+		return(target._list_mode);
+	s64 expected_index = 0;
+	for(const auto& entry : target._map)
+	{
+		if(!dtree_key_is_index(entry.first, expected_index))
+			return(false);
+		expected_index += 1;
+	}
+	return(true);
 }
 
 String DTree::to_string()
@@ -213,6 +244,7 @@ void DTree::set_type(char t)
 			case('M'):
 				_map.clear();
 				_array_index = 0;
+				_list_mode = false;
 				break;
 		}
 	}
@@ -228,6 +260,7 @@ void DTree::set(String s)
 	}
 	set_type('S');
 	_String = s;
+	_list_mode = false;
 }
 
 void DTree::set(void* p)
@@ -240,6 +273,7 @@ void DTree::set(void* p)
 	}
 	set_type('P');
 	_ptr = p;
+	_list_mode = false;
 }
 
 void DTree::set(f64 f)
@@ -252,6 +286,7 @@ void DTree::set(f64 f)
 	}
 	set_type('F');
 	_float = f;
+	_list_mode = false;
 }
 
 void DTree::set_bool(bool b)
@@ -264,6 +299,7 @@ void DTree::set_bool(bool b)
 	}
 	set_type('B');
 	_bool = b;
+	_list_mode = false;
 }
 
 void DTree::set(DTree source)
@@ -279,21 +315,28 @@ void DTree::set(DTree source)
 	{
 		case('S'):
 			_String = source._String;
+			_list_mode = false;
 			break;
 		case('F'):
 			_float = source._float;
+			_list_mode = false;
 			break;
 		case('B'):
 			_bool = source._bool;
+			_list_mode = false;
 			break;
 		case('M'):
 			_map = source._map;
+			_array_index = source._array_index;
+			_list_mode = source._list_mode;
 			break;
 		case('P'):
 			_ptr = source._ptr;
+			_list_mode = false;
 			break;
 		case('R'):
 			_ptr = source._ptr;
+			_list_mode = false;
 			break;
 	}
 }
@@ -307,10 +350,26 @@ void DTree::set(StringMap source)
 		return;
 	}
 	set_type('M');
+	_array_index = 0;
+	_list_mode = false;
 	for (auto it = source.begin(); it != source.end(); ++it)
 	{
 		_map[it->first] = it->second;
 	}
+}
+
+void DTree::set_array()
+{
+	DTree* target = reference_target();
+	if(target)
+	{
+		target->set_array();
+		return;
+	}
+	type = 'M';
+	_map.clear();
+	_array_index = 0;
+	_list_mode = true;
 }
 
 void DTree::set_reference(DTree* target)
@@ -333,6 +392,8 @@ DTree& DTree::operator [] (String s) {
 	if(target)
 		return((*target)[s]);
 	set_type('M');
+	if(_list_mode && !dtree_key_is_index(s))
+		_list_mode = false;
 	return(_map[s]);
 }
 
@@ -351,6 +412,25 @@ void DTree::push(DTree& child)
 		return;
 	}
 	set_type('M');
+	if(_map.size() == 0)
+	{
+		_list_mode = true;
+		_array_index = 0;
+	}
+	else
+	{
+		if(is_list())
+		{
+			_list_mode = true;
+			_array_index = _map.size();
+		}
+		else
+		{
+			_list_mode = false;
+			while(_map.find(std::to_string(_array_index)) != _map.end())
+				_array_index += 1;
+		}
+	}
 	_map[std::to_string(_array_index)] = child;
 	_array_index += 1;
 }
@@ -364,6 +444,8 @@ DTree DTree::pop()
 	auto last = _map.rbegin();
 	DTree result = last->second;
 	_map.erase(last->first);
+	if(_list_mode)
+		_array_index = _map.size();
 	return(result);
 }
 
@@ -377,6 +459,8 @@ void DTree::remove(String s)
 	}
 	set_type('M');
 	_map.erase(s);
+	if(_map.size() == 0)
+		_array_index = 0;
 }
 
 void DTree::clear()
@@ -389,6 +473,7 @@ void DTree::clear()
 	}
 	set_type('M');
 	_map.clear();
+	_array_index = 0;
 }
 
 String to_String(DTree t)

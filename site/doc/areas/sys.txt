@@ -8,11 +8,11 @@ file_exists
 file_get_contents
 file_mtime
 file_put_contents
-get_cwd
+cwd_get
 ls
 mkdir
 path_join
-set_cwd
+cwd_set
 shell_escape
 shell_exec
-unlink
+file_unlink

@@ -28,6 +28,6 @@ RENDER(Request& context)
 			<?: component("components/card", card_props, context) ?>
 		</div>
 		<h2>Named Component</h2>
-		<? render_component("components/card:BODY", named_props, context); ?>
+		<? component_render("components/card:BODY", named_props, context); ?>
 	</>
 }

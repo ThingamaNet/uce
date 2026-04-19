@@ -7,15 +7,15 @@ void render_see_section(String name)
 	{
 		if(idx == 0)
 		{
-			<><h3><?= line ?></h3><ul></>
+			<><div class="category"><h3><?= line ?></h3><ul></>
 		}
 		else if(line != "")
 		{
-			<><li><a href="index.uce?p=<?= uri_encode(line) ?>"><?= line ?><span style="opacity:0.5">()</span></a></li></>
+			<><li><a href="index.uce?p=<?= uri_encode(line) ?>"><?= line ?><span class="dim">()</span></a></li></>
 		}
 		idx += 1;
 	}
-	<></ul></>
+	<></ul></div></>
 }
 
 
@@ -26,20 +26,39 @@ RENDER(Request& context)
 
 	<><html>
 	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1"></meta>
 		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
 	</head>
 	<body>
 		<h1>
-			<a href="index.uce">UCE Docs</a>:
-			<?= page ?>
+			<a href="index.uce">UCE Docs</a><?
+			if(page != "index")
+			{
+				?><span class="dim"> / </span><?= page ?><?
+			}
+		?>
 		</h1>
 		<?
 
 		if(page == "index")
 		{
-			?><div style="display:flex;"><?
-			?><div style="flex:1"><?
-			?><h3>All API Functions</h3><?
+			?><div class="search-bar">
+				<input id="doc-search" type="search" placeholder="Search API…" autocomplete="off" spellcheck="false"/>
+				<span class="search-count" id="search-count"></span>
+			</div>
+			<div id="search-results" hidden></div>
+			<div class="index-pane" id="index-pane">
+			<div class="index-layout">
+			<nav class="sidebar"><?
+			for(auto file_name : ls("areas/"))
+			{
+				String ft = nibble(file_name, ".");
+				render_see_section(ft);
+			}
+			?></nav>
+			<main class="content">
+			<h2>All API Functions</h2>
+			<div class="func-grid"><?
 			for(auto file_name : ls("pages/"))
 			{
 				String ft = nibble(file_name, ".");
@@ -48,7 +67,7 @@ RENDER(Request& context)
 					String fn = ft;
 					String pre = nibble(fn, "_");
 					?>
-					<div><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?></a><span style="opacity:0.5"> : struct</span></div>
+					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">struct</span></a></div>
 					<?
 				}
 				else if(ft.substr(0, 2) == "1_")
@@ -56,28 +75,65 @@ RENDER(Request& context)
 					String fn = ft;
 					String pre = nibble(fn, "_");
 					?>
-					<div><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?></a><span style="opacity:0.5"> : directive</span></div>
+					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">directive</span></a></div>
 					<?
 				}
 				else
 				{
 					?>
-					<div><a href="?p=<?= uri_encode(ft) ?>"><?= ft ?><span style="opacity:0.5">()</span></a></div>
+					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= ft ?><span class="dim">()</span></a></div>
 					<?
 				}
 			}
-			?></div><?
-			?><div style="flex:1"><?
-			for(auto file_name : ls("areas/"))
-			{
-				String ft = nibble(file_name, ".");
-				render_see_section(ft);
-			}
-			?></div><?
-			?></div><?
+			?></div>
+			</main>
+			</div>
+			</div>
+			<?
+			<><script>
+			(function () {
+				var input = document.getElementById('doc-search');
+				var results = document.getElementById('search-results');
+				var pane = document.getElementById('index-pane');
+				var counter = document.getElementById('search-count');
+				var timer;
+
+				function showResults(html) {
+					results.innerHTML = html;
+					results.hidden = false;
+					pane.hidden = true;
+					var hits = results.querySelectorAll('.search-hit').length;
+					counter.textContent = hits ? hits + ' result' + (hits > 1 ? 's' : '') : '';
+				}
+
+				function showIndex() {
+					results.innerHTML = '';
+					results.hidden = true;
+					pane.hidden = false;
+					counter.textContent = '';
+				}
+
+				input.addEventListener('input', function () {
+					var q = this.value.trim();
+					clearTimeout(timer);
+					if (q.length < 2) { showIndex(); return; }
+					counter.textContent = '\u2026';
+					timer = setTimeout(function () {
+						fetch('search.uce?q=' + encodeURIComponent(q))
+							.then(function (r) { return r.text(); })
+							.then(showResults);
+					}, 220);
+				});
+
+				input.addEventListener('keydown', function (e) {
+					if (e.key === 'Escape') { this.value = ''; showIndex(); }
+				});
+			})();
+			</script></>
 		}
 		else
 		{
+			?><article class="doc-detail"><?
 			auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
 			String layout_class = "text";
 			u32 line_idx = 0;
@@ -95,7 +151,7 @@ RENDER(Request& context)
 					{
 						?></div><?
 					}
-					?><div class="<?= layout_class ?>"><?
+					?><div class="doc-section <?= layout_class ?>"><?
 					if(layout_class == "params")
 					{
 						?><h3>Parameters</h3><?
@@ -114,7 +170,7 @@ RENDER(Request& context)
 					}
 					else if(layout_class == "see")
 					{
-						/*?><h3>Related</h3><?*/
+						?><h3>Related</h3><?
 					}
 					else
 					{
@@ -140,15 +196,20 @@ RENDER(Request& context)
 						}
 						else
 						{
-							?><div><a href="index.uce?p=<?= trim(s) ?>"><?= trim(s) ?><span style="opacity:0.5">()</span></a></div><?
+							?><div><a href="index.uce?p=<?= trim(s) ?>"><?= trim(s) ?><span class="dim">()</span></a></div><?
 						}
 					}
 					else
 					{
-						?><div><? print(s); ?></div><?
+						?><div><?: markdown_to_html(s) ?></div><?
 					}
 				}
 			}
+			if(line_idx > 0)
+			{
+				?></div><?
+			}
+			?></article><?
 		}
 
 		?>

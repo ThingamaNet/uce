@@ -3,8 +3,8 @@ COMPONENT(Request& context)
 {
 	<>
 		<section style="border:1px solid #ccc;padding:1em;margin:1em 0;">
-			<? render_component(":TITLE", context.call, context); ?>
-			<? render_component(":BODY", context.call, context); ?>
+			<? component_render(":TITLE", context.call, context); ?>
+			<? component_render(":BODY", context.call, context); ?>
 		</section>
 	</>
 }

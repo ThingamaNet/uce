@@ -396,19 +396,41 @@ String json_encode(DTree t, char quote_char)
 	String result = "";
 	if(t.is_array())
 	{
-		result += "{";
-		u32 count = 0;
-		t.each([&] (DTree item, String key) {
-			if(count > 0)
-				result += ", ";
-			count += 1;
-			result += json_escape(key, quote_char) + ": " + json_encode(item, quote_char);
-		});
-		result += "}";
+		if(t.is_list())
+		{
+			result += "[";
+			u32 count = 0;
+			for(u32 i = 0; i < t.deref()._map.size(); i += 1)
+			{
+				if(count > 0)
+					result += ", ";
+				count += 1;
+				auto it = t.deref()._map.find(std::to_string(i));
+				if(it == t.deref()._map.end())
+				{
+					result += "null";
+					continue;
+				}
+				result += json_encode(it->second, quote_char);
+			}
+			result += "]";
+		}
+		else
+		{
+			result += "{";
+			u32 count = 0;
+			t.each([&] (DTree item, String key) {
+				if(count > 0)
+					result += ", ";
+				count += 1;
+				result += json_escape(key, quote_char) + ": " + json_encode(item, quote_char);
+			});
+			result += "}";
+		}
 	}
 	else
 	{
-		result = t.to_json();
+		result = t.to_json(quote_char);
 	}
 	return(result);
 }
@@ -469,6 +491,7 @@ String json_decode_String(String s, u32& i, char termination_char)
 }
 
 DTree json_decode_map(String s, u32& i);
+DTree json_decode_array(String s, u32& i);
 
 void json_consume_space(String s, u32& i)
 {
@@ -542,6 +565,11 @@ DTree json_decode_value(String s, u32& i)
 		i += 1;
 		return(json_decode_map(s, i));
 	}
+	else if(c == '[')
+	{
+		i += 1;
+		return(json_decode_array(s, i));
+	}
 	else
 	{
 		value = json_decode_keyword(s, i);
@@ -593,6 +621,33 @@ DTree json_decode_map(String s, u32& i)
 		{
 			// malformed
 			return(result);
+		}
+		json_consume_space(s, i);
+	}
+	return(result);
+}
+
+DTree json_decode_array(String s, u32& i)
+{
+	DTree result;
+	result.set_array();
+	json_consume_space(s, i);
+	while(i < s.length())
+	{
+		char c = s[i];
+		if(c == ']')
+		{
+			i += 1;
+			return(result);
+		}
+		else if(c == ',')
+		{
+			i += 1;
+		}
+		else
+		{
+			DTree v = json_decode_value(s, i);
+			result.push(v);
 		}
 		json_consume_space(s, i);
 	}

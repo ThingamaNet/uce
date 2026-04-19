@@ -8,7 +8,7 @@ RENDER(Request& context)
 		<link rel="stylesheet" href='style.css'></link>
 		<h1>
 			<a href="index.uce">UCE Test</a>:
-			parse_time
+			time_parse
 		</h1>
 		<form action="?" method="post">
 			<div>
@@ -21,7 +21,7 @@ RENDER(Request& context)
 		</form>
 		<pre><?
 
-		print(date("%Y-%m-%d %H:%M", parse_time(raw)));
+		print(time_format_local("%Y-%m-%d %H:%M", time_parse(raw)));
 
 		?></pre>
 		<pre><?= var_dump(context.params) ?></pre>

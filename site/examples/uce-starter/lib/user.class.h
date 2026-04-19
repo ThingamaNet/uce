@@ -102,7 +102,7 @@ public:
 			return(result);
 		}
 
-		String salt = gen_sha1(std::to_string((u64)time()) + ":" + std::to_string((u64)(microtime() * 1000000.0)) + ":" + make_session_id()).substr(0, 24);
+		String salt = gen_sha1(std::to_string((u64)time()) + ":" + std::to_string((u64)(time_precise() * 1000000.0)) + ":" + session_id_create()).substr(0, 24);
 		DTree user;
 		user["email"] = email;
 		user["salt"] = salt;

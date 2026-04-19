@@ -20,7 +20,7 @@ RENDER(Request& context)
 			if(context.get["cmd"] == "clear")
 				file_put_contents("/tmp/test.txt", "");
 
-			file_append("/tmp/test.txt", context.server->request_count, "\thello world\t", 2, "\t", time(), "\t", microtime(), "\n");
+			file_append("/tmp/test.txt", context.server->request_count, "\thello world\t", 2, "\t", time(), "\t", time_precise(), "\n");
 
 			print(file_get_contents("/tmp/test.txt"));
 

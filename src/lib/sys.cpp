@@ -214,12 +214,12 @@ bool file_put_contents(String file_name, String content)
 	return(true);
 }
 
-String get_cwd()
+String cwd_get()
 {
 	return(std::filesystem::current_path());
 }
 
-void set_cwd(String path)
+void cwd_set(String path)
 {
 	chdir(path.c_str());
 }
@@ -237,7 +237,7 @@ time_t file_mtime(String file_name)
 	}
 }
 
-void unlink(String file_name)
+void file_unlink(String file_name)
 {
 	remove(file_name.c_str());
 }
@@ -247,7 +247,7 @@ String expand_path(String path, String relative_to_path)
 	String result;
 
 	if(relative_to_path == "")
-		relative_to_path = get_cwd();
+		relative_to_path = cwd_get();
 
 	auto base_path = split(relative_to_path, "/");
 	auto rel_path = split(path, "/");
@@ -271,7 +271,7 @@ String expand_path(String path, String relative_to_path)
 	return(join(base_path, "/"));
 }
 
-f64 microtime()
+f64 time_precise()
 {
 	return ((f64)std::chrono::duration_cast<std::chrono::microseconds>(
 		std::chrono::high_resolution_clock::now().time_since_epoch()).count()) / 1000000;
@@ -282,7 +282,7 @@ u64 time()
 	return(std::time(0));
 }
 
-String date(String format, u64 timestamp)
+String time_format_local(String format, u64 timestamp)
 {
 	String ts;
 	String fmt;
@@ -293,7 +293,7 @@ String date(String format, u64 timestamp)
 	return(trim(shell_exec("date "+ts+" "+fmt)));
 }
 
-String gmdate(String format, u64 timestamp)
+String time_format_utc(String format, u64 timestamp)
 {
 	String ts;
 	String fmt;
@@ -306,7 +306,7 @@ String gmdate(String format, u64 timestamp)
 	return(trim(shell_exec("date -u "+ts+" "+fmt)));
 }
 
-u64 parse_time(String time_String)
+u64 time_parse(String time_String)
 {
 	return(int_val(trim(shell_exec("date -u -d "+shell_escape(time_String)+" +'%s'"))));
 }
@@ -503,6 +503,11 @@ pid_t spawn_subprocess(std::function<void()> exec_after_spawn)
 	}
 }
 
+int task_kill(pid_t pid, int sig)
+{
+	return(kill(pid, sig));
+}
+
 pid_t task_pid(String key)
 {
 	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
@@ -511,9 +516,9 @@ pid_t task_pid(String key)
 	if(status_file != "")
 	{
 		p = int_val(status_file);
-		if(kill(p, 0) == 0) // process is still running
+		if(task_kill(p, 0) == 0) // process is still running
 			return(p);
-		unlink(status_file_name);
+		file_unlink(status_file_name);
 	}
 	return(p);
 }
@@ -526,13 +531,13 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 	if(status_file != "")
 	{
 		p = int_val(status_file);
-		if(kill(p, 0) == 0) // process is still running
+		if(task_kill(p, 0) == 0) // process is still running
 		{
 			printf("(P) worker process '%s' already running: PID %i\n", key.c_str(), p);
 			return(p);
 		}
 		//printf("(P) worker process '%s' had crashed: PID %i\n", key.c_str(), p);
-		unlink(status_file_name);
+		file_unlink(status_file_name);
 	}
 	p = fork();
 	if(p == 0)
@@ -545,7 +550,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		//prctl(PR_SET_PDEATHSIG, SIGHUP);
 		exec_after_spawn();
-		unlink(status_file_name);
+		file_unlink(status_file_name);
 		printf("(P) worker process '%s' terminated: PID %i\n", key.c_str(), my_pid);
 		exit(0);
 	}
@@ -603,7 +608,9 @@ StringMap make_server_settings()
 	cfg["TMP_UPLOAD_PATH"] = "/tmp/uce/uploads";
 	cfg["SESSION_PATH"] = "/tmp/uce/sessions";
 	cfg["COMPILER_SYS_PATH"] = ".";
-	cfg["PRECOMPILE_FILES_IN"] = ".";
+	cfg["PRECOMPILE_FILES_IN"] = "";
+	cfg["SITE_DIRECTORY"] = "site";
+	cfg["PROACTIVE_COMPILE_CHECK_INTERVAL"] = std::to_string(60);
 
 	cfg["HTTP_PORT"] = std::to_string(8080);
 	cfg["SESSION_TIME"] = std::to_string(60*60*24*30);

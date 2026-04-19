@@ -291,7 +291,7 @@ String make_upload_tmp_name()
 	String upload_path = context->server->config["TMP_UPLOAD_PATH"];
 	if(upload_path.length() > 0 && upload_path[upload_path.length()-1] != '/')
 		upload_path.append(1, '/');
-	return(upload_path + make_session_id());
+	return(upload_path + session_id_create());
 }
 
 StringMap parse_multipart(String q, String boundary, std::vector<UploadedFile>& uploaded_files)
@@ -495,7 +495,7 @@ void set_cookie(
 	String cookie = "Set-Cookie: ";
 	cookie.append(uri_encode(name) + "=" + uri_encode(value));
 	if(expires > 0)
-		cookie.append(String("; Expires=") + gmdate("RFC1123", expires));
+		cookie.append(String("; Expires=") + time_format_utc("RFC1123", expires));
 	context->set_cookies.push_back(cookie);
 	context->cookies[name] = value;
 }
@@ -512,7 +512,7 @@ StringMap parse_cookies(String cookie_String)
 	return(result);
 }
 
-String make_session_id()
+String session_id_create()
 {
 	return(to_hex(rand())+to_hex(rand())+to_hex(rand())+to_hex(rand()));
 }
@@ -563,7 +563,7 @@ String session_start(String session_name)
 
 	if(session_id.length() == 0)
 	{
-		session_id = make_session_id();
+		session_id = session_id_create();
 		set_cookie(session_name, session_id, time() + int_val(context->server->config["SESSION_TIME"]));
 	}
 	context->session_id = session_id;

@@ -4,7 +4,7 @@ String starter_fs_root(Request& context)
 {
 	String root = context.var["starter"]["fs_root"].to_string();
 	if(root == "")
-		root = get_cwd();
+		root = cwd_get();
 	return(root);
 }
 
@@ -276,13 +276,89 @@ String starter_html_class(Request& context)
 	return(classes);
 }
 
+String starter_page_main_html(Request& context)
+{
+	String main_html = context.call["main_html"].to_string();
+	if(main_html == "")
+		main_html = context.var["starter"]["fragments"]["main"].to_string();
+	return(main_html);
+}
+
+bool starter_bool_value(DTree value, bool fallback = false)
+{
+	String raw = trim(value.to_string());
+	if(raw == "")
+		return(fallback);
+	return(
+		raw != "0" &&
+		raw != "false" &&
+		raw != "FALSE" &&
+		raw != "False" &&
+		raw != "(false)" &&
+		raw != "no" &&
+		raw != "NO" &&
+		raw != "No"
+	);
+}
+
+bool starter_request_embed_mode(Request& context)
+{
+	return(starter_bool_value(context.var["starter"]["embed_mode"]));
+}
+
+bool starter_page_embed_mode(Request& context)
+{
+	String embed_value = context.call["embed_mode"].to_string();
+	if(embed_value != "")
+		return(starter_bool_value(context.call["embed_mode"]));
+	return(starter_request_embed_mode(context));
+}
+
+String starter_theme_page_component(Request& context)
+{
+	String page_type = first(context.var["starter"]["page_type"].to_string(), "html");
+	if(page_type == "blank")
+		return("themes/common/page.blank.uce");
+	if(page_type == "json")
+		return("themes/common/page.json.uce");
+
+	String theme_path = context.cfg.get_by_path("theme/path").to_string();
+	if(theme_path == "")
+		return("");
+	if(theme_path[theme_path.length() - 1] != '/')
+		theme_path.append(1, '/');
+	return(theme_path + "page.html.uce");
+}
+
+void starter_render_page(Request& context)
+{
+	if(context.flags.status >= 300 && context.flags.status < 400)
+		return;
+
+	DTree page_props;
+	page_props["main_html"] = context.var["starter"]["fragments"]["main"];
+	if(context.var["starter"]["json"].get_type_name() == "array")
+		page_props["json"] = context.var["starter"]["json"];
+
+	String page_component = starter_theme_page_component(context);
+	if(page_component != "" && file_exists(page_component))
+	{
+		print(component(page_component, page_props, context));
+		return;
+	}
+
+	context.set_status(500, "Internal Server Error");
+	context.header["Content-Type"] = "text/plain; charset=utf-8";
+	print("UCE Starter is missing the page template component: " + page_component);
+}
+
 void starter_boot(Request& context)
 {
 	if(context.var["starter"]["booted"].to_string() == "1")
 		return;
 
 	context.var["starter"]["booted"] = "1";
-	context.var["starter"]["fs_root"] = get_cwd();
+	context.var["starter"]["fs_root"] = cwd_get();
 	context.var["starter"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
 
 	String base_url = dirname(context.var["starter"]["script_url"].to_string());

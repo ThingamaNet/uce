@@ -1,0 +1,11 @@
+:sig
+std::vector<String> units_list()
+
+:desc
+Returns the normalized paths of all known `.uce` units.
+
+This includes the shared known-unit registry plus any units already loaded in the current runtime process.
+
+:see
+unit_info
+unit_compile

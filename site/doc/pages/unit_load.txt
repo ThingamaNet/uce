@@ -1,0 +1,16 @@
+:sig
+SharedUnit* unit_load(String file_name)
+
+:params
+file_name : UCE file to load
+return value : loaded shared unit, or `null` if the unit could not be loaded
+
+:desc
+Loads a UCE compilation unit and returns its in-memory `SharedUnit` record.
+
+This is a low-level runtime helper. Most application code should prefer `unit_render()`, `unit_call()`, `component()`, or `component_render()`.
+
+:see
+unit_render
+unit_call
+load

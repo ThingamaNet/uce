@@ -59,7 +59,7 @@ UCE pages now use explicit request handlers instead of implicit globals:
 
 Useful related runtime patterns:
 
-- `render_file(String file_name)` or `render_file(String file_name, Request& context)` to invoke another page
+- `unit_render(String file_name)` or `unit_render(String file_name, Request& context)` to invoke another page
 - `context.cfg` for request-local structured configuration
 - `context.call` for invocation or message-local structured input
 - `context.connection` for broker-owned per-WebSocket-connection state shared across `WS(Request& context)` calls
@@ -101,7 +101,7 @@ Use `<?= ... ?>` by default for user-visible text. Use `<?: ... ?>` only for tru
 UCE includes a native component layer built on top of ordinary `.uce` files:
 
 - `component(name[, props[, context]])`
-- `render_component(name[, props[, context]])`
+- `component_render(name[, props[, context]])`
 - `component_exists(name)`
 - `component_resolve(name)`
 
@@ -121,11 +121,11 @@ When you want returned component markup inside a literal block, prefer:
 </>
 ```
 
-because `<?= ... ?>` HTML-escapes the returned markup. For direct output from C++ code, use `render_component(...)`.
+because `<?= ... ?>` HTML-escapes the returned markup. For direct output from C++ code, use `component_render(...)`.
 
 Components expose `COMPONENT(Request& context)` as their default entrypoint and may expose additional named handlers with `COMPONENT:NAME(Request& context)`.
 
-The component helpers call only `COMPONENT...` handlers. A file meant purely for component use can define `COMPONENT()` without defining `RENDER()`, which keeps direct page entry and component entry cleanly separated. Inside a component file, `component(":NAME", props, context)` and `render_component(":NAME", props, context)` target another named component handler in that same file.
+The component helpers call only `COMPONENT...` handlers. A file meant purely for component use can define `COMPONENT()` without defining `RENDER()`, which keeps direct page entry and component entry cleanly separated. Inside a component file, `component(":NAME", props, context)` and `component_render(":NAME", props, context)` target another named component handler in that same file.
 
 ## WebSockets
 
@@ -254,6 +254,10 @@ SESSION_PATH=/tmp/uce/sessions
 FCGI_SOCKET_PATH=/run/uce.sock
 FCGI_PORT=9993
 
+PRECOMPILE_FILES_IN=
+SITE_DIRECTORY=site
+PROACTIVE_COMPILE_CHECK_INTERVAL=60
+
 WORKER_COUNT=4
 MAX_MEMORY=16777216
 SESSION_TIME=2592000
@@ -272,6 +276,14 @@ If you want WebSocket support through nginx, also make sure the built-in HTTP li
 ```ini
 HTTP_PORT=8080
 ```
+
+Proactive compilation settings:
+
+- `SITE_DIRECTORY=site` tells the runtime which tree to scan on startup for `.uce` files when `PRECOMPILE_FILES_IN` is left empty.
+- `PRECOMPILE_FILES_IN=` can override that startup scan root with a different absolute or runtime-relative directory.
+- `PROACTIVE_COMPILE_CHECK_INTERVAL=60` controls how often the low-priority background compiler rechecks known `.uce` files for stale or missing shared objects.
+
+The runtime keeps a shared known-file registry under `BIN_DIRECTORY` and updates it as request handling discovers new `.uce` files, so proactive recompiles are not limited to the initial startup scan.
 
 Recommended deployment notes:
 

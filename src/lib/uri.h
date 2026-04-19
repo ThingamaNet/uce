@@ -14,7 +14,7 @@ void set_cookie(
 	u64 expires = 0, String path = "/", String domain = "",
 	bool secure = false, bool http_only = true);
 StringMap parse_cookies(String cookie_String);
-String make_session_id();
+String session_id_create();
 StringMap load_session_data(String session_id);
 void save_session_data(String session_id, StringMap data);
 String session_start(String session_name = "uce-session");

@@ -22,7 +22,7 @@ RENDER(Request& context)
 	}
 	else if(action == "store")
 	{
-		context.session["stored-value"] = make_session_id();
+		context.session["stored-value"] = session_id_create();
 		print("action: storing value "+context.session["stored-value"]);
 	}
 	else if(action == "destroy")

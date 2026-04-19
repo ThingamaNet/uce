@@ -1,5 +1,5 @@
 :sig
-f64 microtime()
+f64 time_precise()
 
 :params
 return value : current Unix timestamp

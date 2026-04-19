@@ -21,18 +21,18 @@ bool file_append(String file_name, Ts... args)
 	fout.close();
 	return(true);
 }
-String get_cwd();
-void set_cwd(String path);
+String cwd_get();
+void cwd_set(String path);
 time_t file_mtime(String file_name);
-void unlink(String file_name);
+void file_unlink(String file_name);
 String expand_path(String path, String relative_to_path = "");
 StringList ls(String dir);
 
-f64 microtime();
+f64 time_precise();
 u64 time();
-String date(String format = "", u64 timestamp = 0);
-String gmdate(String format = "", u64 timestamp = 0);
-u64 parse_time(String time_String);
+String time_format_local(String format = "", u64 timestamp = 0);
+String time_format_utc(String format = "", u64 timestamp = 0);
+u64 time_parse(String time_String);
 
 u64 socket_connect(String host, short port);
 void socket_close(u64 sockfd);
@@ -66,6 +66,7 @@ pid_t parent_pid = 0;
 pid_t my_pid = 0;
 
 void on_segfault(int sig);
+int task_kill(pid_t pid, int sig = 0);
 
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout = 60*10);
 pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spawn, u64 timeout = 60*10);

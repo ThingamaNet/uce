@@ -21,7 +21,7 @@ RENDER(Request& context)
 		<h1>Profile</h1>
 		<p>Email: <?= user["email"].to_string() ?></p>
 		<p>Roles: <?= roles ?></p>
-		<p>Created: <?= date("%Y-%m-%dT%H:%M:%S", int_val(user["created"].to_string())) ?></p>
+		<p>Created: <?= time_format_local("%Y-%m-%dT%H:%M:%S", int_val(user["created"].to_string())) ?></p>
 		<p><a href="<?= starter_link("account/logout", context) ?>">Logout</a></p>
 	</>
 }
