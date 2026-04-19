@@ -111,13 +111,14 @@ void render_see_section(String name)
 RENDER(Request& context)
 {
 	
-	already_shown_items = new StringMap();
+	StringMap shown_items;
+	already_shown_items = &shown_items;
 
 	String page = first(context.get["p"], "index");
 
 	<><html>
 	<head>
-		<!--<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>-->
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
 	</head>
 	<body>
 		<h1>

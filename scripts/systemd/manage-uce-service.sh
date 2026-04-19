@@ -10,6 +10,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 UNIT_NAME="uce.service"
 UNIT_SOURCE="$SCRIPT_DIR/uce.service"
+if [[ ( "$REPO_ROOT" == "/usr/lib/uce" || "$REPO_ROOT" == "/opt/uce" ) && -f "$REPO_ROOT/scripts/deb/uce.service" ]]; then
+	UNIT_SOURCE="$REPO_ROOT/scripts/deb/uce.service"
+fi
 UNIT_DEST="/etc/systemd/system/$UNIT_NAME"
 CONFIG_SOURCE="$REPO_ROOT/etc/uce/settings.cfg"
 CONFIG_DEST="/etc/uce/settings.cfg"

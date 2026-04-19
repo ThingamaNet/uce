@@ -1,0 +1,17 @@
+:sig
+bool str_starts_with(String haystack, String needle)
+
+:params
+haystack : string to inspect
+needle : prefix to compare against the start of `haystack`
+return value : `true` when `haystack` begins with `needle`, otherwise `false`
+
+:desc
+Checks whether `haystack` starts with the given prefix.
+
+:see
+>string
+
+:related
+**PHP:** `str_starts_with()`
+**JavaScript / Node.js:** `String.prototype.startsWith()`

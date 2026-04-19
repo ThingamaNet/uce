@@ -188,6 +188,10 @@ RENDER(Request& context)
 						nibble(s, "-");
 						?><li><?= (s) ?></li><?
 					}
+					else if(layout_class == "sig")
+					{
+						?><pre><? print(s); ?></pre><?
+					}
 					else if(layout_class == "params")
 					{
 						?><div><b><?= trim(nibble(s, ":")) ?></b> : <?= trim(s) ?></div><?

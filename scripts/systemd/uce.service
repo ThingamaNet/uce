@@ -6,11 +6,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/Code/uce.openfu.com/uce
-ExecStartPre=/usr/bin/mkdir -p /tmp/uce/work /tmp/uce/uploads /tmp/uce/sessions
-ExecStartPre=/usr/bin/rm -f /run/uce.sock
+RuntimeDirectory=uce
+StateDirectory=uce
+CacheDirectory=uce
+ExecStartPre=/usr/bin/mkdir -p /var/cache/uce/work /var/lib/uce/uploads /var/lib/uce/sessions
+ExecStartPre=/usr/bin/rm -f /run/uce/fastcgi.sock
 ExecStartPre=/usr/bin/bash /Code/uce.openfu.com/uce/scripts/build_linux.sh
 ExecStart=/Code/uce.openfu.com/uce/bin/uce_fastcgi.linux.bin
-ExecStopPost=/usr/bin/rm -f /run/uce.sock
+ExecStopPost=/usr/bin/rm -f /run/uce/fastcgi.sock
 Restart=always
 RestartSec=2
 TimeoutStopSec=15

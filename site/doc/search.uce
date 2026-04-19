@@ -1,10 +1,4 @@
 
-// Returns whether haystack contains needle (case-sensitive, both should be pre-lowercased)
-bool str_contains(String haystack, String needle)
-{
-	return replace(haystack, needle, "\x01") != haystack;
-}
-
 void render_hit(String ft, String name, String badge, String snippet)
 {
 	<><div class="search-hit">
@@ -51,8 +45,8 @@ RENDER(Request& context)
 		}
 
 		String content = file_get_contents("pages/" + ft + ".txt");
-		bool name_match = str_contains(to_lower(name), q);
-		bool content_match = str_contains(to_lower(content), q);
+		bool name_match = contains(to_lower(name), q);
+		bool content_match = contains(to_lower(content), q);
 
 		if(!name_match && !content_match)
 			continue;
@@ -64,7 +58,7 @@ RENDER(Request& context)
 			for(auto line : split(content, "\n"))
 			{
 				String t = trim(line);
-				if(t.length() > 4 && t.substr(0, 1) != ":" && str_contains(to_lower(t), q))
+				if(t.length() > 4 && t.substr(0, 1) != ":" && contains(to_lower(t), q))
 				{
 					snippet = t;
 					if(snippet.length() > 120)

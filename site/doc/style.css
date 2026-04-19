@@ -1,24 +1,29 @@
 /* UCE Documentation — Theme
-   Color palette: #139 deep-blue base · white text · yellow accents */
+   Color palette: deep blue gradient · warm gold accents · frosted glass surfaces */
 
 :root {
-	--bg: #113399;
-	--bg-surface: rgba(255, 255, 255, 0.065);
-	--bg-surface-hover: rgba(255, 255, 255, 0.11);
-	--bg-inset: rgba(0, 0, 0, 0.22);
-	--bg-code: rgba(0, 0, 0, 0.28);
-	--text: #e8ecf4;
-	--text-dim: rgba(255, 255, 255, 0.55);
-	--text-muted: rgba(255, 255, 255, 0.35);
-	--accent: #ffd644;
-	--accent-dim: rgba(255, 214, 68, 0.1);
-	--accent-hover: #ffe680;
-	--border: rgba(255, 255, 255, 0.08);
-	--border-strong: rgba(255, 255, 255, 0.18);
-	--font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-	--font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
-	--radius: 8px;
-	--radius-lg: 14px;
+	--bg: #0b1d4e;
+	--bg-grad: linear-gradient(168deg, #0f2462 0%, #0b1d4e 40%, #091840 100%);
+	--bg-surface: rgba(255, 255, 255, 0.05);
+	--bg-surface-hover: rgba(255, 255, 255, 0.09);
+	--bg-inset: rgba(0, 0, 0, 0.3);
+	--bg-code: rgba(0, 0, 0, 0.32);
+	--text: #dfe5f2;
+	--text-dim: rgba(200, 210, 235, 0.6);
+	--text-muted: rgba(200, 210, 235, 0.35);
+	--accent: #f0c430;
+	--accent-dim: rgba(240, 196, 48, 0.08);
+	--accent-hover: #ffd95c;
+	--accent-glow: rgba(240, 196, 48, 0.15);
+	--border: rgba(255, 255, 255, 0.06);
+	--border-strong: rgba(255, 255, 255, 0.14);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+	--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+	--shadow-glow: 0 0 20px rgba(240, 196, 48, 0.06);
+	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+	--font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+	--radius: 10px;
+	--radius-lg: 16px;
 	--ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -52,8 +57,10 @@ body {
 	font-family: var(--font-sans);
 	font-size: 1rem;
 	line-height: 1.65;
-	background: var(--bg);
+	background: var(--bg-grad);
+	background-attachment: fixed;
 	color: var(--text);
+	min-height: 100vh;
 }
 
 /* ── Typography ── */
@@ -63,8 +70,9 @@ h1 {
 	font-size: 1.6rem;
 	font-weight: 700;
 	letter-spacing: -0.02em;
-	padding: 28px 0 20px;
-	border-bottom: 1px solid var(--border);
+	padding: 32px 0 20px;
+	border-bottom: 2px solid transparent;
+	border-image: linear-gradient(90deg, var(--accent) 0%, rgba(240, 196, 48, 0.15) 100%) 1;
 	margin-bottom: 28px;
 }
 
@@ -131,15 +139,18 @@ a:hover {
 
 .category {
 	background: var(--bg-surface);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	padding: 14px 18px;
 	margin-bottom: 10px;
-	transition: border-color 150ms var(--ease);
+	transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease);
 }
 
 .category:hover {
 	border-color: var(--border-strong);
+	box-shadow: var(--shadow-sm);
 }
 
 .category h3 {
@@ -190,23 +201,25 @@ a:hover {
 	display: block;
 	padding: 7px 12px;
 	border-radius: 6px;
-	transition: background 150ms var(--ease);
+	transition: background 150ms var(--ease), transform 150ms var(--ease);
 }
 
 .func-item a:hover {
 	background: var(--bg-surface-hover);
 	text-decoration: none;
+	transform: translateX(2px);
 }
 
 .badge {
-	font-size: 0.68rem;
-	font-weight: 500;
-	padding: 1px 7px;
-	border-radius: 4px;
-	margin-left: 6px;
+	font-size: 0.65rem;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 10px;
+	margin-left: 8px;
 	vertical-align: middle;
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.06);
 	color: var(--text-dim);
+	letter-spacing: 0.02em;
 }
 
 .dim {
@@ -221,10 +234,13 @@ a:hover {
 
 .doc-section {
 	background: var(--bg-surface);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	padding: 20px 24px;
 	margin-bottom: 16px;
+	box-shadow: var(--shadow-sm);
 }
 
 .doc-section h3 {
@@ -240,10 +256,20 @@ a:hover {
 	line-height: 1.5;
 	background: var(--bg-code);
 	border-color: var(--border-strong);
+	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .sig div {
 	font-family: var(--font-mono);
+}
+
+.sig pre {
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+	font-size: inherit;
+	line-height: inherit;
 }
 
 .params div {
@@ -259,6 +285,23 @@ a:hover {
 	font-family: var(--font-mono);
 	color: var(--accent);
 	font-weight: 500;
+}
+
+.related {
+	background: var(--accent-dim);
+	border: 1px solid rgba(240, 196, 48, 0.12);
+	border-radius: var(--radius);
+	padding: 14px 20px;
+	font-size: 0.9rem;
+	color: var(--text-dim);
+}
+
+.related div {
+	padding: 2px 0;
+}
+
+.related strong {
+	color: var(--text);
 }
 
 .see {
@@ -333,9 +376,10 @@ pre {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	font-family: var(--font-mono);
-	font-size: 0.88rem;
-	line-height: 1.55;
+	font-size: 0.86rem;
+	line-height: 1.6;
 	white-space: pre-wrap;
+	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 code {
@@ -365,9 +409,12 @@ li {
 
 details {
 	background: var(--bg-surface);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	margin-bottom: 16px;
+	box-shadow: var(--shadow-sm);
 }
 
 summary {
@@ -421,7 +468,7 @@ details pre {
 #doc-search:focus {
 	outline: none;
 	border-color: var(--accent);
-	box-shadow: 0 0 0 3px rgba(255, 214, 68, 0.12);
+	box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-glow);
 }
 
 .search-count {
@@ -445,13 +492,14 @@ details pre {
 	display: flex;
 	align-items: baseline;
 	gap: 10px;
-	padding: 5px 12px;
+	padding: 6px 12px;
 	border-radius: 6px;
-	transition: background 120ms var(--ease);
+	transition: background 120ms var(--ease), transform 120ms var(--ease);
 }
 
 .search-hit:hover {
 	background: var(--bg-surface-hover);
+	transform: translateX(2px);
 }
 
 .search-hit a {

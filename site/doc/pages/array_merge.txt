@@ -1,0 +1,24 @@
+:sig
+StringMap array_merge(StringMap a, StringMap b)
+DTree array_merge(DTree a, DTree b)
+
+:params
+a : left-hand source map or tree
+b : right-hand source map or tree
+return value : merged result
+
+:desc
+Merges two maps or trees using PHP-like merge behavior.
+
+For `StringMap`, keys from `b` overwrite keys from `a`.
+
+For `DTree`, string keys from `b` overwrite keys from `a`. Numeric keys are appended and reindexed when either side behaves like a list.
+
+This helper is intended as the closest UCE equivalent to PHP `array_merge()` for common request, config, and JSON-shaped data.
+
+:see
+>types
+
+:related
+**PHP:** `array_merge()`
+**JavaScript / Node.js:** Object spread, `Object.assign()`, or array concatenation depending on whether the data is map-like or list-like

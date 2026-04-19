@@ -247,11 +247,11 @@ The runtime reads its server settings from:
 The shipped example contains the important filesystem and FastCGI settings:
 
 ```ini
-BIN_DIRECTORY=/tmp/uce/work
-TMP_UPLOAD_PATH=/tmp/uce/uploads
-SESSION_PATH=/tmp/uce/sessions
+BIN_DIRECTORY=/var/cache/uce/work
+TMP_UPLOAD_PATH=/var/lib/uce/uploads
+SESSION_PATH=/var/lib/uce/sessions
 
-FCGI_SOCKET_PATH=/run/uce.sock
+FCGI_SOCKET_PATH=/run/uce/fastcgi.sock
 FCGI_PORT=9993
 
 PRECOMPILE_FILES_IN=
@@ -265,7 +265,7 @@ SESSION_TIME=2592000
 
 For nginx deployments, the most important setting is:
 
-- `FCGI_SOCKET_PATH=/run/uce.sock`
+- `FCGI_SOCKET_PATH=/run/uce/fastcgi.sock`
 
 That is the Unix socket nginx should use for normal `.uce` requests.
 
@@ -317,10 +317,34 @@ scripts/systemd/manage-uce-service.sh logs 200
 
 The unit currently:
 
-- creates `/tmp/uce/work`, `/tmp/uce/uploads`, and `/tmp/uce/sessions`
-- removes any stale `/run/uce.sock`
+- uses systemd-managed runtime/state/cache roots under:
+  - `/run/uce`
+  - `/var/lib/uce`
+  - `/var/cache/uce`
+- prepares:
+  - `/var/cache/uce/work`
+  - `/var/lib/uce/uploads`
+  - `/var/lib/uce/sessions`
+- removes any stale `/run/uce/fastcgi.sock`
 - rebuilds the runtime before start
 - runs the binary from the repo root so `COMPILER_SYS_PATH` resolves correctly
+
+### Debian package build
+
+To build a Debian package from the repository root:
+
+```bash
+bash scripts/make_deb.sh 0.1.2
+```
+
+That script:
+
+- rebuilds the runtime first
+- stages the current runtime tree under `/usr/lib/uce`
+- installs `/etc/uce/settings.cfg` as a package conffile
+- installs a packaged `uce.service` under `/lib/systemd/system/`
+- writes Debian maintainer scripts for systemd reload/enable handling
+- follows a more PHP-like/FHS deployment shape with immutable runtime files under `/usr/lib`, config under `/etc`, cache/state under `/var`, and the FastCGI socket under `/run/uce/`
 
 ### 5. Configure nginx for `.uce` and `.ws.uce`
 
@@ -359,7 +383,7 @@ server {
 		fastcgi_param SCRIPT_NAME $fastcgi_script_name;
 		fastcgi_param DOCUMENT_URI $uri;
 		fastcgi_param REQUEST_URI $request_uri;
-		fastcgi_pass unix:/run/uce.sock;
+		fastcgi_pass unix:/run/uce/fastcgi.sock;
 	}
 
 	location ~ \.ws\.uce$ {
@@ -374,7 +398,7 @@ server {
 		fastcgi_param SCRIPT_NAME $fastcgi_script_name;
 		fastcgi_param DOCUMENT_URI $uri;
 		fastcgi_param REQUEST_URI $request_uri;
-		fastcgi_pass unix:/run/uce.sock;
+		fastcgi_pass unix:/run/uce/fastcgi.sock;
 	}
 
 	location @uce_websocket {

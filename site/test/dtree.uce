@@ -3,12 +3,6 @@
 RENDER(Request& context)
 {
 	DTree t;
-	DTree assoc_left;
-	DTree assoc_right;
-	DTree assoc_merged;
-	DTree list_left;
-	DTree list_right;
-	DTree list_merged;
 
 	<>
 		<link rel="stylesheet" href='style.css'></link>
@@ -17,25 +11,25 @@ RENDER(Request& context)
 			DTree
 		</h1>
 
-		Value Types:
+		<h2>Value Types</h2>
 
 		<pre><?
 
 		t.set("String test");
-		print(String("String test: ") + t.to_string()+"\n");
+		print("String:  ", t.to_string(), "\n");
 
 		t.set(true);
-		print(String("bool test: ") + t.to_string()+"\n");
+		print("bool:    ", t.to_string(), "\n");
 
 		t.set(1234.5678);
-		print(String("float test: ") + t.to_string()+"\n");
+		print("float:   ", t.to_string(), "\n");
 
 		t.set(&t);
-		print(String("pointer test: ") + t.to_string()+"\n");
+		print("pointer: ", t.to_string(), "\n");
 
 		?></pre>
 
-		Tree:
+		<h2>Nested Tree</h2>
 
 		<pre><?
 
@@ -53,42 +47,48 @@ RENDER(Request& context)
 
 		?></pre>
 
-		Array Merge
+		<h2>Array Merge — Associative</h2>
 
 		<pre><?
 
+		DTree assoc_left;
 		assoc_left["name"] = "left";
 		assoc_left["shared"] = "left-value";
+
+		DTree assoc_right;
 		assoc_right["shared"] = "right-value";
 		assoc_right["extra"] = "new-value";
-		assoc_merged = array_merge(assoc_left, assoc_right);
-		print("Associative merge:\n");
-		print(var_dump(assoc_merged));
 
-		list_left.set_array();
-		DTree a;
-		a = "A";
-		list_left.push(a);
-		DTree b;
-		b = "B";
-		list_left.push(b);
-
-		list_right.set_array();
-		DTree c;
-		c = "C";
-		list_right.push(c);
-		DTree d;
-		d = "D";
-		list_right.push(d);
-
-		list_merged = array_merge(list_left, list_right);
-		print("\nList merge:\n");
-		print(var_dump(list_merged));
+		print("left:\n", var_dump(assoc_left), "\n");
+		print("right:\n", var_dump(assoc_right), "\n");
+		print("merged:\n", var_dump(array_merge(assoc_left, assoc_right)));
 
 		?></pre>
 
-		Params
-		<pre><?= var_dump(context.params) ?></pre>
+		<h2>Array Merge — List</h2>
+
+		<pre><?
+
+		DTree list_left;
+		list_left.set_array();
+		DTree a; a = "A"; list_left.push(a);
+		DTree b; b = "B"; list_left.push(b);
+
+		DTree list_right;
+		list_right.set_array();
+		DTree c; c = "C"; list_right.push(c);
+		DTree d; d = "D"; list_right.push(d);
+
+		print("left:\n", var_dump(list_left), "\n");
+		print("right:\n", var_dump(list_right), "\n");
+		print("merged:\n", var_dump(array_merge(list_left, list_right)));
+
+		?></pre>
+
+		<details>
+			<summary>Request Parameters</summary>
+			<pre><?= var_dump(context.params) ?></pre>
+		</details>
 	</>
 
 }

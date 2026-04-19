@@ -1,0 +1,25 @@
+[Unit]
+Description=UCE FastCGI Runtime
+After=network-online.target mariadb.service memcached.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/lib/uce
+RuntimeDirectory=uce
+StateDirectory=uce
+CacheDirectory=uce
+ExecStartPre=/usr/bin/mkdir -p /var/cache/uce/work /var/lib/uce/uploads /var/lib/uce/sessions
+ExecStartPre=/usr/bin/rm -f /run/uce/fastcgi.sock
+ExecStartPre=/usr/bin/bash /usr/lib/uce/scripts/build_linux.sh
+ExecStart=/usr/lib/uce/bin/uce_fastcgi.linux.bin
+ExecStopPost=/usr/bin/rm -f /run/uce/fastcgi.sock
+Restart=always
+RestartSec=2
+TimeoutStopSec=15
+KillMode=mixed
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
