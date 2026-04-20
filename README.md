@@ -96,6 +96,10 @@ Inside `<> ... </>` literal blocks, UCE supports three inline forms:
 
 Use `<?= ... ?>` by default for user-visible text. Use `<?: ... ?>` only for trusted markup or content that has already been escaped.
 
+The parser now treats C++ `//` and `/* ... */` comments as comments in both normal code and `<? ... ?>` islands, so quotes or `<>` markers inside comments do not confuse template parsing.
+
+The preprocessing implementation is now split between `src/lib/compiler.cpp` and `src/lib/compiler-parser.cpp`. `compiler.cpp` owns unit compilation and cache orchestration, while `compiler-parser.cpp` owns source rewriting and template parsing.
+
 ## Components
 
 UCE includes a native component layer built on top of ordinary `.uce` files:

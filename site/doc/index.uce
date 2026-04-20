@@ -133,10 +133,25 @@ RENDER(Request& context)
 		}
 		else
 		{
-			?><article class="doc-detail"><?
 			auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
+
+			// Pre-extract related lines for sidebar
+			StringList rel_lines;
+			bool in_rel = false;
+			for(auto s : doc)
+			{
+				if(s == ":related") { in_rel = true; }
+				else if(s != "" && s.substr(0, 1) == ":") { in_rel = false; }
+				else if(in_rel && s != "") { rel_lines.push_back(s); }
+			}
+
+			String detail_class = "detail-layout";
+			if(rel_lines.size() == 0) detail_class += " no-sidebar";
+			?><div class="<?= detail_class ?>">
+			<article class="doc-detail"><?
 			String layout_class = "text";
 			u32 line_idx = 0;
+			bool section_hidden = false;
 			for(auto s : doc)
 			{
 				line_idx++;
@@ -146,42 +161,47 @@ RENDER(Request& context)
 				}
 				else if(s.substr(0, 1) == ":")
 				{
-					layout_class = s.substr(1);
-					if(line_idx > 1)
+					String new_class = s.substr(1);
+
+					// Close previous section's div if it was rendered
+					if(line_idx > 1 && !section_hidden)
 					{
 						?></div><?
 					}
-					?><div class="doc-section <?= layout_class ?>"><?
-					if(layout_class == "params")
+
+					section_hidden = (new_class == "related");
+					layout_class = new_class;
+
+					if(!section_hidden)
 					{
-						?><h3>Parameters</h3><?
-					}
-					else if(layout_class == "sig")
-					{
-						?><h3>Signature</h3><?
-					}
-					else if(layout_class == "pre")
-					{
-						layout_class = "sig";
-					}
-					else if(layout_class == "desc")
-					{
-						?><h3>Description</h3><?
-					}
-					else if(layout_class == "related")
-					{
-						?><h3>Related PHP and JS</h3><?
-					}
-					else if(layout_class == "see")
-					{
-						?><h3>Related</h3><?
-					}
-					else
-					{
-						?><h3><?= layout_class ?></h3><?
+						?><div class="doc-section <?= layout_class ?>"><?
+						if(layout_class == "params")
+						{
+							?><h3>Parameters</h3><?
+						}
+						else if(layout_class == "sig")
+						{
+							?><h3>Signature</h3><?
+						}
+						else if(layout_class == "pre")
+						{
+							layout_class = "sig";
+						}
+						else if(layout_class == "desc")
+						{
+							?><h3>Description</h3><?
+						}
+						else if(layout_class == "see")
+						{
+							?><h3>Related</h3><?
+						}
+						else
+						{
+							?><h3><?= layout_class ?></h3><?
+						}
 					}
 				}
-				else
+				else if(!section_hidden)
 				{
 					if(s.substr(0, 1) == "-")
 					{
@@ -213,11 +233,26 @@ RENDER(Request& context)
 					}
 				}
 			}
-			if(line_idx > 0)
+			if(line_idx > 0 && !section_hidden)
 			{
 				?></div><?
 			}
 			?></article><?
+
+			if(rel_lines.size() > 0)
+			{
+				?><aside class="detail-sidebar">
+				<div class="sidebar-card">
+				<h3>PHP &amp; JS Equivalents</h3><?
+				for(auto rl : rel_lines)
+				{
+					?><div><?: markdown_to_html(rl) ?></div><?
+				}
+				?></div>
+				</aside><?
+			}
+
+			?></div><?
 		}
 
 		?>

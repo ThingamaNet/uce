@@ -5,7 +5,6 @@
 #define WS(X) extern "C" void __uce_websocket(Request& context)
 #define EXPORT extern "C"
 
-String process_html_literal(Request* context, SharedUnit* su, String content);
 String preprocess_shared_unit(Request* context, SharedUnit* su);
 void setup_unit_paths(Request* context, SharedUnit* su, String file_name);
 void load_shared_unit(Request* context, SharedUnit* su, String file_name);

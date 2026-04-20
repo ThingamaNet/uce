@@ -2,12 +2,12 @@
    Color palette: deep blue gradient · warm gold accents · frosted glass surfaces */
 
 :root {
-	--bg: #0b1d4e;
-	--bg-grad: linear-gradient(168deg, #0f2462 0%, #0b1d4e 40%, #091840 100%);
+	--bg: #113399;
+	--bg-grad: linear-gradient(168deg, #1a3daa 0%, #113399 40%, #0d2880 100%);
 	--bg-surface: rgba(255, 255, 255, 0.05);
 	--bg-surface-hover: rgba(255, 255, 255, 0.09);
-	--bg-inset: rgba(0, 0, 0, 0.3);
-	--bg-code: rgba(0, 0, 0, 0.32);
+	--bg-inset: rgba(0, 0, 0, 0.28);
+	--bg-code: rgba(0, 0, 0, 0.3);
 	--text: #dfe5f2;
 	--text-dim: rgba(200, 210, 235, 0.6);
 	--text-muted: rgba(200, 210, 235, 0.35);

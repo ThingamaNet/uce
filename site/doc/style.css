@@ -2,12 +2,12 @@
    Color palette: deep blue gradient · warm gold accents · frosted glass surfaces */
 
 :root {
-	--bg: #0b1d4e;
-	--bg-grad: linear-gradient(168deg, #0f2462 0%, #0b1d4e 40%, #091840 100%);
+	--bg: #113399;
+	--bg-grad: linear-gradient(168deg, #1a3daa 0%, #113399 40%, #0d2880 100%);
 	--bg-surface: rgba(255, 255, 255, 0.05);
 	--bg-surface-hover: rgba(255, 255, 255, 0.09);
-	--bg-inset: rgba(0, 0, 0, 0.3);
-	--bg-code: rgba(0, 0, 0, 0.32);
+	--bg-inset: rgba(0, 0, 0, 0.28);
+	--bg-code: rgba(0, 0, 0, 0.3);
 	--text: #dfe5f2;
 	--text-dim: rgba(200, 210, 235, 0.6);
 	--text-muted: rgba(200, 210, 235, 0.35);
@@ -67,7 +67,7 @@ body {
 
 h1 {
 	font-family: var(--font-mono);
-	font-size: 1.6rem;
+	font-size: 1.5rem;
 	font-weight: 700;
 	letter-spacing: -0.02em;
 	padding: 32px 0 20px;
@@ -88,7 +88,7 @@ h1 a:hover {
 
 h2 {
 	font-family: var(--font-mono);
-	font-size: 1.2rem;
+	font-size: 1.15rem;
 	font-weight: 600;
 	letter-spacing: -0.01em;
 	margin-bottom: 16px;
@@ -97,7 +97,7 @@ h2 {
 
 h3 {
 	font-family: var(--font-mono);
-	font-size: 0.82rem;
+	font-size: 0.75rem;
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -170,7 +170,7 @@ a:hover {
 
 .category li a {
 	font-family: var(--font-mono);
-	font-size: 0.85rem;
+	font-size: 0.875rem;
 	display: block;
 	padding: 3px 8px;
 	border-radius: 4px;
@@ -194,7 +194,7 @@ a:hover {
 
 .func-item {
 	font-family: var(--font-mono);
-	font-size: 0.88rem;
+	font-size: 0.875rem;
 }
 
 .func-item a {
@@ -211,7 +211,7 @@ a:hover {
 }
 
 .badge {
-	font-size: 0.65rem;
+	font-size: 0.7rem;
 	font-weight: 600;
 	padding: 2px 8px;
 	border-radius: 10px;
@@ -229,7 +229,7 @@ a:hover {
 /* ── Detail Page ── */
 
 .doc-detail {
-	max-width: 780px;
+	min-width: 0;
 }
 
 .doc-section {
@@ -251,7 +251,7 @@ a:hover {
 
 .sig {
 	font-family: var(--font-mono);
-	font-size: 1.05rem;
+	font-size: 0.95rem;
 	white-space: pre-wrap;
 	line-height: 1.5;
 	background: var(--bg-code);
@@ -287,21 +287,61 @@ a:hover {
 	font-weight: 500;
 }
 
-.related {
-	background: var(--accent-dim);
-	border: 1px solid rgba(240, 196, 48, 0.12);
+/* ── Detail Layout (sidebar for related) ── */
+
+.detail-layout {
+	display: grid;
+	grid-template-columns: 1fr 220px;
+	gap: 24px;
+	align-items: start;
+}
+
+.detail-layout.no-sidebar {
+	grid-template-columns: 1fr;
+}
+
+@media (max-width: 900px) {
+	.detail-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+.detail-sidebar {
+	position: sticky;
+	top: 20px;
+}
+
+.sidebar-card {
+	background: var(--bg-surface);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	padding: 14px 20px;
-	font-size: 0.9rem;
+	padding: 16px 20px;
+	box-shadow: var(--shadow-sm);
+}
+
+.sidebar-card h3 {
+	margin-bottom: 10px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--border);
+}
+
+.sidebar-card div {
+	padding: 3px 0;
+	font-size: 0.875rem;
+	line-height: 1.5;
 	color: var(--text-dim);
 }
 
-.related div {
-	padding: 2px 0;
+.sidebar-card strong {
+	color: var(--text);
+	font-weight: 600;
 }
 
-.related strong {
-	color: var(--text);
+.sidebar-card code {
+	font-size: 0.8rem;
+	padding: 1px 5px;
 }
 
 .see {
@@ -312,7 +352,7 @@ a:hover {
 
 .see a {
 	font-family: var(--font-mono);
-	font-size: 0.92rem;
+	font-size: 0.875rem;
 }
 
 .see .category {
@@ -376,7 +416,7 @@ pre {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	font-family: var(--font-mono);
-	font-size: 0.86rem;
+	font-size: 0.875rem;
 	line-height: 1.6;
 	white-space: pre-wrap;
 	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -384,7 +424,7 @@ pre {
 
 code {
 	font-family: var(--font-mono);
-	font-size: 0.9em;
+	font-size: 0.875rem;
 	padding: 2px 6px;
 	background: var(--bg-inset);
 	border-radius: 4px;
@@ -457,7 +497,7 @@ details pre {
 	border-radius: 8px;
 	color: var(--text);
 	font-family: var(--font-sans);
-	font-size: 0.95rem;
+	font-size: 0.875rem;
 	transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
 }
 
@@ -472,7 +512,7 @@ details pre {
 }
 
 .search-count {
-	font-size: 0.82rem;
+	font-size: 0.75rem;
 	color: var(--text-muted);
 	white-space: nowrap;
 }
@@ -505,11 +545,11 @@ details pre {
 .search-hit a {
 	flex-shrink: 0;
 	font-family: var(--font-mono);
-	font-size: 0.92rem;
+	font-size: 0.875rem;
 }
 
 .search-snippet {
-	font-size: 0.78rem;
+	font-size: 0.75rem;
 	color: var(--text-muted);
 	white-space: nowrap;
 	overflow: hidden;

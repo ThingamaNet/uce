@@ -6,6 +6,7 @@
 #include "hash.cpp"
 #include "sys.cpp"
 #include "uri.cpp"
+#include "compiler-parser.cpp"
 #include "compiler.cpp"
 #include "markdown.cpp"
 #include "mysql-connector.cpp"

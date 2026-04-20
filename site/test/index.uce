@@ -33,6 +33,7 @@ RENDER(Request& context)
 			<div class="grid-heading">Data Types &amp; Parsing</div>
 			<? render_card("dtree.uce", "DTree", "Dynamic hierarchical data tree"); ?>
 			<? render_card("json.uce", "JSON", "Parse and encode JSON data"); ?>
+			<? render_card("preprocessor-comments.uce", "Preprocessor Comments", "Regression coverage for comment parsing in templates"); ?>
 			<? render_card("string.uce", "String", "String operations"); ?>
 			<? render_card("str_replace.uce", "String Replace", "Search and replace in strings"); ?>
 			<? render_card("utf8.uce", "UTF-8", "Unicode string handling"); ?>
