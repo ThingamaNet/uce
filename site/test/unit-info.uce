@@ -1,9 +1,21 @@
+#include "demo_guard.h"
+
 RENDER(Request& context)
 {
+	bool allow_mutation = test_demo_request_allowed(context);
 	DTree payload;
 
 	if(context.get["compile"] != "")
-		payload["compile_ok"].set_bool(unit_compile(context.get["compile"]));
+	{
+		if(allow_mutation)
+			payload["compile_ok"].set_bool(unit_compile(context.get["compile"]));
+		else
+		{
+			context.set_status(403, "Restricted");
+			payload["error"] = "restricted";
+			payload["reason"] = "Manual compile is restricted to localhost and private-network access.";
+		}
+	}
 
 	payload["current"] = unit_info();
 

@@ -90,7 +90,13 @@ Those are intended for sub-rendering through helpers such as `component("compone
 
 ## Template Output
 
-Inside `<> ... </>` literal blocks, UCE supports three inline forms:
+UCE now treats template parsing as one shared code-vs-literal state machine.
+
+- `<>` and `?>` both enter literal output mode
+- `</>` and `<?` both return to code mode
+- the delimiter pairs are interchangeable, so either style can be used consistently or mixed locally
+
+Inside literal output, UCE supports three inline forms:
 
 - `<? ... ?>` to emit raw C++ statements
 - `<?= expression ?>` to print HTML-escaped output
@@ -98,7 +104,7 @@ Inside `<> ... </>` literal blocks, UCE supports three inline forms:
 
 Use `<?= ... ?>` by default for user-visible text. Use `<?: ... ?>` only for trusted markup or content that has already been escaped.
 
-The parser now treats C++ `//` and `/* ... */` comments as comments in both normal code and `<? ... ?>` islands, so quotes or `<>` markers inside comments do not confuse template parsing.
+The parser now treats C++ `//` and `/* ... */` comments as comments in both normal code and `<? ... ?>` islands, so quotes or delimiter markers inside comments do not confuse template parsing.
 
 The preprocessing implementation is now split between `src/lib/compiler.cpp` and `src/lib/compiler-parser.cpp`. `compiler.cpp` owns unit compilation and cache orchestration, while `compiler-parser.cpp` owns source rewriting and template parsing.
 

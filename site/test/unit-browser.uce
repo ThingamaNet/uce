@@ -1,3 +1,5 @@
+#include "demo_guard.h"
+
 String unit_query(String selected_path, String compile_path = "")
 {
 	String result = "?";
@@ -32,6 +34,7 @@ String unit_flag_label(DTree value)
 
 RENDER(Request& context)
 {
+	bool allow_mutation = test_demo_request_allowed(context);
 	String compile_target = first(context.get["compile"], "");
 	String selected_path = first(context.get["selected"], "");
 	String compile_message = "";
@@ -39,10 +42,19 @@ RENDER(Request& context)
 
 	if(compile_target != "")
 	{
-		bool compile_ok = unit_compile(compile_target);
 		selected_path = compile_target;
-		compile_message = (compile_ok ? "Compile succeeded for " : "Compile failed for ") + compile_target;
-		compile_message_class = compile_ok ? "status-ok" : "status-error";
+		if(allow_mutation)
+		{
+			bool compile_ok = unit_compile(compile_target);
+			compile_message = (compile_ok ? "Compile succeeded for " : "Compile failed for ") + compile_target;
+			compile_message_class = compile_ok ? "status-ok" : "status-error";
+		}
+		else
+		{
+			context.set_status(403, "Restricted");
+			compile_message = "Manual compile is restricted to localhost and private-network access.";
+			compile_message_class = "status-error";
+		}
 	}
 
 	auto unit_paths = units_list();
@@ -122,7 +134,11 @@ RENDER(Request& context)
 							</div>
 							<div class="unit-actions">
 								<span class="status-badge <?= selected_status_class ?>"><?= selected_compile_status ?></span>
-								<a href="<?= selected_compile_link ?>">compile</a>
+								<? if(allow_mutation) { ?>
+									<a href="<?= selected_compile_link ?>">compile</a>
+								<? } else { ?>
+									<span class="dim">compile disabled on public access</span>
+								<? } ?>
 							</div>
 						</div>
 

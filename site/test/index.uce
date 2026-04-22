@@ -1,4 +1,6 @@
 
+#include "demo_guard.h"
+
 
 void render_card(String url, String title, String desc)
 {
@@ -12,6 +14,7 @@ RENDER(Request& context)
 {
 	DTree p;
 	p.set(context.params);
+	bool allow_server_demos = test_demo_request_allowed(context);
 
 	<><html>
 	<head>
@@ -26,9 +29,9 @@ RENDER(Request& context)
 		<div class="test-grid">
 			<div class="grid-heading">Basics</div>
 			<? render_card("hello.uce", "Hello World", "Basic output and server time"); ?>
-			<? render_card("working-dir.uce", "Working Directory", "Server paths and cwd"); ?>
 			<? render_card("header.uce", "Headers", "HTTP response headers"); ?>
-			<? render_card("error-reporting.uce", "Error Reporting", "Error handling and output"); ?>
+			<? if(allow_server_demos) { render_card("working-dir.uce", "Working Directory", "Server paths and cwd"); } ?>
+			<? if(allow_server_demos) { render_card("error-reporting.uce", "Error Reporting", "Error handling and output"); } ?>
 
 			<div class="grid-heading">Data Types &amp; Parsing</div>
 			<? render_card("dtree.uce", "DTree", "Dynamic hierarchical data tree"); ?>
@@ -49,21 +52,27 @@ RENDER(Request& context)
 
 			<div class="grid-heading">Storage &amp; I/O</div>
 			<? render_card("fileio.uce", "File I/O", "Read and write files"); ?>
-			<? render_card("file_append.uce", "File Append", "Append data to files"); ?>
-			<? render_card("shell.uce", "Shell", "Execute shell commands"); ?>
-			<? render_card("memcached.uce", "Memcached", "Memcached key-value store"); ?>
-			<? render_card("mysql.uce", "MySQL", "MySQL database connector"); ?>
+			<? if(allow_server_demos) { render_card("file_append.uce", "File Append", "Append data to files"); } ?>
+			<? if(allow_server_demos) { render_card("shell.uce", "Shell", "Execute shell commands"); } ?>
+			<? if(allow_server_demos) { render_card("memcached.uce", "Memcached", "Memcached key-value store"); } ?>
+			<? if(allow_server_demos) { render_card("mysql.uce", "MySQL", "MySQL database connector"); } ?>
 
 			<div class="grid-heading">Advanced</div>
 			<? render_card("call_file.uce", "unit_call()", "Dynamic file inclusion"); ?>
-			<? render_card("unit-browser.uce", "Unit Browser", "units_list(), unit_info(), unit_compile()"); ?>
 			<? render_card("components.uce", "Components", "Reusable component system"); ?>
 			<? render_card("markdown.uce", "Markdown", "Markdown parsing with components"); ?>
 			<? render_card("script.uce", "Script", "UCE script integration"); ?>
-			<? render_card("task.uce", "Task", "Background task execution"); ?>
-			<? render_card("task_repeat.uce", "Task Repeat", "Recurring task scheduling"); ?>
 			<? render_card("websockets.ws.uce", "WebSockets", "Real-time WebSocket chat"); ?>
+			<? render_card("unit-browser.uce", "Unit Browser", "units_list(), unit_info(), unit_compile()"); ?>
+			<? if(allow_server_demos) { render_card("task.uce", "Task", "Background task execution"); } ?>
+			<? if(allow_server_demos) { render_card("task_repeat.uce", "Task Repeat", "Recurring task scheduling"); } ?>
 		</div>
+		<? if(!allow_server_demos) { ?>
+		<div class="system-info">
+			<h3>Restricted On Public Access</h3>
+			<pre>Local-only demos are hidden here because they can execute shell commands, access infrastructure services, mutate server state, compile units, or expose internal runtime details.</pre>
+		</div>
+		<? } else { ?>
 		<div class="system-info">
 			<h3>System Info</h3>
 			<pre><?
@@ -73,6 +82,7 @@ RENDER(Request& context)
 				print("Request #", context.server->request_count, "\n");
 			?></pre>
 		</div>
+		<? } ?>
 		<details>
 			<summary>Request Parameters</summary>
 			<pre><?= (var_dump(p)) ?></pre>

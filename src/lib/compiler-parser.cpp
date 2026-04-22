@@ -145,6 +145,37 @@ String compiler_capture_markup_literal(const String& content, u32& i)
 	return(buffer);
 }
 
+String compiler_capture_code_until_php_close(const String& content, u32& i)
+{
+	String buffer = "";
+	CompilerCodeState code_state;
+
+	while(i < content.length())
+	{
+		char c = content[i];
+		char c1 = (i + 1 < content.length()) ? content[i + 1] : '\0';
+
+		if(compiler_code_state_is_neutral(code_state) && c == '?' && c1 == '>')
+		{
+			i += 1;
+			return(buffer);
+		}
+
+		compiler_code_state_consume(code_state, buffer, content, i);
+		i += 1;
+	}
+
+	return(buffer);
+}
+
+void compiler_append_text_literal_output(String& parsed_content, String& literal_buffer)
+{
+	if(literal_buffer == "")
+		return;
+	parsed_content.append("print(R\"(" + literal_buffer + ")\");");
+	literal_buffer.clear();
+}
+
 String compiler_process_text_literal(Request* context, SharedUnit* su, String content)
 {
 	String parsed_content;
@@ -314,21 +345,61 @@ String compiler_preprocess_shared_unit_char_wise(Request* context, SharedUnit* s
 		"#line 1\n";
 	CompilerCodeState code_state;
 	String current_line = "";
+	String literal_buffer = "";
+	bool inside_literal = false;
 
 	for(u32 i = 0; i < content.length(); i++)
 	{
 		char c = content[i];
 		char c1 = (i + 1 < content.length()) ? content[i + 1] : '\0';
-		current_line.append(1, c);
+		char c2 = (i + 2 < content.length()) ? content[i + 2] : '\0';
 
-		if(compiler_code_state_is_neutral(code_state) && c == '<' && c1 == '>')
+		if(inside_literal)
 		{
-			String markup_literal = compiler_capture_markup_literal(content, i);
-			parsed_content.append(compiler_process_text_literal(context, su, markup_literal));
-			if(i < content.length() && content[i] == '\n')
-				current_line = "\n";
+			if(c == '<' && c1 == '?' && (c2 == '=' || c2 == ':'))
+			{
+				compiler_append_text_literal_output(parsed_content, literal_buffer);
+				bool escape_field = (c2 == '=');
+				i += 3;
+				String field_code = compiler_capture_code_until_php_close(content, i);
+				if(escape_field)
+					parsed_content.append("print(html_escape( " + field_code + " )); ");
+				else
+					parsed_content.append("print( " + field_code + " ); ");
+				continue;
+			}
+
+			if(c == '<' && c1 == '?')
+			{
+				compiler_append_text_literal_output(parsed_content, literal_buffer);
+				inside_literal = false;
+				code_state = CompilerCodeState();
+				i += 1;
+				continue;
+			}
+
+			if(c == '<' && c1 == '/' && c2 == '>')
+			{
+				compiler_append_text_literal_output(parsed_content, literal_buffer);
+				inside_literal = false;
+				i += 2;
+				continue;
+			}
+
+			literal_buffer.append(1, c);
 			continue;
 		}
+
+		if(compiler_code_state_is_neutral(code_state) && ((c == '<' && c1 == '>') || (c == '?' && c1 == '>')))
+		{
+			inside_literal = true;
+			literal_buffer = "";
+			current_line = "";
+			i += 1;
+			continue;
+		}
+
+		current_line.append(1, c);
 
 		compiler_code_state_consume(code_state, parsed_content, content, i);
 
@@ -360,6 +431,9 @@ String compiler_preprocess_shared_unit_char_wise(Request* context, SharedUnit* s
 		if(c == 10)
 			current_line = "";
 	}
+
+	if(inside_literal)
+		compiler_append_text_literal_output(parsed_content, literal_buffer);
 
 	return(parsed_content);
 }

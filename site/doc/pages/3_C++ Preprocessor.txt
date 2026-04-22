@@ -14,12 +14,14 @@ unit_call
 :content
 UCE runs a small custom source-to-source preprocessor before Clang sees a `.uce` or `.ws.uce` file.
 
-The implementation lives in `src/lib/compiler.cpp`. It does not try to parse all of C++. Instead, it performs a narrow character-wise rewrite that understands UCE literal blocks, inline code islands, `#load`, and `EXPORT` harvesting, then writes a generated `.cpp` file and compiles that file into a shared object.
+The template rewriting implementation lives in `src/lib/compiler-parser.cpp`, with orchestration in `src/lib/compiler.cpp`. It does not try to parse all of C++. Instead, it performs a narrow character-wise rewrite that understands literal output, inline code islands, `#load`, and `EXPORT` harvesting, then writes a generated `.cpp` file and compiles that file into a shared object.
 
 ## Syntax
 
 - `<> ... </>` enters literal-output mode.
-- Inside a literal block, `<? ... ?>` emits raw C++.
+- `?> ... <?` also enters literal-output mode.
+- The open and close pairs are interchangeable, so `<> ... <?`, `?> ... </>`, and the traditional matched forms all work.
+- Inside literal output, `<? ... ?>` emits raw C++.
 - Inside a literal block, `<?= expression ?>` emits `print(html_escape(expression));`.
 - Inside a literal block, `<?: expression ?>` emits `print(expression);` without HTML escaping.
 - `#load "other.uce"` injects another UCE unit at compile time.
@@ -32,7 +34,9 @@ The implementation lives in `src/lib/compiler.cpp`. It does not try to parse all
 - The generated file starts by including `COMPILER_SYS_PATH/src/lib/uce_lib.h`.
 - It then inlines the configured setup template from `SETUP_TEMPLATE` (by default `scripts/setup.h.template`), which defines the internal hook `__uce_set_current_request(Request*)`.
 - It inserts `#line 1` before page code so compiler diagnostics point back to the original `.uce` file.
-- Each literal block is rewritten into one or more `print(R"( ... )");` calls.
+- Each literal region is rewritten into one or more `print(R"( ... )");` calls.
+- `<>` and `?>` both switch from code mode into literal output.
+- `</>` and `<?` both switch from literal output back into code mode.
 - `<? ... ?>` temporarily breaks out of literal printing, emits the enclosed C++ unchanged, then resumes literal output.
 - `<?= ... ?>` becomes `print(html_escape(...));`.
 - `<?: ... ?>` becomes `print(...);` and is intended for trusted markup or already-escaped content.
@@ -59,6 +63,15 @@ Literal output with escaped data:
 RENDER(Request& context)
 {
     <><h1><?= context.params["DOCUMENT_URI"] ?></h1></>
+}
+```
+
+The same thing can also be written with PHP-style literal delimiters:
+
+```cpp
+RENDER(Request& context)
+{
+    ?><h1><?= context.params["DOCUMENT_URI"] ?></h1><?
 }
 ```
 
@@ -102,8 +115,9 @@ The loaded file is resolved relative to the current source file unless the path 
 
 ## Rules
 
-- Literal mode starts only on the exact token `<>`.
-- Literal mode ends only on the exact token `</>`.
+- Literal mode can start on either `<>` or `?>`.
+- Literal mode can end on either `</>` or `<?`.
+- Literal delimiters are interchangeable; the parser now treats them as one shared code-vs-literal state machine rather than as separate nested block types.
 - `#load` is recognized only when the current line starts with `#load ` at column 1.
 - `EXPORT` harvesting only triggers when the current line starts with `EXPORT` at column 1 and is followed by whitespace.
 - Relative `#load` paths are expanded against the including unit's source directory.
@@ -112,10 +126,9 @@ The loaded file is resolved relative to the current source file unless the path 
 ## Limitations
 
 - This pass is character-wise, not a full parser.
-- Outside literal blocks it only tracks double-quoted C++ strings while deciding whether `<>` should open literal mode.
+- Outside literal blocks it tracks C++ quotes and comments while deciding whether `<>` or `?>` should open literal mode.
 - It does not understand comments, raw string literals, templates, or general C++ token structure.
-- Inside literal blocks it tracks single and double quotes while scanning a `<? ... ?>` island so quoted `?>` text does not close the island early.
-- Literal blocks are not nested.
+- Inside literal blocks it tracks quotes and comments while scanning `<? ... ?>`, `<?= ... ?>`, and `<?: ... ?>` islands so quoted `?>` text does not close those islands early.
 - Because literal output is emitted as a C++ raw string literal `R"( ... )"`, literal content must not contain the exact terminator sequence `)"` or the generated C++ will break.
 - `#load` depends on the target unit's generated `.cpp` existing and being compilable. If the target cannot be preprocessed or compiled correctly, the including file will fail to compile as well.
 
