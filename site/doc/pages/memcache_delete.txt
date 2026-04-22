@@ -6,12 +6,15 @@ connection : connection handle
 key : key string
 return value : true if the operation was successful
 
-:desc
-Deletes entry specified by the 'key'.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Deletes the entry identified by `key`.
+
+The return value is `true` when the operation succeeds.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages

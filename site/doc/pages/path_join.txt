@@ -6,14 +6,15 @@ base : parent path
 child : child path or absolute override
 return value : combined path
 
-:desc
-Joins two filesystem-style path fragments with a single `/` when needed.
-
-If `child` is empty, `base` is returned. If `child` already starts with `/`, it is returned unchanged. This makes `path_join()` a better fit for app-level path assembly than open-coded string concatenation.
-
 :see
 >sys
 
-:related
-**PHP:** Manual path composition with `DIRECTORY_SEPARATOR` or helper wrappers around it
-**JavaScript / Node.js:** Node `path.join()`
+:content
+Joins two filesystem-style path fragments with a single `/` when needed.
+
+If `child` is empty, `base` is returned. If `child` already starts with `/`, it is returned unchanged. That makes `path_join()` a better fit for app-level path assembly than open-coded string concatenation.
+
+Related:
+
+- PHP: manual path composition with `DIRECTORY_SEPARATOR` or helper wrappers around it
+- JavaScript / Node.js: Node `path.join()`

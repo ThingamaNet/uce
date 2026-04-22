@@ -6,12 +6,15 @@ str : string to be split
 delim : delimiter
 return value : a list of strings
 
-:desc
-Splits 'str' into multiple strings based on the given delimiter 'delim'.
-
 :see
 >string
 
-:related
-**PHP:** `explode()` or `preg_split()`
-**JavaScript / Node.js:** `String.prototype.split()`
+:content
+Splits `str` into multiple strings using `delim` as the separator.
+
+Every exact occurrence of `delim` creates a new entry in the returned `StringList`.
+
+Related:
+
+- PHP: `explode()` or `preg_split()`
+- JavaScript / Node.js: `String.prototype.split()`

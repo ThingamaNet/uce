@@ -1,7 +1,10 @@
 :sig
 String component_resolve(String name)
 
-:desc
+:see
+>ob
+
+:content
 Resolves a component name to the concrete `.uce` file path that will be loaded.
 
 Resolution tries the exact file name first, then the same name with `.uce` appended, and then the same two forms under the `components/` prefix.
@@ -10,9 +13,7 @@ If `name` contains a colon, only the file portion is used for resolution.
 
 This is primarily a debugging helper so you can see which concrete file a shorthand component name maps to.
 
-:see
->ob
+## Related Concepts
 
-:related
-**PHP:** Resolving include paths or view names to a concrete template file before rendering
-**JavaScript / Node.js:** Resolving module paths, alias-based imports, or component registry entries
+- PHP: resolving include paths or view names to a concrete template file before rendering
+- JavaScript / Node.js: resolving module paths, alias-based imports, or component registry entries

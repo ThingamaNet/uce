@@ -7,10 +7,10 @@ String var_dump(DTree t, String prefix = "", String postfix = "\n")
 t : object to be dumped into a string
 return value : string containing a human-friendly representation of 't'
 
-:desc
-Returns a string representation of 't' intended for debugging.
+:content
+Returns a string representation of `t` intended for debugging.
 
+Related:
 
-:related
-**PHP:** `var_dump()` and `print_r()`
-**JavaScript / Node.js:** `console.log()`, `console.dir()`, and structured inspection helpers like `util.inspect()`
+- PHP: `var_dump()` and `print_r()`
+- JavaScript / Node.js: `console.log()`, `console.dir()`, and structured inspection helpers like `util.inspect()`

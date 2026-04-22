@@ -7,12 +7,15 @@ search : the string that should be searched for
 replace_with : the string that should appear in places where 'search' occurs
 return value : a version of 's' where all instances of 'search' have been replaced with 'replace_with'
 
-:desc
-Replace all occurrences of 'search' with the string defined in 'replace_with'.
-
 :see
 >string
 
-:related
-**PHP:** `str_replace()` or `preg_replace()`
-**JavaScript / Node.js:** `String.prototype.replace()` or `replaceAll()`
+:content
+Replaces every occurrence of `search` in `s` with `replace_with`.
+
+The returned string contains the fully replaced result.
+
+Related:
+
+- PHP: `str_replace()` or `preg_replace()`
+- JavaScript / Node.js: `String.prototype.replace()` or `replaceAll()`

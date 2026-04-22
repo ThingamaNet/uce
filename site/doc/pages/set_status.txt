@@ -5,15 +5,16 @@ void context.set_status(s32 code, String reason = "")
 code : HTTP status code
 reason : optional reason phrase override
 
-:desc
-Sets the current request status line and mirrors the numeric status into `context.flags.status`.
-
-When `reason` is omitted, UCE fills in a standard reason phrase for common HTTP status codes such as `200`, `302`, `400`, `404`, and `500`.
-
 :see
 0_context
 >types
 
-:related
-**PHP:** `http_response_code()` and explicit status-line header control
-**JavaScript / Node.js:** `res.status(...)`, `Response` init status, or low-level status assignment on an HTTP response
+:content
+Sets the current request status line and mirrors the numeric status into `context.flags.status`.
+
+When `reason` is omitted, UCE fills in a standard reason phrase for common HTTP status codes such as `200`, `302`, `400`, `404`, and `500`.
+
+Related:
+
+- PHP: `http_response_code()` and explicit status-line header control
+- JavaScript / Node.js: `res.status(...)`, `Response` init status, or low-level status assignment on an HTTP response

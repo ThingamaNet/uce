@@ -5,14 +5,15 @@ bool ws_close(String connection_id = "")
 connection_id : optional target client ID, defaults to the current WebSocket client
 return value : true if the target connection exists and was scheduled to close
 
-:desc
+:see
+>websocket
+
+:content
 Queues a WebSocket close frame and closes the targeted connection.
 
 If `connection_id` is omitted, the current connection handled by `WS(Request& context)` is closed.
 
-:see
->websocket
+Related:
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

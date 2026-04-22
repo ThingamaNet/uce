@@ -7,12 +7,13 @@ message : message payload to send
 binary : set to true to send a binary frame instead of a text frame
 return value : true if the target connection exists and the message was queued
 
-:desc
-Queues a WebSocket message for one specific connected client.
-
 :see
 >websocket
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+:content
+Queues a WebSocket message for one specific connected client.
+
+Related:
+
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

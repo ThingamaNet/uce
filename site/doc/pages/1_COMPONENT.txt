@@ -1,10 +1,21 @@
+:title
+COMPONENT
+
 :sig
 COMPONENT(Request& context)
 
-:desc
+:see
+>component
+>component_render
+>1_RENDER
+>1_WS
+
+:content
 Defines the default component entrypoint for the current `.uce` file.
 
-`component()` and `component_render()` invoke `COMPONENT(Request& context)` by default. Named component entrypoints use `COMPONENT:NAME(Request& context)`.
+`component()` and `component_render()` call `COMPONENT(Request& context)` by default. Named component entrypoints use `COMPONENT:NAME(Request& context)`.
+
+## Why It Exists
 
 This keeps page rendering and component rendering separate:
 
@@ -18,23 +29,21 @@ Inside component handlers, props arrive through `context.call`.
 
 When you call `component(":NAME", props, context)` or `component_render(":NAME", props, context)`, the runtime resolves `:NAME` against the current `.uce` file instead of requiring the file name again.
 
-Examples:
-`COMPONENT(Request& context)`
-`{`
-`    &lt;&gt;&lt;section&gt;&lt;?: component(":BODY", context.call, context) ?&gt;&lt;/section&gt;&lt;/&gt;`
-`}`
+## Example
 
-`COMPONENT:BODY(Request& context)`
-`{`
-`    &lt;&gt;&lt;p&gt;&lt;?= context.call["body"] ?&gt;&lt;/p&gt;&lt;/&gt;`
-`}`
+```cpp
+COMPONENT(Request& context)
+{
+    <><section><?: component(":BODY", context.call, context) ?></section></>
+}
 
-:see
->component
->component_render
->1_RENDER
->1_WS
+COMPONENT:BODY(Request& context)
+{
+    <><p><?= context.call["body"] ?></p></>
+}
+```
 
-:related
-**PHP:** View partials, reusable include files, small template helpers, and server-side component-like rendering patterns
-**JavaScript / Node.js:** Reusable component functions, React or Vue components, and server-rendered partials
+## Related Concepts
+
+- PHP: view partials, reusable include files, small template helpers, and server-side component-like rendering patterns
+- JavaScript / Node.js: reusable component functions, React or Vue components, and server-rendered partials

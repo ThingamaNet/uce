@@ -7,12 +7,15 @@ username : user name
 password : password
 return value : pointer to the MySQL connection struct
 
-:desc
-Establishes a connection to a MySQL server.
-
 :see
 >mysql
 
-:related
-**PHP:** Modern PHP database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
-**JavaScript / Node.js:** Node database clients such as `mysql2`, query builders, or ORM adapters
+:content
+Establishes a connection to a MySQL server and returns a pointer to the connection struct.
+
+This connection handle is then used with helpers such as `mysql_query()`, `mysql_error()`, and `mysql_disconnect()`.
+
+Related:
+
+- PHP: modern database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
+- JavaScript / Node.js: clients such as `mysql2`, query builders, or ORM adapters

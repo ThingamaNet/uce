@@ -1,7 +1,132 @@
+struct DocPage {
+	String title;
+	String content;
+	StringList sig_lines;
+	StringList param_lines;
+	StringList see_lines;
+};
+
+String doc_default_title(String page)
+{
+	String page_title = page;
+	if(page_title.length() > 1 && page_title[1] == '_')
+		nibble(page_title, "_");
+	return(page_title);
+}
+
+String doc_markdown_inline(String text)
+{
+	text = trim(text);
+	if(text == "")
+		return("");
+	String html = markdown_to_html(text);
+	if(html.length() >= 7 && html.substr(0, 3) == "<p>" && html.substr(html.length() - 4) == "</p>")
+		return(html.substr(3, html.length() - 7));
+	return(html);
+}
+
+String doc_legacy_heading(String section)
+{
+	if(section == "desc")
+		return("");
+	if(section == "related")
+		return("## PHP & JS Equivalents");
+	return("## " + section);
+}
+
+DocPage load_doc_page(String page)
+{
+	DocPage result;
+	StringList lines = split(file_get_contents("pages/" + page + ".txt"), "\n");
+	String current_section = "";
+	bool content_mode = false;
+	StringList content_lines;
+
+	for(auto line : lines)
+	{
+		if(!content_mode && line != "" && line.substr(0, 1) == ":")
+		{
+			String section = trim(line.substr(1));
+			if(section == "title" || section == "sig" || section == "params" || section == "see")
+			{
+				current_section = section;
+				continue;
+			}
+			if(section == "content")
+			{
+				content_mode = true;
+				current_section = "content";
+				continue;
+			}
+
+			current_section = "legacy";
+			String heading = doc_legacy_heading(section);
+			if(heading != "")
+			{
+				if(content_lines.size() > 0 && content_lines.back() != "")
+					content_lines.push_back("");
+				content_lines.push_back(heading);
+				content_lines.push_back("");
+			}
+			continue;
+		}
+
+		if(current_section == "title")
+		{
+			if(result.title != "")
+				result.title += "\n";
+			result.title += line;
+		}
+		else if(current_section == "sig")
+		{
+			result.sig_lines.push_back(line);
+		}
+		else if(current_section == "params")
+		{
+			result.param_lines.push_back(line);
+		}
+		else if(current_section == "see")
+		{
+			if(trim(line) != "")
+				result.see_lines.push_back(trim(line));
+		}
+		else
+		{
+			content_lines.push_back(line);
+		}
+	}
+
+	result.content = join(content_lines, "\n");
+	result.title = trim(result.title);
+	return(result);
+}
+
+void render_doc_params(StringList param_lines)
+{
+	if(param_lines.size() == 0)
+		return;
+
+	<><div class="doc-section params">
+	<h3>Parameters</h3><?
+	for(auto line : param_lines)
+	{
+		if(trim(line) == "")
+			continue;
+		String name = trim(nibble(line, ":"));
+		String value = trim(line);
+		?><div><b><?= name ?></b><?
+		if(value != "")
+		{
+			?> : <?: doc_markdown_inline(value) ?><?
+		}
+		?></div><?
+	}
+	?></div></>
+}
 
 void render_see_section(String name)
 {
-	StringList lines = split(file_get_contents("areas/"+name+".txt"), "\n");
+	StringList lines = split(file_get_contents("areas/" + name + ".txt"), "\n");
 	s32 idx = 0;
 	for(auto line : lines)
 	{
@@ -18,13 +143,40 @@ void render_see_section(String name)
 	<></ul></div></>
 }
 
+void render_doc_see_links(StringList see_lines)
+{
+	if(see_lines.size() == 0)
+		return;
+
+	<><h3 class="sidebar-subhead">Related</h3>
+	<?
+	for(auto sl : see_lines)
+	{
+		if(sl[0] == '>')
+		{
+			render_see_section(sl.substr(1));
+		}
+		else
+		{
+			?><div><a href="index.uce?p=<?= trim(sl) ?>"><?= trim(sl) ?><span class="dim">()</span></a></div><?
+		}
+	} 
+	?>
+	</>
+}
+
 
 RENDER(Request& context)
 {
-
 	String page = first(context.get["p"], "index");
-	String page_title = page;
-	nibble(page_title, "_");
+	DocPage doc_page;
+	String page_title = doc_default_title(page);
+	if(page != "index")
+	{
+		doc_page = load_doc_page(page);
+		if(doc_page.title != "")
+			page_title = doc_page.title;
+	}
 
 	<><html>
 	<head>
@@ -143,135 +295,35 @@ RENDER(Request& context)
 		}
 		else
 		{
-			auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
-
-			// Pre-extract sidebar-only sections so the article body stays focused.
-			StringList equiv_lines;
-			StringList see_lines;
-			String sidebar_section = "";
-			for(auto s : doc)
-			{
-				if(s != "" && s.substr(0, 1) == ":")
-				{
-					sidebar_section = s.substr(1);
-				}
-				else if(sidebar_section == "related" && s != "")
-				{
-					equiv_lines.push_back(s);
-				}
-				else if(sidebar_section == "see" && s != "")
-				{
-					see_lines.push_back(s);
-				}
-			}
-
 			String detail_class = "detail-layout";
-			if(equiv_lines.size() == 0 && see_lines.size() == 0) detail_class += " no-sidebar";
+			if(doc_page.see_lines.size() == 0)
+				detail_class += " no-sidebar";
+
 			?><div class="<?= detail_class ?>">
 			<article class="doc-detail"><?
-			String layout_class = "text";
-			u32 line_idx = 0;
-			bool section_hidden = false;
-			for(auto s : doc)
+
+			if(doc_page.sig_lines.size() > 0)
 			{
-				line_idx++;
-				if(s == "")
-				{
-
-				}
-				else if(s.substr(0, 1) == ":")
-				{
-					String new_class = s.substr(1);
-
-					// Close previous section's div if it was rendered
-					if(line_idx > 1 && !section_hidden)
-					{
-						?></div><?
-					}
-
-					section_hidden = (new_class == "related" || new_class == "see");
-					layout_class = new_class;
-
-					if(!section_hidden)
-					{
-						?><div class="doc-section <?= layout_class ?>"><?
-						if(layout_class == "params")
-						{
-							?><h3>Parameters</h3><?
-						}
-						else if(layout_class == "sig")
-						{
-							?><h3>Signature</h3><?
-						}
-						else if(layout_class == "pre")
-						{
-							layout_class = "sig";
-						}
-						else if(layout_class == "desc")
-						{
-							?><h3>Description</h3><?
-						}
-						else
-						{
-							?><h3><?= layout_class ?></h3><?
-						}
-					}
-				}
-				else if(!section_hidden)
-				{
-					if(s.substr(0, 1) == "-")
-					{
-						nibble(s, "-");
-						?><li><?= (s) ?></li><?
-					}
-					else if(layout_class == "sig")
-					{
-						?><pre><? print(s); ?></pre><?
-					}
-					else if(layout_class == "params")
-					{
-						?><div><b><?= trim(nibble(s, ":")) ?></b> : <?= trim(s) ?></div><?
-					}
-					else
-					{
-						?><div><?: markdown_to_html(s) ?></div><?
-					}
-				}
+				?><div class="doc-section sig">
+				<h3>Signature</h3>
+				<pre><? print(join(doc_page.sig_lines, "\n")); ?></pre>
+				</div><?
 			}
-			if(line_idx > 0 && !section_hidden)
+
+			render_doc_params(doc_page.param_lines);
+
+			if(trim(doc_page.content) != "")
 			{
-				?></div><?
+				?><div class="doc-section content"><?: markdown_to_html(doc_page.content) ?></div><?
 			}
+
 			?></article><?
 
-			if(equiv_lines.size() > 0 || see_lines.size() > 0)
+			if(doc_page.see_lines.size() > 0)
 			{
 				?><aside class="detail-sidebar">
 				<div class="sidebar-card"><?
-				if(equiv_lines.size() > 0)
-				{
-					?><h3>PHP &amp; JS Equivalents</h3><?
-					for(auto rl : equiv_lines)
-					{
-						?><div><?: markdown_to_html(rl) ?></div><?
-					}
-				}
-
-				if(see_lines.size() > 0)
-				{
-					?><h3 class="sidebar-subhead">Related</h3><?
-					for(auto sl : see_lines)
-					{
-						if(sl[0] == '>')
-						{
-							render_see_section(sl.substr(1));
-						}
-						else
-						{
-							?><div><a href="index.uce?p=<?= trim(sl) ?>"><?= trim(sl) ?><span class="dim">()</span></a></div><?
-						}
-					}
-				}
+				render_doc_see_links(doc_page.see_lines);
 				?></div>
 				</aside><?
 			}
@@ -282,5 +334,4 @@ RENDER(Request& context)
 		?>
 	</body>
 	</html></>
-
 }

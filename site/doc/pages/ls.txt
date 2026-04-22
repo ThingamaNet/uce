@@ -5,12 +5,15 @@ StringList ls(String path)
 path : a filesystem path
 return value : list of directory entries
 
-:desc
-Returns a list of files and subdirectories within the given 'path'.
-
 :see
 >sys
 
-:related
-**PHP:** `scandir()`, `glob()`, or `DirectoryIterator`
-**JavaScript / Node.js:** Node `fs.readdirSync()` or `fs.promises.readdir()`
+:content
+Returns a list of files and subdirectories within `path`.
+
+This is a simple directory listing helper for filesystem-oriented tasks.
+
+Related:
+
+- PHP: `scandir()`, `glob()`, or `DirectoryIterator`
+- JavaScript / Node.js: Node `fs.readdirSync()` or `fs.promises.readdir()`

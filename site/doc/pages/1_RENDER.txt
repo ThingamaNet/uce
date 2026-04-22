@@ -1,10 +1,18 @@
+:title
+RENDER
+
 :sig
 RENDER(Request& context)
 
-:desc
+:see
+>ob
+
+:content
 Defines the main HTTP render handler for the current `.uce` page.
 
 When a page is requested over HTTP, the runtime loads the target file and calls its `RENDER(Request& context)` function.
+
+## Entry Point Behavior
 
 The default page entrypoint is always the plain `RENDER(Request& context)` handler.
 
@@ -16,11 +24,15 @@ For a normal direct page request, `context.call` starts empty.
 
 If the page is invoked from another UCE file via `unit_render(file_name, context)`, the callee receives that same `context`.
 
-Pages intended to serve WebSocket traffic may expose both `RENDER(Request& context)` and `WS(Request& context)`. Files may also define `COMPONENT()` handlers when they intentionally need both page and component behavior in one unit. In that case `RENDER(Request& context)` serves the direct HTTP response, `WS(Request& context)` handles subsequent WebSocket messages, and `COMPONENT()` remains available only through the component helpers.
+Pages intended to serve WebSocket traffic may expose both `RENDER(Request& context)` and `WS(Request& context)`. Files may also define `COMPONENT()` handlers when they intentionally need both page and component behavior in one unit.
 
-:see
->ob
+In that case:
 
-:related
-**PHP:** Front controller entrypoints, template files, `include`, `require`, and route handlers that write the HTTP response
-**JavaScript / Node.js:** Express or Fastify route handlers, page controller functions, and SSR entrypoints that build a response
+- `RENDER(Request& context)` serves the direct HTTP response
+- `WS(Request& context)` handles later WebSocket messages
+- `COMPONENT()` remains available only through the component helpers
+
+## Related Concepts
+
+- PHP: front controller entrypoints, template files, `include`, `require`, and route handlers that write the HTTP response
+- JavaScript / Node.js: Express or Fastify route handlers, page controller functions, and SSR entrypoints that build a response

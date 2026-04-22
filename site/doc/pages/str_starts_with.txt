@@ -6,12 +6,13 @@ haystack : string to inspect
 needle : prefix to compare against the start of `haystack`
 return value : `true` when `haystack` begins with `needle`, otherwise `false`
 
-:desc
-Checks whether `haystack` starts with the given prefix.
-
 :see
 >string
 
-:related
-**PHP:** `str_starts_with()`
-**JavaScript / Node.js:** `String.prototype.startsWith()`
+:content
+Checks whether `haystack` starts with `needle`.
+
+Related:
+
+- PHP: `str_starts_with()`
+- JavaScript / Node.js: `String.prototype.startsWith()`

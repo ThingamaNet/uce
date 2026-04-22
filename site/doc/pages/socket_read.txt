@@ -7,12 +7,15 @@ max_length : optional maximum data size, defaults to 128kBytes
 timeout : optional operation timeout, defaults to one second
 return value : string containing the data that was read
 
-:desc
-Reads data from a socket connection.
-
 :see
 >socket
 
-:related
-**PHP:** PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
-**JavaScript / Node.js:** Node `net.Socket` connect, read, write, and close operations
+:content
+Reads data from a socket connection.
+
+`max_length` limits how much data is read, and `timeout` controls how long the operation is allowed to wait.
+
+Related:
+
+- PHP: PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
+- JavaScript / Node.js: Node `net.Socket` connect, read, write, and close operations

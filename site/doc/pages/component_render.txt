@@ -1,7 +1,10 @@
 :sig
 void component_render(String name, [DTree props], [Request& context])
 
-:desc
+:see
+>ob
+
+:content
 Renders another `.uce` file as a component and writes the result directly to the current output buffer.
 
 This is the direct-output counterpart to `component()`.
@@ -12,14 +15,16 @@ When `name` starts with `:`, the runtime resolves that named handler against the
 
 Use `component_render()` when you want to write component output directly from C++ code instead of capturing it as a `String`.
 
-Example:
-`DTree props;`
-`props["body"] = "Hello";`
-`component_render("components/card:BODY", props, context);`
+## Example
 
-:see
->ob
+```cpp
+DTree props;
+props["body"] = "Hello";
 
-:related
-**PHP:** Rendering a partial directly into the current output buffer rather than returning a string
-**JavaScript / Node.js:** Direct `res.write()`-style partial rendering or imperative component mount helpers
+component_render("components/card:BODY", props, context);
+```
+
+## Related Concepts
+
+- PHP: rendering a partial directly into the current output buffer rather than returning a string
+- JavaScript / Node.js: direct `res.write()`-style partial rendering or imperative component mount helpers

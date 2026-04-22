@@ -6,14 +6,15 @@ haystack : string to search in
 needle : substring to look for
 return value : `true` when `needle` appears in `haystack`, otherwise `false`
 
-:desc
+:see
+>string
+
+:content
 Returns whether `haystack` contains `needle`.
 
 An empty `needle` always returns `true`.
 
-:see
->string
+## Related Concepts
 
-:related
-**PHP:** `str_contains()`
-**JavaScript / Node.js:** `String.prototype.includes()`
+- PHP: `str_contains()`
+- JavaScript / Node.js: `String.prototype.includes()`

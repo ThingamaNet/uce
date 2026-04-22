@@ -5,20 +5,6 @@ DTree json_decode(String s)
 s : string containing JSON data
 return value : a DTree object containing the deserialized JSON data
 
-:desc
-Deserializes 's' into a DTree structure.
-
-The returned structure is usually consumed through `DTree` accessors such as:
-- `tree["key"].to_string()`
-- `tree["count"].to_u64()`
-- `tree["enabled"].to_bool()`
-
-Current runtime note:
-- JSON objects and arrays become map-shaped `DTree` values
-- JSON booleans become native `bool` `DTree` values
-- JSON strings become native `String` `DTree` values
-- JSON numbers currently deserialize as string-valued `DTree` nodes, so typed conversions like `to_f64()` and `to_u64()` are the normal way to read numeric content
-
 :see
 DTree
 json_encode
@@ -26,6 +12,23 @@ to_bool
 to_f64
 to_u64
 
-:related
-**PHP:** `json_decode()`
-**JavaScript / Node.js:** `JSON.parse()`
+:content
+Deserializes `s` into a `DTree` structure.
+
+The returned structure is usually consumed through `DTree` accessors such as:
+
+- `tree["key"].to_string()`
+- `tree["count"].to_u64()`
+- `tree["enabled"].to_bool()`
+
+Current runtime behavior:
+
+- JSON objects and arrays become map-shaped `DTree` values.
+- JSON booleans become native `bool` `DTree` values.
+- JSON strings become native `String` `DTree` values.
+- JSON numbers currently deserialize as string-valued `DTree` nodes, so typed conversions such as `to_f64()` and `to_u64()` are the normal way to read numeric content.
+
+Related:
+
+- PHP: `json_decode()`
+- JavaScript / Node.js: `JSON.parse()`

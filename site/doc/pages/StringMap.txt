@@ -1,26 +1,30 @@
 :sig
 StringMap
 
-:desc
+:see
+>types
+
+:content
 Associative container mapping `String` keys to `String` values.
 
 `StringMap` is an alias for `std::map<String, String>`.
 
-It is commonly used for:
-`context.params`
-`context.get`
-`context.post`
-`context.cookies`
-`context.session`
-`context.header`
+## Common Uses
+
+`StringMap` commonly appears in:
+
+- `context.params`
+- `context.get`
+- `context.post`
+- `context.cookies`
+- `context.session`
+- `context.header`
 
 Because it uses `std::map`, `map["key"]` will create an empty entry when that key does not already exist.
 
-Related helpers such as `parse_query()` and `encode_query()` convert between query strings and `StringMap` values.
+Helpers such as `parse_query()` and `encode_query()` convert between query strings and `StringMap` values.
 
-:see
->types
+## Related Concepts
 
-:related
-**PHP:** Associative arrays keyed by string, especially request bags like `$_GET` and `$_SERVER`
-**JavaScript / Node.js:** Plain objects, dictionaries, `Map`, and header or query objects in web frameworks
+- PHP: associative arrays keyed by string, especially request bags like `$_GET` and `$_SERVER`
+- JavaScript / Node.js: plain objects, dictionaries, `Map`, and header or query objects in web frameworks

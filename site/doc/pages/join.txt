@@ -6,12 +6,15 @@ l : list of strings to be joined
 delim : delimiter (defaults to newline character)
 return value : a string containing items joined by 'delim'
 
-:desc
-Joins the items contained in 'l' into a single String.
-
 :see
 >string
 
-:related
-**PHP:** `implode()`
-**JavaScript / Node.js:** `Array.prototype.join()`
+:content
+Joins all strings in `l` into a single `String`.
+
+The delimiter is inserted between items. If `delim` is omitted, the default separator is a newline character.
+
+Related:
+
+- PHP: `implode()`
+- JavaScript / Node.js: `Array.prototype.join()`

@@ -7,12 +7,15 @@ key : key string
 default_value : optional default value
 return value : value that was returned by the Memcache server
 
-:desc
-Retrieves a value from an existing connection to a Memcache server.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Retrieves a value from an existing Memcache connection.
+
+If the key is missing, `default_value` is returned instead.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages

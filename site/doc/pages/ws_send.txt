@@ -7,14 +7,15 @@ binary : set to true to send a binary frame instead of a text frame
 scope : optional scope identifier, defaults to the current WebSocket page scope
 return value : true if the message was queued for at least one connected client
 
-:desc
+:see
+>websocket
+
+:content
 Queues a WebSocket message for every client connected to the given scope.
 
 If `scope` is omitted, the current page scope is used.
 
-:see
->websocket
+Related:
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

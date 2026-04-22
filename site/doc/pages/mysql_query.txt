@@ -7,15 +7,17 @@ q : a string containing a MySQL query
 params : optional, a list of query parameter keys and values
 return value : a list of rows returned from executing the query
 
-:desc
-Executes a MySQL query and returns the resulting data (if any).
-
-:Examples
-(tbd)
-
 :see
 >mysql
 
-:related
-**PHP:** Modern PHP database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
-**JavaScript / Node.js:** Node database clients such as `mysql2`, query builders, or ORM adapters
+:content
+Executes a MySQL query and returns the resulting data, if any.
+
+`params` provides the query parameter values used by the statement.
+
+The result is returned as a `DTree`, which makes it easy to iterate through rows and read fields with the usual `DTree` accessors.
+
+Related:
+
+- PHP: modern database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
+- JavaScript / Node.js: clients such as `mysql2`, query builders, or ORM adapters

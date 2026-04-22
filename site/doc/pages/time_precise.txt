@@ -4,12 +4,13 @@ f64 time_precise()
 :params
 return value : current Unix timestamp
 
-:desc
-Returns a 64 bit float containing the current Unix timestamp with millisecond accuracy or better.
-
 :see
 >time
 
-:related
-**PHP:** `microtime(true)` or high-resolution timers
-**JavaScript / Node.js:** `performance.now()` or high-resolution Node timers
+:content
+Returns the current Unix timestamp as a 64-bit float with millisecond accuracy or better.
+
+Related:
+
+- PHP: `microtime(true)` or high-resolution timers
+- JavaScript / Node.js: `performance.now()` or high-resolution Node timers

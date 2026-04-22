@@ -4,12 +4,13 @@ void cwd_set(String path)
 :params
 path : the new working directory
 
-:desc
-Sets a new working directory.
-
 :see
 >sys
 
-:related
-**PHP:** `chdir()`
-**JavaScript / Node.js:** Node `process.chdir()`
+:content
+Sets a new working directory.
+
+## Related Concepts
+
+- PHP: `chdir()`
+- JavaScript / Node.js: Node `process.chdir()`

@@ -1,15 +1,16 @@
 :sig
 std::vector<String> units_list()
 
-:desc
-Returns the normalized paths of all known `.uce` units.
-
-This includes the shared known-unit registry plus any units already loaded in the current runtime process.
-
 :see
 unit_info
 unit_compile
 
-:related
-**PHP:** Enumerating available modules, templates, or plugin entrypoints
-**JavaScript / Node.js:** Listing registered modules, routes, or dynamically discovered components
+:content
+Returns the normalized paths of all known `.uce` units.
+
+This includes the shared known-unit registry plus any units already loaded in the current runtime process.
+
+Related:
+
+- PHP: enumerating available modules, templates, or plugin entrypoints
+- JavaScript / Node.js: listing registered modules, routes, or dynamically discovered components

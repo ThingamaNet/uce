@@ -5,13 +5,14 @@ time_t file_mtime(String file_name)
 file_name : name of the file
 return value : Unix time stamp of the file's last modification
 
-:desc
-Retrieves the last modification date of 'file_name' as a Unix timestamp.
-
 :see
 >sys
 >time
 
-:related
-**PHP:** `filemtime()`
-**JavaScript / Node.js:** Node `fs.statSync().mtimeMs` or `fs.promises.stat()`
+:content
+Retrieves the last modification date of `file_name` as a Unix timestamp.
+
+## Related Concepts
+
+- PHP: `filemtime()`
+- JavaScript / Node.js: Node `fs.statSync().mtimeMs` or `fs.promises.stat()`

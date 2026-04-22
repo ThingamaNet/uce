@@ -1,7 +1,10 @@
 :sig
 String
 
-:desc
+:see
+>types
+
+:content
 Primary string type used throughout UCE.
 
 `String` is an alias for `std::string`.
@@ -12,9 +15,7 @@ Because it is backed by `std::string`, it is binary-safe and may also contain ra
 
 For UTF-8-aware splitting, use helpers such as `split_utf8()` instead of assuming one byte equals one character.
 
-:see
->types
+## Related Concepts
 
-:related
-**PHP:** Native PHP strings with helpers such as `substr()`, `trim()`, `explode()`, and `implode()`
-**JavaScript / Node.js:** JavaScript `string` values with methods such as `slice()`, `trim()`, `split()`, and `join()`
+- PHP: native PHP strings with helpers such as `substr()`, `trim()`, `explode()`, and `implode()`
+- JavaScript / Node.js: JavaScript `string` values with methods such as `slice()`, `trim()`, `split()`, and `join()`

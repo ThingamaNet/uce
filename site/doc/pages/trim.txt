@@ -5,12 +5,13 @@ String trim(String raw)
 raw : string to be trimmed
 return value : string with leading and trailing whitespace characters removed
 
-:desc
-Returns a string where leading an trailing whitespace characters have been trimmed off.
-
 :see
 >string
 
-:related
-**PHP:** `trim()`
-**JavaScript / Node.js:** `String.prototype.trim()`
+:content
+Returns `raw` with leading and trailing whitespace removed.
+
+Related:
+
+- PHP: `trim()`
+- JavaScript / Node.js: `String.prototype.trim()`

@@ -6,12 +6,15 @@ host : optional host name of the memcache server, defaults to local address 127.
 port : optional memcache server's port, defaults to 11211
 return value : the connection handle (or -1 if an error occurred)
 
-:desc
-Connects to a memcache server instance.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Connects to a Memcache server instance.
+
+If the connection fails, the function returns `-1`.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages

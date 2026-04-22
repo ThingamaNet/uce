@@ -7,12 +7,13 @@ items : list of items to be filtered
 f : a function that decides which items should be in the new list
 return value : a new list
 
-:desc
-Returns a list containing the members of 'items' for which 'f' returned boolean true.
-
 :see
 >string
 
-:related
-**PHP:** `array_filter()` for arrays or custom predicate-based filtering over strings and collections
-**JavaScript / Node.js:** `Array.prototype.filter()` and custom predicate helpers
+:content
+Returns a new list containing the members of `items` for which `f` returned `true`.
+
+## Related Concepts
+
+- PHP: `array_filter()` for arrays or custom predicate-based filtering over strings and collections
+- JavaScript / Node.js: `Array.prototype.filter()` and custom predicate helpers

@@ -4,12 +4,15 @@ void print(...val)
 :params
 ...val : one or more values that should be output
 
-:desc
-Appends data to the current request's output stream.
-
 :see
 >string
 
-:related
-**PHP:** `echo`, `print`, and output buffering patterns
-**JavaScript / Node.js:** `res.write()`, stream writes, or string-returning render helpers depending on context
+:content
+Appends data to the current request output stream.
+
+Use `print()` when you want to emit response content directly from UCE code.
+
+Related:
+
+- PHP: `echo`, `print`, and output buffering patterns
+- JavaScript / Node.js: `res.write()`, stream writes, or string-returning render helpers depending on context

@@ -8,12 +8,15 @@ value : the value to be set
 expires_in : optional expiration timeout, defaults to one hour
 return value : true if the operation was successful
 
-:desc
-Stores a 'value' on the Memcache server.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Stores `value` under `key` on the Memcache server.
+
+`expires_in` controls the expiration timeout and defaults to one hour.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages

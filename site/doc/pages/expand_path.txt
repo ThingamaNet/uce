@@ -6,12 +6,13 @@ path : a relative path
 relative_to_path : optional, expand relative to this path (if not given, the current path is used)
 return value : expanded version of the 'path'
 
-:desc
-Converts a relative path name into an absolute path, using the current working directory as a base.
-
 :see
 >sys
 
-:related
-**PHP:** `realpath()` and application-specific path normalization helpers
-**JavaScript / Node.js:** Node `path.resolve()` and `path.normalize()`
+:content
+Converts a relative path name into an absolute path, using the current working directory as a base when `relative_to_path` is not provided.
+
+## Related Concepts
+
+- PHP: `realpath()` and application-specific path normalization helpers
+- JavaScript / Node.js: Node `path.resolve()` and `path.normalize()`

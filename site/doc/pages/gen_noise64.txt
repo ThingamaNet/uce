@@ -6,12 +6,13 @@ index : index position
 seed : seed set (defaults to 0)
 return value : a noise value given the 'index' and 'seed' values.
 
-:desc
-Generates a noise value for the given 'index' and 'seed' values.
-
 :see
 >noise
 
-:related
-**PHP:** There is no built-in PHP equivalent; this is closest to userland noise or deterministic pseudo-random helpers
-**JavaScript / Node.js:** There is no built-in browser equivalent; closest matches are userland noise libraries or deterministic PRNG helpers
+:content
+Generates a deterministic 64-bit-indexed noise value for the given `index` and `seed`.
+
+## Related Concepts
+
+- PHP: no built-in equivalent; closest matches are userland noise or deterministic pseudo-random helpers
+- JavaScript / Node.js: no built-in browser equivalent; closest matches are userland noise libraries or deterministic PRNG helpers

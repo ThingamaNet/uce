@@ -5,12 +5,13 @@ String dirname(String fn)
 fn : raw filename
 return value : the directory's name
 
-:desc
-Isolates the directory name component from a path/file name.
-
 :see
 >sys
 
-:related
-**PHP:** `dirname()`
-**JavaScript / Node.js:** Node `path.dirname()`
+:content
+Isolates the directory component from a path or file name.
+
+## Related Concepts
+
+- PHP: `dirname()`
+- JavaScript / Node.js: Node `path.dirname()`

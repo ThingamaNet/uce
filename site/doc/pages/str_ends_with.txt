@@ -6,12 +6,13 @@ haystack : string to inspect
 needle : suffix to compare against the end of `haystack`
 return value : `true` when `haystack` ends with `needle`, otherwise `false`
 
-:desc
-Checks whether `haystack` ends with the given suffix.
-
 :see
 >string
 
-:related
-**PHP:** `str_ends_with()`
-**JavaScript / Node.js:** `String.prototype.endsWith()`
+:content
+Checks whether `haystack` ends with `needle`.
+
+Related:
+
+- PHP: `str_ends_with()`
+- JavaScript / Node.js: `String.prototype.endsWith()`

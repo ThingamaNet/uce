@@ -6,12 +6,17 @@ haystack : string to be nibbled at
 delim : delimiter
 return value : string before first occurrence of 'delim'
 
-:desc
-Returns the part of 'haystack' before the first occurrence of 'delim', removing the corresponding part from 'haystack' (including 'delim'). If the substring 'delim' does not occurr in 'haystack', the entire string is returned and 'haystack' is set to an empty string.
-
 :see
 >string
 
-:related
-**PHP:** Small parsing helpers built with `strpos()`, `substr()`, and `explode()`
-**JavaScript / Node.js:** Manual parsing with `indexOf()`, `slice()`, and `split()`
+:content
+Returns the part of `haystack` before the first occurrence of `delim`.
+
+As a side effect, the consumed portion is removed from `haystack`, including the delimiter itself.
+
+If `delim` does not occur in `haystack`, the entire string is returned and `haystack` is set to an empty string.
+
+Related:
+
+- PHP: small parsing helpers built with `strpos()`, `substr()`, and `explode()`
+- JavaScript / Node.js: manual parsing with `indexOf()`, `slice()`, and `split()`

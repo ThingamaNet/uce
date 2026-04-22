@@ -6,19 +6,23 @@ path : slash-delimited path to traverse
 delim : optional path separator
 return value : the resolved child node, or an empty `DTree` when the path cannot be followed
 
-:desc
-Traverses a nested `DTree` without creating missing keys.
-
-Empty path segments are ignored, so leading and trailing `/` characters are harmless. If any intermediate node is not a map or a segment is missing, `get_by_path()` returns an empty `DTree`.
-
-Typical usage:
-`context.cfg.get_by_path("theme/options/portal-dark/label").to_string()`
-
 :see
 DTree
 0_context
 >types
 
-:related
-**PHP:** Deep array access helpers for associative arrays, decoded JSON, or configuration trees
-**JavaScript / Node.js:** Optional chaining like `obj?.a?.b`, lodash `get`, or small path-walking helpers
+:content
+Traverses a nested `DTree` without creating missing keys.
+
+Empty path segments are ignored, so leading and trailing `/` characters are harmless. If any intermediate node is not a map or a segment is missing, `get_by_path()` returns an empty `DTree`.
+
+## Example
+
+```cpp
+context.cfg.get_by_path("theme/options/portal-dark/label").to_string()
+```
+
+## Related Concepts
+
+- PHP: deep array access helpers for associative arrays, decoded JSON, or configuration trees
+- JavaScript / Node.js: optional chaining like `obj?.a?.b`, lodash `get`, or small path-walking helpers

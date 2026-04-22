@@ -4,12 +4,13 @@ String concat(...vals)
 :params
 ...val : one or more values that should be concatenated
 
-:desc
-Returns a string with all the parameters concatenated into one.
-
 :see
 >string
 
-:related
-**PHP:** String concatenation with `.` or helpers like `implode()`
-**JavaScript / Node.js:** String concatenation with `+`, template literals, or `Array.prototype.join()`
+:content
+Returns a string with all parameters concatenated into one result.
+
+## Related Concepts
+
+- PHP: string concatenation with `.` or helpers like `implode()`
+- JavaScript / Node.js: string concatenation with `+`, template literals, or `Array.prototype.join()`

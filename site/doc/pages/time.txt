@@ -4,12 +4,13 @@ u64 time()
 :params
 return value : second-accurate current Unix timestamp
 
-:desc
-Returns a 64 bit integer containing the current Unix timestamp.
-
 :see
 >time
 
-:related
-**PHP:** `time()`
-**JavaScript / Node.js:** `Math.floor(Date.now() / 1000)` or `Date.now()` depending on units
+:content
+Returns the current Unix timestamp as a 64-bit integer with second precision.
+
+Related:
+
+- PHP: `time()`
+- JavaScript / Node.js: `Math.floor(Date.now() / 1000)` or `Date.now()` depending on units

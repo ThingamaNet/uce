@@ -4,7 +4,10 @@ u8 ws_opcode()
 :params
 return value : opcode of the current WebSocket message
 
-:desc
+:see
+>websocket
+
+:content
 Returns the opcode of the message currently being handled by `WS(Request& context)`.
 
 Common values are:
@@ -12,9 +15,7 @@ Common values are:
 - `0x1` for text messages
 - `0x2` for binary messages
 
-:see
->websocket
+Related:
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

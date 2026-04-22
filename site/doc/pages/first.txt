@@ -5,12 +5,15 @@ String first(String... args)
 args : a variable number of String arguments
 return value : first of the 'args' that was not empty.
 
-:desc
-Given a variable number of String parameters, the first() function returns the first of these parameters that was not empty. Leading and trailing whitespace characters are not considered, resulting in a string that contains only whitespace characters being considered empty.
-
 :see
 >string
 
-:related
-**PHP:** Null-coalescing patterns like `$a ?? $b`, fallback helpers, or `reset()` for arrays
-**JavaScript / Node.js:** `??`, `||`, and small fallback helper functions
+:content
+Returns the first non-empty string from the provided arguments.
+
+Leading and trailing whitespace are ignored when checking emptiness, so a string containing only whitespace counts as empty.
+
+## Related Concepts
+
+- PHP: null-coalescing patterns like `$a ?? $b`, fallback helpers, or `reset()` for arrays
+- JavaScript / Node.js: `??`, `||`, and small fallback helper functions

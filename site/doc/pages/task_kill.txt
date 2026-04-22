@@ -6,14 +6,17 @@ pid : PID of the process
 sig : signal number
 return value : 0 if signal was sent, -1 otherwise
 
-:desc
-Wraps the standard POSIX `kill()` function.
-
-Possible signal numbers are: SIGABND, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGPOLL, SIGPROF, SIGQUIT, SIGSEGV, SIGSYS, SIGTERM, SIGTRAP, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGXCPU, SIGXFSZ, SIGCHLD, SIGIO, SIGIOERR, SIGWINCH, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGCONT.
-
 :see
 >task
 
-:related
-**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
-**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs
+:content
+Wraps the standard POSIX `kill()` function.
+
+`sig` may be any supported POSIX signal, including values such as `SIGTERM`, `SIGKILL`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `SIGCHLD`, `SIGCONT`, and related process-control signals.
+
+Passing `0` as the signal performs an existence and permission check without actually delivering a signal.
+
+Related:
+
+- PHP: background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+- JavaScript / Node.js: Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

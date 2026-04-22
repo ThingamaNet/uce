@@ -6,12 +6,15 @@ connection : connection handle
 command : string containing the Memcache command
 return value : string containing the Memcache server's response
 
-:desc
-Executes a command on an open memcache connection.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Executes a raw command on an open Memcache connection and returns the server response as a string.
+
+This is the low-level escape hatch for Memcache operations that are not covered by the dedicated helpers.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages

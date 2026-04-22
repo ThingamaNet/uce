@@ -5,12 +5,15 @@ u64 mysql_insert_id(MySQL* m)
 m : pointer to an active MySQL connection
 return value : the last used automatic row ID
 
-:desc
-This retrieves the last row ID that was used for a column with an AUTO_INCREMENT row key.
-
 :see
 >mysql
 
-:related
-**PHP:** Modern PHP database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
-**JavaScript / Node.js:** Node database clients such as `mysql2`, query builders, or ORM adapters
+:content
+Returns the last automatically assigned row ID used by the current MySQL connection.
+
+This is typically used after an `INSERT` into a table with an `AUTO_INCREMENT` primary key.
+
+Related:
+
+- PHP: modern database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
+- JavaScript / Node.js: clients such as `mysql2`, query builders, or ORM adapters

@@ -5,12 +5,15 @@ String file_get_contents(String file_name)
 file_name : file name of file that should be read
 return value : String containing the file's contents
 
-:desc
-Reads the file identified by 'file_name' and returns it as a String. If the file cannot be read, this function will return an empty string.
-
 :see
 >sys
 
-:related
-**PHP:** `file_get_contents()`
-**JavaScript / Node.js:** Node `fs.readFileSync()` or `fs.promises.readFile()`
+:content
+Reads the file identified by `file_name` and returns it as a `String`.
+
+If the file cannot be read, this function returns an empty string.
+
+## Related Concepts
+
+- PHP: `file_get_contents()`
+- JavaScript / Node.js: Node `fs.readFileSync()` or `fs.promises.readFile()`

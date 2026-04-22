@@ -1,75 +1,56 @@
+:title
+Request
+
 :sig
 Request& context;
-
-:ServerState* server
-Contains the current server state
-
-:StringMap params
-All FastCGI server parameters
-
-:StringMap get
-The current request's GET variables
-
-:StringMap post
-The current request's POST variables
-
-:StringMap cookies
-Cookies that have been transmitted by the browser
-
-:StringMap session
-The current session
-
-:String session_id
-ID of the session cookie
-
-:String session_name
-Name of the session cookie
-
-:DTree var
-Variable user-defined data
-
-:DTree cfg
-Request-local configuration tree. Apps can keep structured configuration here and traverse it with `context.cfg.get_by_path("path/to/value")`.
-
-:DTree call
-Invocation or message-local structured data
-
-:DTree connection
-Broker-owned per-WebSocket-connection state. Inside `WS(Request& context)`, updates to this tree persist for the lifetime of that socket connection.
-
-:std::vector<UploadedFile> uploaded_files
-Files that have been uploaded in the current request
-
-:StringMap header
-Headers to be sent back to the browser
-
-:StringList set_cookies;
-Cookies that should be sent back to the browser
-
-:context.set_status(s32 code[, String reason])
-Sets the HTTP status line and updates `context.flags.status`. When `reason` is omitted, UCE uses a built-in standard reason phrase for common status codes.
-
-:u64 random_seed
-The current request's "random" noise generator seed
-
-:u64 random_index
-The current request's "random" noise generator index position
-
-:bool flags.log_request
-Whether the request should be logged
-
-:Stats
-	u32 stats.bytes_written
-	f64 stats.time_init
-	f64 stats.time_start
-	f64 stats.time_end
-
-:unit_render(String file_name, [Request& context])
-Invokes another UCE file using the current or supplied request context
 
 :see
 >types
 
-:related
-**PHP:** `$_SERVER`, `$_GET`, `$_POST`, `$_COOKIE`, `$_SESSION`, `header()`, and `http_response_code()`
-**JavaScript / Node.js:** Express `req` and `res`, Fetch `Request`, `Headers`, cookies or session middleware, and per-connection state in WebSocket handlers
+:content
+`Request& context` is the request-local state object passed into UCE handlers. It carries incoming request data, response state, runtime metadata, and helper trees such as `context.cfg`, `context.var`, and `context.call`.
+
+## Core Fields
+
+- `ServerState* server`: current server state
+- `StringMap params`: FastCGI server parameters
+- `StringMap get`: current request GET variables
+- `StringMap post`: current request POST variables
+- `StringMap cookies`: cookies sent by the browser
+- `StringMap session`: current session data
+- `String session_id`: session cookie ID
+- `String session_name`: session cookie name
+- `DTree var`: user-defined request-local data
+- `DTree cfg`: request-local configuration tree
+- `DTree call`: invocation or message-local structured data
+- `DTree connection`: broker-owned WebSocket connection state that persists across `WS(Request& context)` calls for the same socket
+- `std::vector<UploadedFile> uploaded_files`: files uploaded in the current request
+- `StringMap header`: headers to send back to the browser
+- `StringList set_cookies`: cookies queued for the response
+- `u64 random_seed`: current request noise seed
+- `u64 random_index`: current request noise index position
+
+## Response Control
+
+`context.set_status(s32 code[, String reason])` sets the HTTP status line and updates `context.flags.status`. When `reason` is omitted, UCE uses a built-in standard reason phrase for common status codes.
+
+## Flags And Stats
+
+- `bool flags.log_request`: controls whether the request should be logged
+- `u32 stats.bytes_written`
+- `f64 stats.time_init`
+- `f64 stats.time_start`
+- `f64 stats.time_end`
+
+## Common Usage Notes
+
+- `context.cfg` is the usual place for structured configuration. Use `context.cfg.get_by_path("path/to/value")` for deep reads.
+- `context.call` carries invocation data for component calls, unit calls, and WebSocket messages.
+- `context.connection` is only meaningful for WebSocket traffic and persists for the lifetime of the connection.
+
+`unit_render(String file_name, [Request& context])` invokes another UCE file using the current or supplied request context.
+
+## Related Concepts
+
+- PHP: `$_SERVER`, `$_GET`, `$_POST`, `$_COOKIE`, `$_SESSION`, `header()`, and `http_response_code()`
+- JavaScript / Node.js: Express `req` and `res`, Fetch `Request`, `Headers`, cookies or session middleware, and per-connection state in WebSocket handlers

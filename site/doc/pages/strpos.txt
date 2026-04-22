@@ -7,16 +7,17 @@ needle : substring to search for
 offset : optional start offset; negative values count from the end of the string
 return value : zero-based position of the first match, or `-1` if `needle` is not found
 
-:desc
+:see
+>string
+
+:content
 Finds the first occurrence of `needle` inside `haystack`.
 
 This is the closest UCE equivalent to PHP `strpos()`, but it returns `-1` instead of `false` when no match is found.
 
 If `needle` is an empty string, `strpos()` returns the normalized start offset.
 
-:see
->string
+Related:
 
-:related
-**PHP:** `strpos()`
-**JavaScript / Node.js:** `String.prototype.indexOf()`
+- PHP: `strpos()`
+- JavaScript / Node.js: `String.prototype.indexOf()`

@@ -5,12 +5,15 @@ String mysql_error(MySQL* m)
 m : pointer to a MySQL connection struct
 return value : MySQL error message (if present, otherwise empty string)
 
-:desc
-Returns the last error message from a connection to a MySQL server.
-
 :see
 >mysql
 
-:related
-**PHP:** Modern PHP database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
-**JavaScript / Node.js:** Node database clients such as `mysql2`, query builders, or ORM adapters
+:content
+Returns the last error message associated with the given MySQL connection.
+
+If there is no current error, the result is an empty string.
+
+Related:
+
+- PHP: modern database access through `mysqli_*` or PDO methods rather than the old `mysql_*` family
+- JavaScript / Node.js: clients such as `mysql2`, query builders, or ORM adapters

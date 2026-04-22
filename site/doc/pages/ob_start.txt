@@ -4,12 +4,15 @@ void ob_start()
 :params
 (none)
 
-:desc
-Starts a new output buffer. All subsequent output will be directed into this buffer. Every call to ob_start() starts a new buffer and puts that buffer on the output buffer stack. ob_close() and ob_get_close() destroy buffers and remove them from the stack.
-
 :see
 >ob
 
-:related
-**PHP:** `ob_start()`, `ob_get_contents()`, `ob_get_clean()`, and related output-buffering APIs
-**JavaScript / Node.js:** String accumulation, buffer capture, or render-to-string patterns in server code
+:content
+Starts a new output buffer.
+
+All subsequent output is directed into that buffer until it is closed or collected. Every call to `ob_start()` pushes another buffer onto the output buffer stack. `ob_close()` and `ob_get_close()` destroy buffers and remove them from the stack.
+
+Related:
+
+- PHP: `ob_start()`, `ob_get_contents()`, `ob_get_clean()`, and related output-buffering APIs
+- JavaScript / Node.js: string accumulation, buffer capture, or render-to-string patterns in server code

@@ -6,21 +6,25 @@ void unit_render(String file_name, Request& context)
 file_name : UCE file to load and execute
 context : optional request context to pass into the target page
 
-:desc
+:see
+>ob
+
+:content
 Calls another UCE file and executes its `RENDER(Request& context)` function.
 
 If `context` is omitted, the current active request context is used.
 
-:Example
+Examples:
+
+```cpp
 // call a common page template
 unit_render("page-template.uce");
 
 // explicitly pass a request context
 unit_render("page-template.uce", context);
+```
 
-:see
->ob
+Related:
 
-:related
-**PHP:** Rendering another view or template with the current request state and captured output
-**JavaScript / Node.js:** Calling another template renderer or SSR partial with the current request context
+- PHP: rendering another view or template with the current request state and captured output
+- JavaScript / Node.js: calling another template renderer or SSR partial with the current request context

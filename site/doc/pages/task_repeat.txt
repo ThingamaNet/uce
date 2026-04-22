@@ -8,14 +8,17 @@ exec_func : function to execute repeatedly
 timeout : optional task timeout value
 return value : the process ID of the started (or still running) task
 
-:desc
-Starts a repeating background worker process. The function `exec_func` is executed in a loop and the worker sleeps for `interval` seconds between executions.
-
-If a process with the same `key` is already running, `task_repeat()` does not start a second worker and instead returns the PID of the existing one.
-
 :see
 >task
 
-:related
-**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
-**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs
+:content
+Starts a repeating background worker process.
+
+`exec_func` runs in a loop, and the worker sleeps for `interval` seconds between executions.
+
+If a process with the same `key` is already running, `task_repeat()` does not start a second worker and instead returns the PID of the existing one.
+
+Related:
+
+- PHP: background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+- JavaScript / Node.js: Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

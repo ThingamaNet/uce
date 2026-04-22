@@ -4,16 +4,17 @@ String ws_scope()
 :params
 return value : scope identifier of the current WebSocket endpoint
 
-:desc
+:see
+>websocket
+
+:content
 Returns the runtime's scope identifier for the current WebSocket endpoint.
 
 This is the same default scope used by `ws_send()`, `ws_connections()`, and `ws_connection_count()` when no explicit scope is supplied.
 
 In the current runtime implementation this scope is the page's internal endpoint identifier, typically the absolute `SCRIPT_FILENAME` of the `.ws.uce` file.
 
-:see
->websocket
+Related:
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

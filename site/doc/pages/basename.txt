@@ -5,12 +5,13 @@ String basename(String fn)
 fn : raw filename
 return value : the file's name
 
-:desc
-Isolates the file name component from a path/file name.
-
 :see
 >sys
 
-:related
-**PHP:** `basename()`
-**JavaScript / Node.js:** Node `path.basename()`
+:content
+Isolates the file name component from a path or file name.
+
+## Related Concepts
+
+- PHP: `basename()`
+- JavaScript / Node.js: Node `path.basename()`

@@ -6,12 +6,15 @@ s : data to be hashed
 as_binary : when set to false, returns hash in hexadecimal notation (defaults to false)
 return value : the resulting hash value
 
-:desc
-Returns the sha1 hash of 's'.
-
 :see
 >noise
 
-:related
-**PHP:** `sha1()`
-**JavaScript / Node.js:** Node `crypto.createHash("sha1")` or browser `SubtleCrypto` wrappers
+:content
+Returns the SHA-1 hash of `s`.
+
+When `as_binary` is `false`, the hash is returned as hexadecimal text. When it is `true`, the raw binary hash bytes are returned.
+
+## Related Concepts
+
+- PHP: `sha1()`
+- JavaScript / Node.js: Node `crypto.createHash("sha1")` or browser `SubtleCrypto` wrappers

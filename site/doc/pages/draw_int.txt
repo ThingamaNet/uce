@@ -6,12 +6,15 @@ from : minimum value
 to : maximum value
 return value : a noise value between 'from' and 'to'
 
-:desc
-This function works exactly like generate_int(), but context.random_index is used for the 'index' value and context.random_seed is used for the seed. After this function has been called, the context.random_index is increased by one. At the start of every request, context.random_seed is automatically populated with a new seed value.
-
 :see
 >noise
 
-:related
-**PHP:** `random_int()`, `mt_rand()`, and custom numeric random helpers
-**JavaScript / Node.js:** `Math.random()` or `crypto.getRandomValues()`-based helpers for numeric ranges
+:content
+Works like `generate_int()`, but uses `context.random_index` for the index value and `context.random_seed` for the seed.
+
+After each call, `context.random_index` is increased by one. At the start of every request, `context.random_seed` is automatically populated with a new seed value.
+
+## Related Concepts
+
+- PHP: `random_int()`, `mt_rand()`, and custom numeric random helpers
+- JavaScript / Node.js: `Math.random()` or `crypto.getRandomValues()`-based helpers for numeric ranges

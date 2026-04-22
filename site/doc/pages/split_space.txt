@@ -5,12 +5,15 @@ StringList split_space(String str)
 str : string to be split
 return value : a list of strings
 
-:desc
-Splits 'str' into multiple strings along any whitespace characters (multiple whitespace characters count as one).
-
 :see
 >string
 
-:related
-**PHP:** Whitespace splitting via `preg_split(/\s+/, ...)`
-**JavaScript / Node.js:** Whitespace splitting via regex with `split(/\\s+/)`
+:content
+Splits `str` on runs of whitespace.
+
+Multiple adjacent whitespace characters are treated as a single separator, so repeated spaces, tabs, or line breaks do not create empty entries.
+
+Related:
+
+- PHP: whitespace splitting via `preg_split(/\s+/, ...)`
+- JavaScript / Node.js: regex-based splitting with `split(/\\s+/)`

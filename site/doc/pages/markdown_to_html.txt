@@ -7,7 +7,14 @@ src : markdown source text
 options : optional markdown options tree
 return value : rendered HTML string
 
-:desc
+:see
+markdown_to_ast
+component
+component_render
+json_decode
+String
+
+:content
 Renders Markdown source into HTML and returns the generated markup as a `String`.
 
 `markdown_to_html()` does not write to the output stream directly. This keeps it aligned with the UCE naming convention where `render_*` names are reserved for direct-output helpers.
@@ -16,14 +23,18 @@ Because the return value is HTML markup, embed it with `<?: markdown_to_html(...
 
 By default the function aims at a practical GitHub-flavored Markdown target, including tables, task lists, fenced code blocks, autolinks, and strikethrough.
 
-:Example
-`DTree options;`
-`options["components"][":::warning"] = "components/markdown/warning";`
-`options["components"]["node.code_block"] = "components/markdown/code_block";`
-`String html = markdown_to_html(file_get_contents("guide.md"), options);`
-`print(html);`
+Example:
 
-:SupportedSyntax
+```uce
+DTree options;
+options["components"][":::warning"] = "components/markdown/warning";
+options["components"]["node.code_block"] = "components/markdown/code_block";
+String html = markdown_to_html(file_get_contents("guide.md"), options);
+print(html);
+```
+
+Supported syntax:
+
 - headings with `#` or setext underlines
 - paragraphs
 - ordered and unordered lists
@@ -32,73 +43,69 @@ By default the function aims at a practical GitHub-flavored Markdown target, inc
 - fenced code blocks
 - horizontal rules
 - tables
-- inline emphasis, strong, strikethrough, code spans
+- inline emphasis, strong, strikethrough, and code spans
 - links, images, and bare `http://` / `https://` URLs
 - `:::name ... :::` directive blocks
 
-:Options
-`options["gfm"]`
-Defaults to true.
-Turns on GitHub-style extras such as tables, task lists, autolinks, and strikethrough.
+Options:
 
-`options["allow_html"]`
-Defaults to false.
-When true, raw HTML blocks and inline tags may pass through as `raw_html` nodes instead of being escaped as plain text.
+- `options["gfm"]` defaults to `true` and turns on GitHub-style extras such as tables, task lists, autolinks, and strikethrough.
+- `options["allow_html"]` defaults to `false`. When true, raw HTML blocks and inline tags may pass through as `raw_html` nodes instead of being escaped as plain text.
+- `options["components"]` declares renderer extension points using normal UCE components.
 
-`options["components"]`
-Declares renderer extension points using normal UCE components.
+Directive hook example:
 
-Exact directive hooks:
-`options["components"][":::warning"] = "components/markdown/warning"`
-This hook is selected for `:::warning ... :::` blocks.
+```uce
+options["components"][":::warning"] = "components/markdown/warning";
+```
 
-Generic node hooks:
-`options["components"]["node.code_block"] = "components/markdown/code_block"`
-`options["components"]["node.table"] = "components/markdown/table"`
-`options["components"]["node.link"] = "components/markdown/link"`
-`options["components"]["node.directive"] = "components/markdown/directive"`
+Generic node hook examples:
+
+```uce
+options["components"]["node.code_block"] = "components/markdown/code_block";
+options["components"]["node.table"] = "components/markdown/table";
+options["components"]["node.link"] = "components/markdown/link";
+options["components"]["node.directive"] = "components/markdown/directive";
+```
 
 If both an exact directive hook and a generic `node.directive` hook exist, the exact directive hook wins.
 
-:ComponentProps
 When a markdown hook component is called, its props arrive in `context.call`.
 
 Useful fields include:
-`context.call["hook"]` : matched hook key such as `:::warning` or `node.code_block`
-`context.call["target"]` : resolved component target name
-`context.call["default_html"]` : renderer output without the hook
-`context.call["children_html"]` : already-rendered child HTML
-`context.call["node"]` : full AST node
-`context.call["type"]` : node type
-`context.call["name"]` : directive name when applicable
-`context.call["argument"]` : directive remainder after the name
-`context.call["text"]` : source text for nodes such as `code_block`
-`context.call["lang"]` : fenced code language
-`context.call["href"]` / `context.call["src"]` / `context.call["title"]`
-`context.call["options"]` : full markdown options tree
 
-This lets a component either replace the HTML completely or wrap `default_html` / `children_html`.
+- `context.call["hook"]` for the matched hook key such as `:::warning` or `node.code_block`
+- `context.call["target"]` for the resolved component target name
+- `context.call["default_html"]` for the renderer output without the hook
+- `context.call["children_html"]` for already-rendered child HTML
+- `context.call["node"]` for the full AST node
+- `context.call["type"]` for the node type
+- `context.call["name"]` for the directive name when applicable
+- `context.call["argument"]` for directive remainder after the name
+- `context.call["text"]` for source text used by nodes such as `code_block`
+- `context.call["lang"]` for fenced code language
+- `context.call["href"]`, `context.call["src"]`, and `context.call["title"]`
+- `context.call["options"]` for the full markdown options tree
 
-:DirectiveSchema
 Directive blocks use this form:
-`:::warning title="Heads up"`
-`Body markdown here`
-`:::`
+
+```md
+:::warning title="Heads up"
+Body markdown here
+:::
+```
 
 The parser stores:
-`node["name"] = "warning"`
-`node["argument"] = ...` for bare trailing text
-`node["attrs"] = ...` for parsed `key=value` pairs such as `title="Heads up"`
 
-This makes directive components a good fit for alerts, callouts, cards, embeds, and any richer page-level markdown extension.
+```text
+node["name"] = "warning"
+node["argument"] = ...
+node["attrs"] = ...
+```
 
-:see
-markdown_to_ast
-component
-component_render
-json_decode
-String
+That makes directive components a good fit for alerts, callouts, cards, embeds, and richer page-level Markdown extensions.
 
-:related
-**PHP:** Parsedown, League CommonMark, or similar Markdown-to-HTML renderers
-**JavaScript / Node.js:** `marked`, `markdown-it`, `remark-html`, or other Markdown renderers
+Related:
+
+- PHP: Parsedown, League CommonMark, or similar Markdown-to-HTML renderers
+- JavaScript / Node.js: `marked`, `markdown-it`, `remark-html`, or other Markdown renderers

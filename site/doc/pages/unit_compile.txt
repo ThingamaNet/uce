@@ -5,15 +5,16 @@ bool unit_compile(String path = "")
 path : optional UCE unit path. If empty, recompiles the current executing unit.
 return value : `true` when the unit was compiled and loaded successfully
 
-:desc
-Triggers a manual recompile of a UCE compilation unit.
-
-If `path` is relative, it is resolved relative to the current executing unit. Successful manual compiles also refresh the in-memory metadata for that unit.
-
 :see
 unit_info
 units_list
 
-:related
-**PHP:** Template compilation or preloading steps that generate cached PHP artifacts
-**JavaScript / Node.js:** Build-step compilation, bundling, or ahead-of-time template transforms
+:content
+Triggers a manual recompile of a UCE compilation unit.
+
+If `path` is relative, it is resolved relative to the current executing unit. Successful manual compiles also refresh the in-memory metadata for that unit.
+
+Related:
+
+- PHP: template compilation or preloading steps that generate cached PHP artifacts
+- JavaScript / Node.js: build-step compilation, bundling, or ahead-of-time template transforms

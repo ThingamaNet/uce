@@ -7,11 +7,19 @@ src : markdown source text
 options : optional markdown options tree
 return value : a `DTree` document AST
 
-:desc
+:see
+markdown_to_html
+component
+component_render
+json_encode
+DTree
+
+:content
 Parses Markdown source into a structured `DTree` document tree.
 
 The parser targets a practical GitHub-flavored subset by default:
-- ATX headings (`#`)
+
+- ATX headings with `#`
 - setext headings
 - paragraphs
 - blockquotes
@@ -20,62 +28,57 @@ The parser targets a practical GitHub-flavored subset by default:
 - fenced code blocks
 - tables
 - horizontal rules
-- emphasis / strong / strikethrough
+- emphasis, strong, and strikethrough
 - links, images, autolinks, and code spans
 - `:::` directive blocks for component-based extensions
 
 The returned AST uses `type` plus node-specific fields such as `level`, `text`, `lang`, `href`, `src`, `name`, `argument`, `attrs`, and `children`.
 
 Top-level documents use:
-`type = "document"`
-`children = [...]`
+
+```text
+type = "document"
+children = [...]
+```
 
 Common block nodes:
-`heading`
-`paragraph`
-`blockquote`
-`list`
-`list_item`
-`code_block`
-`table`
-`directive`
-`hr`
+
+- `heading`
+- `paragraph`
+- `blockquote`
+- `list`
+- `list_item`
+- `code_block`
+- `table`
+- `directive`
+- `hr`
 
 Common inline nodes:
-`text`
-`code`
-`strong`
-`em`
-`strike`
-`link`
-`image`
-`raw_html`
 
-:Example
-`DTree options = json_decode("{\"components\":{\":::warning\":\"components/markdown/warning\"}}");`
-`DTree ast = markdown_to_ast(file_get_contents("README.md"), options);`
-`print(json_encode(ast));`
+- `text`
+- `code`
+- `strong`
+- `em`
+- `strike`
+- `link`
+- `image`
+- `raw_html`
 
-:Options
-`options["gfm"]`
-Enables GitHub-style extras such as tables, task lists, strikethrough, and bare-URL autolinks.
-Defaults to true.
+Example:
 
-`options["allow_html"]`
-Allows raw HTML passthrough nodes to be captured and rendered.
-Defaults to false.
+```uce
+DTree options = json_decode("{\"components\":{\":::warning\":\"components/markdown/warning\"}}");
+DTree ast = markdown_to_ast(file_get_contents("README.md"), options);
+print(json_encode(ast));
+```
 
-`options["components"]`
-Component hook map used later by `markdown_to_html()`.
-The parser preserves directive data needed by those hooks.
+Options:
 
-:see
-markdown_to_html
-component
-component_render
-json_encode
-DTree
+- `options["gfm"]` enables GitHub-style extras such as tables, task lists, strikethrough, and bare-URL autolinks. Defaults to `true`.
+- `options["allow_html"]` allows raw HTML passthrough nodes to be captured and rendered. Defaults to `false`.
+- `options["components"]` provides the component hook map later used by `markdown_to_html()`. The parser preserves directive data needed by those hooks.
 
-:related
-**PHP:** CommonMark or Parsedown parsing pipelines that expose a syntax tree or token stream
-**JavaScript / Node.js:** `remark`, `micromark`, or `markdown-it` token streams and AST-like structures
+Related:
+
+- PHP: CommonMark or Parsedown parsing pipelines that expose a syntax tree or token stream
+- JavaScript / Node.js: `remark`, `micromark`, or `markdown-it` token streams and AST-like structures

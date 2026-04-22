@@ -5,12 +5,13 @@ String encode_query(StringMap map)
 q : StringMap containing URL parameters to be encoded
 return value : a string with the encoded parameters
 
-:desc
-Encodes a StringMap containing URL parameters into a single String.
-
 :see
 >uri
 
-:related
-**PHP:** `http_build_query()`
-**JavaScript / Node.js:** `URLSearchParams` and `toString()`
+:content
+Encodes a `StringMap` of URL parameters into a single query-string `String`.
+
+## Related Concepts
+
+- PHP: `http_build_query()`
+- JavaScript / Node.js: `URLSearchParams` and `toString()`

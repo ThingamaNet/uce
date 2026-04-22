@@ -5,7 +5,12 @@ DTree unit_info(String path = "")
 path : optional UCE unit path. If empty, uses the current executing unit.
 return value : metadata tree for the resolved unit, or an empty tree if the unit cannot be resolved
 
-:desc
+:see
+units_list
+unit_compile
+0_context
+
+:content
 Returns runtime metadata for a UCE compilation unit.
 
 The returned tree includes:
@@ -22,11 +27,7 @@ If `path` is relative, it is resolved relative to the current executing unit.
 
 Because unit metadata lives in process memory alongside `SharedUnit`, request and timing counters reflect the current runtime process, not an aggregate across every worker process.
 
-:see
-units_list
-unit_compile
-0_context
+Related:
 
-:related
-**PHP:** Reflection-style metadata about included modules, callables, or exported capabilities
-**JavaScript / Node.js:** Module metadata, reflection-like inspection, or manifest-based capability lookup
+- PHP: reflection-style metadata about included modules, callables, or exported capabilities
+- JavaScript / Node.js: module metadata, reflection-like inspection, or manifest-based capability lookup

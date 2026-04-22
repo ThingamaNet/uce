@@ -5,12 +5,13 @@ String uri_encode(String s)
 s : string that should be encoded
 return value : an URI-encoded version of 's'
 
-:desc
-URI-encodes a string.
-
 :see
 >uri
 
-:related
-**PHP:** `urlencode()` or `rawurlencode()`
-**JavaScript / Node.js:** `encodeURIComponent()`
+:content
+URI-encodes a string.
+
+Related:
+
+- PHP: `urlencode()` or `rawurlencode()`
+- JavaScript / Node.js: `encodeURIComponent()`

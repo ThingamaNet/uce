@@ -5,12 +5,15 @@ String shell_exec(String cmd)
 cmd : string that contains the shell command line to be executed
 return value : output of the command execution
 
-:desc
-Executes a Linux shell command and returns the generated output
-
 :see
 >sys
 
-:related
-**PHP:** `shell_exec()`, `exec()`, or `proc_open()`
-**JavaScript / Node.js:** Node `child_process.exec()` or `spawn()`
+:content
+Executes a Linux shell command and returns the generated output.
+
+When command text includes user-controlled input, escape that input first with `shell_escape()`.
+
+Related:
+
+- PHP: `shell_exec()`, `exec()`, or `proc_open()`
+- JavaScript / Node.js: Node `child_process.exec()` or `spawn()`

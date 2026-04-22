@@ -5,12 +5,15 @@ pid_t task_pid(String key)
 key : string uniquely identifying the task
 return value : the process ID of the task
 
-:desc
-Checks whether a process with the given 'key' is running and returns its PID if it is. Returns 0 otherwise.
-
 :see
 >task
 
-:related
-**PHP:** Background-process patterns using `proc_open()`, queues, cron, or worker supervisors
-**JavaScript / Node.js:** Node `child_process`, worker queues, timers, schedulers, and supervised background jobs
+:content
+Checks whether a process with the given `key` is running and returns its PID if it is.
+
+Returns `0` when no matching task is active.
+
+Related:
+
+- PHP: background-process patterns using `proc_open()`, queues, cron, or worker supervisors
+- JavaScript / Node.js: Node `child_process`, worker queues, timers, schedulers, and supervised background jobs

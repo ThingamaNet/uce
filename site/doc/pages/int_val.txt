@@ -6,10 +6,12 @@ s : string to be converted
 base : number system base (default 10)
 return value : a u64 containing the number (0 if no number could be identified).
 
-:desc
-Extracts an integer from a String.
+:content
+Extracts an integer value from `s`.
 
+The `base` argument controls which number system is used while parsing. If no usable number can be identified, the function returns `0`.
 
-:related
-**PHP:** `intval()`
-**JavaScript / Node.js:** `Number()` or `parseInt()`
+Related:
+
+- PHP: `intval()`
+- JavaScript / Node.js: `Number()` or `parseInt()`

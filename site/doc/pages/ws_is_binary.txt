@@ -4,14 +4,15 @@ bool ws_is_binary()
 :params
 return value : true if the current WebSocket message is binary
 
-:desc
+:see
+>websocket
+
+:content
 Returns whether the message currently being handled by `WS(Request& context)` arrived as a binary frame.
 
 If this returns `false`, the current message was delivered as a text frame.
 
-:see
->websocket
+Related:
 
-:related
-**PHP:** WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
-**JavaScript / Node.js:** Browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods
+- PHP: WebSocket connection metadata and send APIs in Ratchet, Workerman, or similar server frameworks
+- JavaScript / Node.js: browser `WebSocket` properties and Node `ws` server-side connection inspection and send methods

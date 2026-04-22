@@ -1,14 +1,19 @@
 :sig
 String component(String name, [DTree props], [Request& context])
 
-:desc
+:see
+>ob
+
+:content
 Renders another `.uce` file as a component and returns the captured output as a `String`.
 
-`component()` resolves the target file relative to the current page and also tries the `components/` prefix automatically, mirroring the shorthand used by the web app starter example project.
+`component()` resolves the target file relative to the current page and also tries the `components/` prefix automatically, mirroring the shorthand used by the starter example project.
 
 Component props are passed in `context.call`.
 
 Because `<?= ... ?>` HTML-escapes its value, embed component markup with `<?: component(...) ?>`, `print(component(...))`, or use `component_render(...)` for direct output.
+
+## Named Components
 
 When `name` contains a colon, such as `components/card:BODY`, the part after the colon selects a named component handler exported from the component file through `COMPONENT:BODY(Request& context)`.
 
@@ -16,19 +21,22 @@ The default handler is `COMPONENT(Request& context)`.
 
 When `name` starts with a colon, such as `:BODY`, the target resolves against the current `.uce` file so component files can call their own named handlers without repeating the file name.
 
-Resolution order is:
-exact file name
-exact file name with `.uce`
-the same two forms under `components/`
+## Resolution Order
 
-Example:
-`DTree props;`
-`props["title"] = "Status";`
-`&lt;&gt;&lt;?: component("workspace/panel", props, context) ?&gt;&lt;/&gt;`
+- exact file name
+- exact file name with `.uce`
+- the same two forms under `components/`
 
-:see
->ob
+## Example
 
-:related
-**PHP:** Reusable template partials or helper-rendered view fragments returned as strings
-**JavaScript / Node.js:** Component render helpers, especially patterns that return markup as a string
+```cpp
+DTree props;
+props["title"] = "Status";
+
+<><?: component("workspace/panel", props, context) ?></>
+```
+
+## Related Concepts
+
+- PHP: reusable template partials or helper-rendered view fragments returned as strings
+- JavaScript / Node.js: component render helpers, especially patterns that return markup as a string

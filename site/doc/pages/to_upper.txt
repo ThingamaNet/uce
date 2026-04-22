@@ -5,14 +5,15 @@ String to_upper(String s)
 s : the string to be converted
 return value : returns a version of 's' where all lower case characters have been changed into upper case
 
-:desc
-Returns a upper case version of the input string 's'.
-
-Note: this function is not yet Unicode-aware.
-
 :see
 >string
 
-:related
-**PHP:** `strtoupper()`
-**JavaScript / Node.js:** `String.prototype.toUpperCase()`
+:content
+Returns an upper-case version of `s`.
+
+This function is not yet Unicode-aware.
+
+Related:
+
+- PHP: `strtoupper()`
+- JavaScript / Node.js: `String.prototype.toUpperCase()`

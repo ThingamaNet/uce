@@ -6,12 +6,15 @@ host : host name
 port : port number
 return value : the socket handle
 
-:desc
-Opens a socket connection to the given 'host' and 'port'.
-
 :see
 >socket
 
-:related
-**PHP:** PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
-**JavaScript / Node.js:** Node `net.Socket` connect, read, write, and close operations
+:content
+Opens a socket connection to the given `host` and `port`.
+
+The returned socket handle is then used with `socket_read()`, `socket_write()`, and `socket_close()`.
+
+Related:
+
+- PHP: PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
+- JavaScript / Node.js: Node `net.Socket` connect, read, write, and close operations

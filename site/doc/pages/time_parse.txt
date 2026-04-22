@@ -5,12 +5,13 @@ u64 time_parse(String time_string)
 time_string : a string containing a date and/or time in text form
 return value : the interpreted 'time_string' as a Unix timestamp
 
-:desc
-Attempts to parse the given 'time_string' into a Unix timestamp.
-
 :see
 >time
 
-:related
-**PHP:** `strtotime()` or `DateTimeImmutable` parsing
-**JavaScript / Node.js:** `Date.parse()` or date-library parsing helpers
+:content
+Attempts to parse `time_string` into a Unix timestamp.
+
+Related:
+
+- PHP: `strtotime()` or `DateTimeImmutable` parsing
+- JavaScript / Node.js: `Date.parse()` or date-library parsing helpers

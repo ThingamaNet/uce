@@ -5,14 +5,15 @@ String to_lower(String s)
 s : the string to be converted
 return value : returns a version of 's' where all upper case characters have been changed into lower case
 
-:desc
-Returns a lower case version of the input string 's'.
-
-Note: this function is not yet Unicode-aware.
-
 :see
 >string
 
-:related
-**PHP:** `strtolower()`
-**JavaScript / Node.js:** `String.prototype.toLowerCase()`
+:content
+Returns a lower-case version of `s`.
+
+This function is not yet Unicode-aware.
+
+Related:
+
+- PHP: `strtolower()`
+- JavaScript / Node.js: `String.prototype.toLowerCase()`

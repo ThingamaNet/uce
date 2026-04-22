@@ -7,13 +7,14 @@ s : string to encode as a JSON string literal
 t : DTree object to be serialized
 return value : string containing the JSON result
 
-:desc
+:content
 Serializes either a `String` or a `DTree` into JSON notation.
 
 When passed a `String`, `json_encode()` returns a quoted and escaped JSON string literal.
 
 When passed a `DTree`, scalar values are serialized directly and nested map values are emitted as JSON objects.
 
-:related
-**PHP:** `json_encode()`
-**JavaScript / Node.js:** `JSON.stringify()`
+Related:
+
+- PHP: `json_encode()`
+- JavaScript / Node.js: `JSON.stringify()`

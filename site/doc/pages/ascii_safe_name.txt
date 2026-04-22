@@ -5,14 +5,15 @@ String ascii_safe_name(String raw)
 raw : input string to normalize
 return value : ASCII-safe identifier made from letters, digits, and underscores
 
-:desc
-Builds a conservative identifier by keeping ASCII letters, digits, and underscores and dropping other characters.
-
-This is useful when turning user- or config-provided names into handler suffixes, DOM-safe variable stems, or CSS/JS hook names.
-
 :see
 >string
 
-:related
-**PHP:** Slug or safe-filename helpers built with `preg_replace()` and transliteration utilities
-**JavaScript / Node.js:** Regex-based slugify or safe-name helpers used for URLs and filenames
+:content
+Builds a conservative identifier by keeping ASCII letters, digits, and underscores and dropping other characters.
+
+This is useful when turning user- or config-provided names into handler suffixes, DOM-safe variable stems, or CSS and JS hook names.
+
+## Related Concepts
+
+- PHP: slug or safe-filename helpers built with `preg_replace()` and transliteration utilities
+- JavaScript / Node.js: regex-based slugify or safe-name helpers used for URLs and filenames

@@ -6,12 +6,15 @@ sockfd : socket handle
 data : a string containing the data to be written to the socket
 return value : true if the write operation was successful
 
-:desc
-Writes a string of 'data' to the given socket.
-
 :see
 >socket
 
-:related
-**PHP:** PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
-**JavaScript / Node.js:** Node `net.Socket` connect, read, write, and close operations
+:content
+Writes `data` to the given socket.
+
+The function returns `true` when the write succeeds.
+
+Related:
+
+- PHP: PHP sockets and stream APIs like `socket_connect()`, `fread()`, `fwrite()`, and stream clients
+- JavaScript / Node.js: Node `net.Socket` connect, read, write, and close operations

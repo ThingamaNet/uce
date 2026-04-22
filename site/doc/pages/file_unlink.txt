@@ -4,12 +4,13 @@ void file_unlink(String file_name)
 :params
 file_name : name of the file
 
-:desc
-Deletes the file identified by `file_name`.
-
 :see
 >sys
 
-:related
-**PHP:** `unlink()`
-**JavaScript / Node.js:** Node `fs.unlinkSync()` or `fs.promises.unlink()`
+:content
+Deletes the file identified by `file_name`.
+
+## Related Concepts
+
+- PHP: `unlink()`
+- JavaScript / Node.js: Node `fs.unlinkSync()` or `fs.promises.unlink()`

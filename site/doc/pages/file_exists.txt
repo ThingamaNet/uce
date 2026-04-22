@@ -5,12 +5,13 @@ bool file_exists(String path)
 path : the path name to be checked
 return value : true if the file exists
 
-:desc
-Checks whether the file or path specified by 'path' exists.
-
 :see
 >sys
 
-:related
-**PHP:** `file_exists()` or `is_file()`
-**JavaScript / Node.js:** Node `fs.existsSync()` or `fs.stat()`
+:content
+Checks whether the file or path specified by `path` exists.
+
+## Related Concepts
+
+- PHP: `file_exists()` or `is_file()`
+- JavaScript / Node.js: Node `fs.existsSync()` or `fs.stat()`

@@ -5,12 +5,15 @@ bool mkdir(String path)
 path : the path name to be created
 return value : returns true if the directory was successfully created
 
-:desc
-Creates a directory stated by 'path'
-
 :see
 >sys
 
-:related
-**PHP:** `mkdir()`
-**JavaScript / Node.js:** Node `fs.mkdirSync()` or `fs.promises.mkdir()`
+:content
+Creates the directory named by `path`.
+
+The function returns `true` when the directory was created successfully.
+
+Related:
+
+- PHP: `mkdir()`
+- JavaScript / Node.js: Node `fs.mkdirSync()` or `fs.promises.mkdir()`

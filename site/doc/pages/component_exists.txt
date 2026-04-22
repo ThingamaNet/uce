@@ -1,7 +1,10 @@
 :sig
 bool component_exists(String name)
 
-:desc
+:see
+>ob
+
+:content
 Checks whether a component file can be resolved from the current page context.
 
 Resolution tries the exact name first and then the `components/` shorthand form.
@@ -10,9 +13,7 @@ If `name` contains a colon, only the file portion is used for existence checks.
 
 This is useful when a page wants to render an optional component if it is present without hard-failing when it is missing.
 
-:see
->ob
+## Related Concepts
 
-:related
-**PHP:** `function_exists()`, `class_exists()`, or file-existence checks before including a partial
-**JavaScript / Node.js:** Module existence checks, dynamic import guards, or registry lookups for named components
+- PHP: `function_exists()`, `class_exists()`, or file-existence checks before including a partial
+- JavaScript / Node.js: module existence checks, dynamic import guards, or registry lookups for named components

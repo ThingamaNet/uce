@@ -4,12 +4,15 @@ void ob_close()
 :params
 (none)
 
-:desc
-Discard the current output buffer. If are more output buffers on the stack, switch to the next one.
-
 :see
 >ob
 
-:related
-**PHP:** `ob_start()`, `ob_get_contents()`, `ob_get_clean()`, and related output-buffering APIs
-**JavaScript / Node.js:** String accumulation, buffer capture, or render-to-string patterns in server code
+:content
+Discards the current output buffer.
+
+If more output buffers remain on the stack, UCE switches to the next one.
+
+Related:
+
+- PHP: `ob_start()`, `ob_get_contents()`, `ob_get_clean()`, and related output-buffering APIs
+- JavaScript / Node.js: string accumulation, buffer capture, or render-to-string patterns in server code

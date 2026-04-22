@@ -5,12 +5,15 @@ String shell_escape(String raw)
 raw : string that should be escaped
 return value : escaped version of 'raw'
 
-:desc
-Escapes a parameter for shell_exec
-
 :see
 >sys
 
-:related
-**PHP:** `escapeshellarg()` and `escapeshellcmd()`
-**JavaScript / Node.js:** There is no direct built-in equivalent; prefer `spawn()` argument arrays and avoid shell interpolation
+:content
+Escapes a parameter so it can be used more safely with `shell_exec()`.
+
+This is the helper to reach for when building shell command lines from dynamic input.
+
+Related:
+
+- PHP: `escapeshellarg()` and `escapeshellcmd()`
+- JavaScript / Node.js: there is no direct built-in equivalent; prefer `spawn()` argument arrays and avoid shell interpolation

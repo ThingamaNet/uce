@@ -6,12 +6,15 @@ connection : connection handle
 keys : a list of strings containing the keys to be retrieved
 return value : a StringMap with the retrieved entries
 
-:desc
-Retrieves a bunch of entries all at once.
-
 :see
 >memcache
 
-:related
-**PHP:** The `Memcache` or `Memcached` extension methods such as `get()`, `set()`, `delete()`, and `getMulti()`
-**JavaScript / Node.js:** Node clients like `memjs`, `memcached`, or similar Memcached packages
+:content
+Retrieves multiple entries in one call.
+
+The result is returned as a `StringMap` keyed by the requested Memcache keys.
+
+Related:
+
+- PHP: `Memcache` or `Memcached` methods such as `get()`, `set()`, `delete()`, and `getMulti()`
+- JavaScript / Node.js: clients such as `memjs`, `memcached`, or similar Memcached packages
