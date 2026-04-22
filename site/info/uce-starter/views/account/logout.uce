@@ -1,0 +1,8 @@
+#load "../../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	StarterUser(context).logout();
+	starter_redirect("account/login", context);
+}

@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -9,6 +8,12 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include "sys.h"
+
+namespace {
+
+constexpr f64 FILE_LOCK_WAIT_TIMEOUT_SECONDS = 3.0;
+
+}
 
 String capture_backtrace_string(u32 max_frames, u32 skip_frames)
 {
@@ -188,12 +193,15 @@ bool file_exists(String path)
 	return(std::filesystem::exists(fp));
 }
 
-int file_open_locked(String file_name, int open_flags, int lock_type, int create_mode)
+int file_open_locked(String file_name, int open_flags, int lock_type, int create_mode, f64 wait_timeout_seconds, String purpose)
 {
+	(void)wait_timeout_seconds;
+	(void)purpose;
 	int fd = open(file_name.c_str(), open_flags, create_mode);
 	if(fd == -1)
 		return(-1);
-	if(flock(fd, lock_type) == -1)
+	fcntl(fd, F_SETFD, FD_CLOEXEC);
+	if(flock(fd, lock_type) != 0)
 	{
 		close(fd);
 		return(-1);
@@ -207,6 +215,11 @@ void file_close_locked(int fd)
 		return;
 	flock(fd, LOCK_UN);
 	close(fd);
+}
+
+void file_release_process_locks(String reason)
+{
+	(void)reason;
 }
 
 String file_get_contents_locked_fd(int fd)
@@ -254,7 +267,7 @@ bool file_put_contents_locked_fd(int fd, String content)
 
 String file_get_contents(String file_name)
 {
-	s32 fd = file_open_locked(file_name, O_RDONLY, LOCK_SH);
+	s32 fd = file_open_locked(file_name, O_RDONLY, LOCK_SH, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "file_get_contents:" + file_name);
 	if(fd == -1)
 	{
 		printf("(!) Could not read %s\n", file_name.c_str());
@@ -267,7 +280,7 @@ String file_get_contents(String file_name)
 
 bool file_put_contents(String file_name, String content)
 {
-	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "file_put_contents:" + file_name);
 	if(fd == -1)
 	{
 		printf("(!) Could not write %s\n", file_name.c_str());
@@ -285,7 +298,7 @@ bool file_put_contents(String file_name, String content)
 
 bool file_append_contents(String file_name, String content)
 {
-	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "file_append:" + file_name);
 	if(fd == -1)
 	{
 		printf("(!) Could not append %s\n", file_name.c_str());
@@ -583,6 +596,7 @@ pid_t spawn_subprocess(std::function<void()> exec_after_spawn)
 	p = fork();
 	if(p == 0)
 	{
+		file_release_process_locks("fork child startup");
 		my_pid = getpid();
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
@@ -629,7 +643,9 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 {
 	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
 	String lock_file_name = status_file_name + ".lock";
-	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task:" + key);
+	if(lock_fd == -1)
+		return(0);
 	String status_file = file_get_contents(status_file_name);
 	pid_t p;
 	if(status_file != "")
@@ -647,6 +663,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 	p = fork();
 	if(p == 0)
 	{
+		file_release_process_locks("task child startup");
 		file_close_locked(lock_fd);
 		my_pid = getpid();
 
@@ -655,7 +672,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		//prctl(PR_SET_PDEATHSIG, SIGHUP);
 		exec_after_spawn();
-		int exit_lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+		int exit_lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task-exit:" + key);
 		file_unlink(status_file_name);
 		file_close_locked(exit_lock_fd);
 		printf("(P) worker process '%s' terminated: PID %i\n", key.c_str(), my_pid);

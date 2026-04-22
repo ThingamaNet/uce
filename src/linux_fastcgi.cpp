@@ -1,5 +1,9 @@
 #include "lib/uce_lib.cpp"
 #include <csetjmp>
+#include <deque>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/socket.h>
 
 ServerState server_state;
 
@@ -8,12 +12,20 @@ ServerState server_state;
 FastCGIServer server;
 pid_t http_worker_pid = 0;
 pid_t proactive_compiler_pid = 0;
+pid_t websocket_exec_pid = 0;
 bool worker_accepts_http = false;
 static sigjmp_buf request_fault_jmp;
 static volatile sig_atomic_t request_fault_active = 0;
 static volatile sig_atomic_t request_fault_signal = 0;
 static Request* request_fault_request = 0;
 static String request_fault_trace = "";
+static int websocket_exec_fd = -1;
+static String websocket_exec_read_buffer = "";
+static std::deque<DTree> websocket_exec_pending_jobs;
+static DTree websocket_exec_inflight_job;
+static String websocket_exec_write_buffer = "";
+
+void close_inherited_server_sockets();
 
 Request* set_active_request(Request& request)
 {
@@ -119,6 +131,545 @@ void restore_request_fault_handlers()
 	signal(SIGFPE, on_segfault);
 }
 
+namespace {
+
+const char* websocket_ipc_base64_alphabet =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+String websocket_ipc_base64_encode(String raw)
+{
+	String result;
+	size_t i = 0;
+	while(i < raw.length())
+	{
+		unsigned char input[3] = {0, 0, 0};
+		size_t chunk = 0;
+		for(; chunk < 3 && i < raw.length(); ++chunk, ++i)
+			input[chunk] = (unsigned char)raw[i];
+
+		result += websocket_ipc_base64_alphabet[input[0] >> 2];
+		result += websocket_ipc_base64_alphabet[((input[0] & 0x03) << 4) | (input[1] >> 4)];
+		result += (chunk > 1 ? websocket_ipc_base64_alphabet[((input[1] & 0x0F) << 2) | (input[2] >> 6)] : '=');
+		result += (chunk > 2 ? websocket_ipc_base64_alphabet[input[2] & 0x3F] : '=');
+	}
+	return(result);
+}
+
+int websocket_ipc_base64_value(char c)
+{
+	if(c >= 'A' && c <= 'Z')
+		return(c - 'A');
+	if(c >= 'a' && c <= 'z')
+		return(c - 'a' + 26);
+	if(c >= '0' && c <= '9')
+		return(c - '0' + 52);
+	if(c == '+')
+		return(62);
+	if(c == '/')
+		return(63);
+	return(-1);
+}
+
+String websocket_ipc_base64_decode(String raw, bool& ok)
+{
+	ok = false;
+	String filtered = "";
+	for(auto c : raw)
+	{
+		if(!isspace((unsigned char)c))
+			filtered.append(1, c);
+	}
+	if(filtered == "")
+	{
+		ok = true;
+		return("");
+	}
+	if(filtered.length() % 4 != 0)
+		return("");
+
+	String result;
+	for(size_t i = 0; i < filtered.length(); i += 4)
+	{
+		int values[4] = {0, 0, 0, 0};
+		int padding = 0;
+		for(int j = 0; j < 4; ++j)
+		{
+			char c = filtered[i + j];
+			if(c == '=')
+			{
+				values[j] = 0;
+				padding += 1;
+				continue;
+			}
+			values[j] = websocket_ipc_base64_value(c);
+			if(values[j] < 0)
+				return("");
+		}
+
+		result.append(1, (char)((values[0] << 2) | (values[1] >> 4)));
+		if(padding < 2)
+			result.append(1, (char)(((values[1] & 0x0F) << 4) | (values[2] >> 2)));
+		if(padding < 1)
+			result.append(1, (char)(((values[2] & 0x03) << 6) | values[3]));
+	}
+
+	ok = true;
+	return(result);
+}
+
+bool websocket_ipc_set_nonblocking(int fd)
+{
+	int flags = fcntl(fd, F_GETFL, 0);
+	if(flags == -1)
+		return(false);
+	return(fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0);
+}
+
+bool websocket_exec_enabled_for_process()
+{
+	return(worker_accepts_http);
+}
+
+u64 websocket_exec_queue_limit_bytes()
+{
+	u64 configured = int_val(server_state.config["WEBSOCKET_EXEC_QUEUE_BYTES"]);
+	if(configured < 64 * 1024)
+		configured = 1024 * 1024;
+	return(configured);
+}
+
+bool websocket_exec_has_inflight_job()
+{
+	return(websocket_exec_inflight_job.to_bool());
+}
+
+FastCGIServer::Connection* websocket_find_connection(String connection_id)
+{
+	for(auto& item : server.client_sockets)
+	{
+		FastCGIServer::Connection* connection = item.second;
+		if(connection->is_websocket && connection->websocket_connection_id == connection_id)
+			return(connection);
+	}
+	return(0);
+}
+
+void websocket_exec_clear_ipc_state()
+{
+	if(websocket_exec_fd != -1)
+		close(websocket_exec_fd);
+	websocket_exec_fd = -1;
+	websocket_exec_read_buffer = "";
+	websocket_exec_write_buffer = "";
+	websocket_exec_inflight_job.clear();
+}
+
+void websocket_exec_close_connection(String connection_id, u16 status_code = 1011, String reason = "websocket handler unavailable")
+{
+	if(connection_id == "")
+		return;
+	server.websocket_close(connection_id, status_code, reason);
+}
+
+void websocket_exec_fail_inflight_job(String reason = "websocket handler unavailable")
+{
+	if(!websocket_exec_has_inflight_job())
+		return;
+	websocket_exec_close_connection(websocket_exec_inflight_job["connection_id"].to_string(), 1011, reason);
+	websocket_exec_inflight_job.clear();
+	websocket_exec_write_buffer = "";
+}
+
+void websocket_exec_queue_job(DTree job)
+{
+	if(job["connection_id"].to_string() == "")
+		return;
+
+	u64 queued_bytes = websocket_exec_write_buffer.length();
+	if(websocket_exec_has_inflight_job())
+		queued_bytes += websocket_exec_inflight_job["serialized"].to_string().length();
+	for(auto& pending : websocket_exec_pending_jobs)
+		queued_bytes += pending["serialized"].to_string().length();
+	queued_bytes += json_encode(job).length();
+
+	if(queued_bytes > websocket_exec_queue_limit_bytes())
+	{
+		printf("(!) websocket dispatch queue overflow for %s\n", job["connection_id"].to_string().c_str());
+		websocket_exec_close_connection(job["connection_id"].to_string(), 1013, "websocket server busy");
+		return;
+	}
+
+	job["serialized"] = json_encode(job) + "\n";
+	websocket_exec_pending_jobs.push_back(job);
+}
+
+StringList websocket_exec_snapshot_connections(String scope)
+{
+	return(server.websocket_connection_ids(scope));
+}
+
+void websocket_exec_append_command(DTree command)
+{
+	if(!context)
+		return;
+	context->resources.websocket_dispatch_commands.push(command);
+}
+
+void websocket_exec_apply_command(DTree command)
+{
+	String action = command["action"].to_string();
+	if(action == "broadcast")
+	{
+		bool ok = false;
+		String payload = websocket_ipc_base64_decode(command["message_b64"].to_string(), ok);
+		if(!ok)
+			return;
+		server.websocket_broadcast(command["scope"].to_string(), payload, command["binary"].to_bool());
+		return;
+	}
+	if(action == "send_to")
+	{
+		bool ok = false;
+		String payload = websocket_ipc_base64_decode(command["message_b64"].to_string(), ok);
+		if(!ok)
+			return;
+		server.websocket_send_to(command["connection_id"].to_string(), payload, command["binary"].to_bool());
+		return;
+	}
+	if(action == "close")
+	{
+		server.websocket_close(
+			command["connection_id"].to_string(),
+			(u16)command["status_code"].to_u64(),
+			command["reason"].to_string()
+		);
+	}
+}
+
+void websocket_exec_apply_result(DTree result)
+{
+	if(result["type"].to_string() != "result")
+		return;
+
+	String inflight_connection_id = websocket_exec_inflight_job["connection_id"].to_string();
+	String result_connection_id = result["connection_id"].to_string();
+	if(inflight_connection_id != "" && result_connection_id != "" && inflight_connection_id != result_connection_id)
+	{
+		printf("(!) websocket dispatch result mismatch: expected %s got %s\n",
+			inflight_connection_id.c_str(),
+			result_connection_id.c_str());
+	}
+
+	FastCGIServer::Connection* connection = websocket_find_connection(result_connection_id);
+	if(connection)
+		connection->websocket_state = result["connection_state"];
+
+	result["commands"].each([] (DTree command, String) {
+		websocket_exec_apply_command(command);
+	});
+
+	websocket_exec_inflight_job.clear();
+}
+
+void websocket_exec_handle_ipc_line(String line)
+{
+	line = trim(line);
+	if(line == "")
+		return;
+	DTree result = json_decode(line);
+	websocket_exec_apply_result(result);
+}
+
+void websocket_exec_read_results()
+{
+	if(websocket_exec_fd == -1)
+		return;
+
+	char buffer[4096];
+	for(;;)
+	{
+		ssize_t read_result = read(websocket_exec_fd, buffer, sizeof(buffer));
+		if(read_result == 0)
+		{
+			printf("(!) websocket executor disconnected\n");
+			websocket_exec_fail_inflight_job();
+			websocket_exec_clear_ipc_state();
+			return;
+		}
+		if(read_result < 0)
+		{
+			if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+				break;
+			perror("websocket executor read");
+			websocket_exec_fail_inflight_job();
+			websocket_exec_clear_ipc_state();
+			return;
+		}
+
+		websocket_exec_read_buffer.append(buffer, read_result);
+		for(;;)
+		{
+			size_t line_end = websocket_exec_read_buffer.find('\n');
+			if(line_end == String::npos)
+				break;
+			String line = websocket_exec_read_buffer.substr(0, line_end);
+			websocket_exec_read_buffer.erase(0, line_end + 1);
+			websocket_exec_handle_ipc_line(line);
+		}
+	}
+}
+
+void websocket_exec_flush_queue()
+{
+	if(websocket_exec_fd == -1)
+		return;
+
+	if(websocket_exec_write_buffer == "" && !websocket_exec_has_inflight_job() && websocket_exec_pending_jobs.size() > 0)
+	{
+		websocket_exec_inflight_job = websocket_exec_pending_jobs.front();
+		websocket_exec_pending_jobs.pop_front();
+		websocket_exec_write_buffer = websocket_exec_inflight_job["serialized"].to_string();
+	}
+
+	while(websocket_exec_write_buffer != "")
+	{
+		ssize_t write_result = write(websocket_exec_fd, websocket_exec_write_buffer.data(), websocket_exec_write_buffer.length());
+		if(write_result < 0)
+		{
+			if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+				return;
+			perror("websocket executor write");
+			websocket_exec_fail_inflight_job();
+			websocket_exec_clear_ipc_state();
+			return;
+		}
+		if(write_result == 0)
+			return;
+		websocket_exec_write_buffer.erase(0, write_result);
+	}
+}
+
+Request websocket_exec_build_event_request(DTree job, String message)
+{
+	Request event_request;
+	event_request.server = &server_state;
+	event_request.params = job["params"].to_stringmap();
+	event_request.params["REQUEST_METHOD"] = "WEBSOCKET";
+	event_request.get = parse_query(event_request.params["QUERY_STRING"]);
+	event_request.resources.is_websocket = true;
+	event_request.resources.websocket_connection_id = job["connection_id"].to_string();
+	event_request.resources.websocket_scope = job["scope"].to_string();
+	event_request.resources.websocket_opcode = (u8)job["opcode"].to_u64();
+	event_request.resources.websocket_is_binary = job["is_binary"].to_bool();
+	event_request.resources.websocket_is_text = job["is_text"].to_bool();
+	event_request.resources.websocket_dispatch_capture = true;
+	job["scope_connections"].each([&] (DTree item, String) {
+		event_request.resources.websocket_scope_connection_ids.push_back(item.to_string());
+	});
+	event_request.connection = job["connection_state"];
+	event_request.stats.time_init = time_precise();
+	event_request.stats.time_start = event_request.stats.time_init;
+	event_request.random_index = 0;
+	event_request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&event_request.stats.time_start));
+	event_request.response_code = "WEBSOCKET";
+	event_request.header["Content-Type"] = server_state.config["CONTENT_TYPE"];
+	event_request.in = message;
+
+	if(event_request.params["HTTP_COOKIE"].length() > 0)
+		event_request.cookies = parse_cookies(event_request.params["HTTP_COOKIE"]);
+
+	event_request.var["ws"]["message"] = message;
+	event_request.var["ws"]["connection_id"] = event_request.resources.websocket_connection_id;
+	event_request.var["ws"]["scope"] = event_request.resources.websocket_scope;
+	event_request.var["ws"]["connection_count"] = (f64)event_request.resources.websocket_scope_connection_ids.size();
+	event_request.var["ws"]["opcode"] = (f64)event_request.resources.websocket_opcode;
+	event_request.var["ws"]["is_binary"].set_bool(event_request.resources.websocket_is_binary);
+	event_request.var["ws"]["is_text"].set_bool(event_request.resources.websocket_is_text);
+	event_request.var["ws"]["document_uri"] = first(
+		event_request.params["DOCUMENT_URI"],
+		event_request.params["REQUEST_URI"]
+	);
+
+	event_request.call["message"] = message;
+	event_request.call["connection_id"] = event_request.resources.websocket_connection_id;
+	event_request.call["scope"] = event_request.resources.websocket_scope;
+	event_request.call["opcode"] = (f64)event_request.resources.websocket_opcode;
+	event_request.call["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
+	return(event_request);
+}
+
+bool websocket_exec_send_response(int fd, DTree response)
+{
+	String encoded = json_encode(response) + "\n";
+	size_t offset = 0;
+	while(offset < encoded.length())
+	{
+		ssize_t write_result = write(fd, encoded.data() + offset, encoded.length() - offset);
+		if(write_result < 0)
+		{
+			if(errno == EINTR)
+				continue;
+			return(false);
+		}
+		offset += (size_t)write_result;
+	}
+	return(true);
+}
+
+void websocket_exec_process_job_line(int fd, String line)
+{
+	line = trim(line);
+	if(line == "")
+		return;
+
+	DTree job = json_decode(line);
+	if(job["type"].to_string() != "dispatch")
+		return;
+
+	bool decoded = false;
+	String message = websocket_ipc_base64_decode(job["message_b64"].to_string(), decoded);
+	if(!decoded)
+	{
+		printf("(!) invalid websocket IPC payload for %s\n", job["connection_id"].to_string().c_str());
+		return;
+	}
+
+	Request event_request = websocket_exec_build_event_request(job, message);
+	Request* previous_context = set_active_request(event_request);
+	server_state.request_count += 1;
+
+	compiler_invoke_websocket(&event_request, event_request.params["SCRIPT_FILENAME"]);
+
+	if(event_request.session_id.length() > 0)
+		save_session_data(event_request.session_id, event_request.session);
+	cleanup_mysql_connections();
+
+	DTree response;
+	response["type"] = "result";
+	response["connection_id"] = event_request.resources.websocket_connection_id;
+	response["connection_state"] = event_request.connection;
+	response["commands"] = event_request.resources.websocket_dispatch_commands;
+
+	restore_active_request(previous_context);
+	if(!websocket_exec_send_response(fd, response))
+		exit(1);
+}
+
+void websocket_exec_child_loop(int fd)
+{
+	Request background_context;
+	my_pid = getpid();
+	context = &background_context;
+	close_inherited_server_sockets();
+	signal(SIGSEGV, on_segfault);
+	signal(SIGABRT, on_segfault);
+	signal(SIGBUS, on_segfault);
+	signal(SIGILL, on_segfault);
+	signal(SIGFPE, on_segfault);
+	signal(SIGPIPE, SIG_IGN);
+	setpriority(PRIO_PROCESS, 0, 5);
+
+	String read_buffer;
+	char buffer[4096];
+	for(;;)
+	{
+		ssize_t read_result = read(fd, buffer, sizeof(buffer));
+		if(read_result == 0)
+			exit(0);
+		if(read_result < 0)
+		{
+			if(errno == EINTR)
+				continue;
+			exit(1);
+		}
+
+		read_buffer.append(buffer, read_result);
+		for(;;)
+		{
+			size_t line_end = read_buffer.find('\n');
+			if(line_end == String::npos)
+				break;
+			String line = read_buffer.substr(0, line_end);
+			read_buffer.erase(0, line_end + 1);
+			websocket_exec_process_job_line(fd, line);
+		}
+	}
+}
+
+bool websocket_exec_alive()
+{
+	return(websocket_exec_pid > 0 && task_kill(websocket_exec_pid, 0) == 0 && websocket_exec_fd != -1);
+}
+
+void ensure_websocket_executor()
+{
+	if(!websocket_exec_enabled_for_process())
+		return;
+	if(websocket_exec_alive())
+		return;
+
+	if(websocket_exec_pid > 0 || websocket_exec_fd != -1)
+	{
+		websocket_exec_fail_inflight_job();
+		websocket_exec_clear_ipc_state();
+		websocket_exec_pid = 0;
+	}
+
+	int sockets[2] = {-1, -1};
+	if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+	{
+		perror("socketpair");
+		return;
+	}
+
+	pid_t p = fork();
+	if(p < 0)
+	{
+		perror("fork");
+		close(sockets[0]);
+		close(sockets[1]);
+		return;
+	}
+	if(p == 0)
+	{
+		parent_pid = getppid();
+		file_release_process_locks("websocket executor fork");
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
+		close(sockets[0]);
+		websocket_exec_child_loop(sockets[1]);
+		exit(0);
+	}
+
+	close(sockets[1]);
+	if(!websocket_ipc_set_nonblocking(sockets[0]))
+	{
+		printf("(!) failed to set websocket executor socket nonblocking\n");
+		close(sockets[0]);
+		return;
+	}
+
+	websocket_exec_fd = sockets[0];
+	websocket_exec_pid = p;
+	printf("(P) websocket executor spawned: PID %i\n", p);
+}
+
+void websocket_exec_tick()
+{
+	if(!websocket_exec_enabled_for_process())
+		return;
+	if(!websocket_exec_alive())
+	{
+		websocket_exec_fail_inflight_job();
+		websocket_exec_clear_ipc_state();
+		websocket_exec_pid = 0;
+		ensure_websocket_executor();
+	}
+	websocket_exec_read_results();
+	websocket_exec_flush_queue();
+}
+
+}
+
 String current_ws_scope()
 {
 	if(!context)
@@ -185,6 +736,13 @@ bool ws_is_binary()
 
 StringList ws_connections(String scope)
 {
+	if(context && context->resources.websocket_dispatch_capture)
+	{
+		String normalized_scope = normalize_ws_scope(scope);
+		if(normalized_scope == context->resources.websocket_scope)
+			return(context->resources.websocket_scope_connection_ids);
+		return(StringList());
+	}
 	return(server.websocket_connection_ids(normalize_ws_scope(scope)));
 }
 
@@ -195,11 +753,31 @@ u64 ws_connection_count(String scope)
 
 bool ws_send(String message, bool binary, String scope)
 {
+	if(context && context->resources.websocket_dispatch_capture)
+	{
+		DTree command;
+		command["action"] = "broadcast";
+		command["scope"] = normalize_ws_scope(scope);
+		command["binary"].set_bool(binary);
+		command["message_b64"] = websocket_ipc_base64_encode(message);
+		websocket_exec_append_command(command);
+		return(true);
+	}
 	return(server.websocket_broadcast(normalize_ws_scope(scope), message, binary) > 0);
 }
 
 bool ws_send_to(String connection_id, String message, bool binary)
 {
+	if(context && context->resources.websocket_dispatch_capture)
+	{
+		DTree command;
+		command["action"] = "send_to";
+		command["connection_id"] = connection_id;
+		command["binary"].set_bool(binary);
+		command["message_b64"] = websocket_ipc_base64_encode(message);
+		websocket_exec_append_command(command);
+		return(true);
+	}
 	return(server.websocket_send_to(connection_id, message, binary));
 }
 
@@ -209,6 +787,16 @@ bool ws_close(String connection_id)
 		connection_id = ws_connection_id();
 	if(connection_id == "")
 		return(false);
+	if(context && context->resources.websocket_dispatch_capture)
+	{
+		DTree command;
+		command["action"] = "close";
+		command["connection_id"] = connection_id;
+		command["status_code"] = (f64)1000;
+		command["reason"] = "";
+		websocket_exec_append_command(command);
+		return(true);
+	}
 	return(server.websocket_close(connection_id));
 }
 
@@ -334,55 +922,36 @@ int handle_complete(FastCGIRequest& request) {
 
 int handle_websocket_message(FastCGIRequest& request, const String& message, u8 opcode)
 {
-	Request event_request;
-	ByteStream ws_output;
+	ensure_websocket_executor();
+	if(!websocket_exec_alive())
+	{
+		printf("(!) websocket executor unavailable for %s\n", request.resources.websocket_connection_id.c_str());
+		server.websocket_close(request.resources.websocket_connection_id, 1011, "websocket handler unavailable");
+		return(0);
+	}
 
-	Request* previous_context = set_active_request(event_request);
-	server_state.request_count += 1;
-	event_request.server = &server_state;
-	event_request.params = request.params;
-	event_request.params["REQUEST_METHOD"] = "WEBSOCKET";
-	event_request.get = parse_query(event_request.params["QUERY_STRING"]);
-	event_request.resources = request.resources;
-	if(event_request.resources.websocket_connection_state)
-		event_request.connection.set_reference(event_request.resources.websocket_connection_state);
-	event_request.stats.time_init = time_precise();
-	event_request.stats.time_start = event_request.stats.time_init;
-	event_request.random_index = 0;
-	event_request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&event_request.stats.time_start));
-	event_request.response_code = "WEBSOCKET";
-	event_request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
-	event_request.in = message;
-	event_request.ob = &ws_output;
+	DTree job;
+	job["type"] = "dispatch";
+	job["connection_id"] = request.resources.websocket_connection_id;
+	job["scope"] = request.resources.websocket_scope;
+	job["opcode"] = (f64)opcode;
+	job["is_binary"].set_bool(request.resources.websocket_is_binary);
+	job["is_text"].set_bool(request.resources.websocket_is_text);
+	job["message_b64"] = websocket_ipc_base64_encode(message);
+	if(request.resources.websocket_connection_state)
+		job["connection_state"] = *request.resources.websocket_connection_state;
 
-	if(event_request.params["HTTP_COOKIE"].length() > 0)
-		event_request.cookies = parse_cookies(event_request.params["HTTP_COOKIE"]);
+	for(auto& item : request.params)
+		job["params"][item.first] = item.second;
 
-	event_request.var["ws"]["message"] = message;
-	event_request.var["ws"]["connection_id"] = request.resources.websocket_connection_id;
-	event_request.var["ws"]["scope"] = request.resources.websocket_scope;
-	event_request.var["ws"]["connection_count"] = (f64)server.websocket_connection_ids(request.resources.websocket_scope).size();
-	event_request.var["ws"]["opcode"] = (f64)opcode;
-	event_request.var["ws"]["is_binary"].set_bool(request.resources.websocket_is_binary);
-	event_request.var["ws"]["is_text"].set_bool(request.resources.websocket_is_text);
-	event_request.var["ws"]["document_uri"] = first(
-		request.params["DOCUMENT_URI"],
-		request.params["REQUEST_URI"]
-	);
+	for(auto& connection_id : websocket_exec_snapshot_connections(request.resources.websocket_scope))
+	{
+		DTree snapshot_item;
+		snapshot_item = connection_id;
+		job["scope_connections"].push(snapshot_item);
+	}
 
-	event_request.call["message"] = message;
-	event_request.call["connection_id"] = request.resources.websocket_connection_id;
-	event_request.call["scope"] = request.resources.websocket_scope;
-	event_request.call["opcode"] = (f64)opcode;
-	event_request.call["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
-
-	compiler_invoke_websocket(&event_request, request.params["SCRIPT_FILENAME"]);
-
-	if(event_request.session_id.length() > 0)
-		save_session_data(event_request.session_id, event_request.session);
-
-	cleanup_mysql_connections();
-	restore_active_request(previous_context);
+	websocket_exec_queue_job(job);
 	return 0;
 }
 
@@ -520,7 +1089,7 @@ void run_proactive_compiler()
 				retry_after.erase(file_name);
 			}
 			background_context.session.clear();
-			background_context.session_serialized = "";
+			background_context.session_loaded_hash = "";
 			clear_shared_unit_cache(server_state);
 			usleep(250000);
 			continue;
@@ -548,6 +1117,7 @@ void ensure_proactive_compiler()
 	pid_t p = fork();
 	if(p == 0)
 	{
+		file_release_process_locks("proactive compiler fork");
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		run_proactive_compiler();
 		exit(0);
@@ -579,9 +1149,14 @@ void listen_for_connections()
 	server.on_data = &handle_data;
 	server.on_complete = &handle_complete;
 	server.on_websocket_message = &handle_websocket_message;
+	if(worker_accepts_http)
+		ensure_websocket_executor();
 	for(;;)
 	{
-		server.process();
+		file_release_process_locks("worker loop cleanup");
+		server.process(worker_accepts_http ? 50 : -1);
+		if(worker_accepts_http)
+			websocket_exec_tick();
 	}
 }
 

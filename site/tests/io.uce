@@ -1,0 +1,38 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	if(!test_demo_request_allowed(context))
+	{
+		site_tests_restricted(context, "Filesystem", "write to local files and append server-side test data");
+		return;
+	}
+
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	String file_name = path_join("/tmp", "uce-site-tests-io.txt");
+	bool write_ok = file_put_contents(file_name, "alpha");
+	file_append(file_name, "|beta");
+	String file_text = file_get_contents(file_name);
+
+	site_tests_page_start("Filesystem", "Local-only file helper coverage using a temporary file under /tmp.");
+
+	check("path_join()", file_name == "/tmp/uce-site-tests-io.txt", file_name);
+	check("file_put_contents()", write_ok, file_name);
+	check("file_append()", file_text.find("|beta") != String::npos, file_text);
+	check("file_get_contents()", file_text == "alpha|beta", file_text);
+
+	site_tests_summary(passed, failed, skipped, "This page intentionally limits writes to /tmp/uce-site-tests-io.txt so it stays disposable.");
+	site_tests_page_end();
+}

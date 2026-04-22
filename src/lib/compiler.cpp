@@ -229,9 +229,13 @@ String compiler_registry_lock_file_name(Request* context)
 	return(compiler_registry_file_name(context) + ".lock");
 }
 
-int compiler_open_lock_file(String file_name)
+int compiler_open_lock_file(String file_name, String purpose)
 {
-	int fdlock = open(file_name.c_str(), O_RDWR | O_CREAT, 0666);
+	(void)purpose;
+	auto lock_dir = dirname(file_name);
+	if(lock_dir != "")
+		mkdir(lock_dir);
+	int fdlock = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0666);
 	if(fdlock == -1)
 		printf("(!) Could not open lock file %s\n", file_name.c_str());
 	return(fdlock);
@@ -239,10 +243,7 @@ int compiler_open_lock_file(String file_name)
 
 void compiler_close_lock_file(int fdlock)
 {
-	if(fdlock == -1)
-		return;
-	flock(fdlock, LOCK_UN);
-	close(fdlock);
+	file_close_locked(fdlock);
 }
 
 String compiler_normalize_unit_path(Request* context, String file_name)
@@ -297,9 +298,7 @@ template <typename TCallback>
 auto compiler_with_registry_lock(Request* context, TCallback callback) -> decltype(callback())
 {
 	auto lock_file_name = compiler_registry_lock_file_name(context);
-	int fdlock = compiler_open_lock_file(lock_file_name);
-	if(fdlock != -1)
-		flock(fdlock, LOCK_EX);
+	int fdlock = compiler_open_lock_file(lock_file_name, "compiler-registry");
 	auto result = callback();
 	compiler_close_lock_file(fdlock);
 	return(result);
@@ -794,9 +793,16 @@ SharedUnit* compiler_get_shared_unit_internal(Request* context, String file_name
 	setup_unit_paths(context, su, file_name);
 	su->opt_so_optional = opt_so_optional;
 
-	int fdlock = compiler_open_lock_file(su->so_name + ".lock");
-	if(fdlock != -1)
-		flock(fdlock, LOCK_EX);
+	int fdlock = compiler_open_lock_file(su->so_name + ".lock", "shared-unit:" + file_name);
+	if(fdlock == -1)
+	{
+		su->compiler_messages = "could not open compile lock";
+		su->compile_status = "lock_error";
+		su->compile_error_status = su->compiler_messages;
+		su->last_error = time();
+		context->server->units[file_name] = su;
+		return(su);
+	}
 
 	cached = compiler_reusable_cached_unit(context, file_name, opt_so_optional, force_recompile);
 	if(cached)

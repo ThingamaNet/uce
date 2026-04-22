@@ -1,0 +1,28 @@
+#load "../../lib/app.uce"
+
+COMPONENT(Request& context)
+{
+	starter_boot(context);
+	bool embed_mode = starter_page_embed_mode(context);
+	String main_html = starter_page_main_html(context);
+
+	DTree footer_props;
+	footer_props["embed_mode"].set_bool(embed_mode);
+
+	<>
+		<!doctype html>
+		<html class="<?= starter_html_class(context) ?>" lang="en" data-theme-key="<?= context.cfg.get_by_path("theme/key").to_string() ?>">
+		<head>
+			<?: component("../../components/theme/head", context) ?>
+		</head>
+		<body<?: embed_mode ? " class=\"embed-mode\"" : "" ?>>
+			<?: component("../../components/theme/global_controls", context) ?>
+			<?: component("../../components/theme/standard_nav", context) ?>
+			<div id="content"<?: embed_mode ? " class=\"embed-content\"" : "" ?>>
+				<?: main_html ?>
+			</div>
+			<?: component("../../components/theme/footer", footer_props, context) ?>
+		</body>
+		</html>
+	</>
+}

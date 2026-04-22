@@ -1,0 +1,53 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	site_tests_page_start("Core APIs", "Pure helper coverage for strings, UTF-8 splitting, DTree, and JSON encoding/decoding.");
+
+	auto comma_parts = split("alpha,beta,gamma", ",");
+	check("split()", comma_parts.size() == 3 && comma_parts[1] == "beta", join(comma_parts, " | "));
+
+	auto spaced_parts = split_space("  one   two  three  ");
+	check("split_space()", spaced_parts.size() == 3 && spaced_parts[2] == "three", join(spaced_parts, " / "));
+
+	check("trim()", trim("  padded value  ") == "padded value", trim("  padded value  "));
+	check("replace()", replace("alpha-beta-beta", "beta", "done") == "alpha-done-done", replace("alpha-beta-beta", "beta", "done"));
+	check("substr() + strpos()", strpos("component suite", "suite") == 10 && substr("component suite", 10) == "suite", "strpos=10 substr='" + substr("component suite", 10) + "'");
+	check("str_starts_with()", str_starts_with("websocket-suite", "websocket"), "websocket-suite starts with websocket");
+	check("str_ends_with()", str_ends_with("component.uce", ".uce"), "component.uce ends with .uce");
+	check("to_lower() / to_upper()", to_lower("MiXeD") == "mixed" && to_upper("MiXeD") == "MIXED", to_lower("MiXeD") + " / " + to_upper("MiXeD"));
+
+	String utf8_sample = "A\xC3\xA9";
+	auto utf8_parts = split_utf8(utf8_sample);
+	check("split_utf8()", utf8_parts.size() == 2, "count=" + std::to_string(utf8_parts.size()));
+
+	DTree payload;
+	payload["name"] = "uce";
+	payload["count"] = (f64)3;
+	payload["kind"] = "core";
+	String payload_json = json_encode(payload);
+	DTree decoded = json_decode(payload_json);
+	check("json_encode() / json_decode()", decoded["name"].to_string() == "uce" && int_val(decoded["count"].to_string()) == 3, payload_json);
+
+	DTree tree;
+	tree["suite"] = "core";
+	tree["nested"]["api"] = "dtree";
+	tree["nested"]["ok"].set_bool(true);
+	check("DTree map access", tree["suite"].to_string() == "core" && tree["nested"]["api"].to_string() == "dtree", json_encode(tree));
+
+	site_tests_summary(passed, failed, skipped, "These assertions intentionally stay pure and side-effect free so they remain safe on the public site.");
+	site_tests_page_end();
+}

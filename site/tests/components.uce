@@ -1,0 +1,50 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	DTree props;
+	props["title"] = "Component Output";
+	props["body"] = "This body comes from component()";
+	props["footer"] = "Named footer render";
+
+	bool exists = component_exists("components/panel");
+	String resolved = component_resolve("components/panel");
+	String panel_markup = component("components/panel", props, context);
+
+	ob_start();
+	component_render("components/panel:FOOTER", props, context);
+	String footer_markup = ob_get_close();
+
+	ob_start();
+	print("buffered-text");
+	String buffer_markup = ob_get_close();
+
+	site_tests_page_start("Components", "Component helpers, named handlers, and output buffering coverage.");
+
+	check("component_exists()", exists, exists ? "components/panel resolved as existing" : "components/panel missing");
+	check("component_resolve()", resolved != "", resolved);
+	check("component()", panel_markup.find("Component Output") != String::npos && panel_markup.find("This body comes from component()") != String::npos, panel_markup);
+	check("component_render() named handler", footer_markup.find("Named footer render") != String::npos, footer_markup);
+	check("ob_start() / ob_get_close()", buffer_markup == "buffered-text", buffer_markup);
+
+	?><div class="tests-section">
+		<h3>Rendered Component</h3>
+		<?: panel_markup ?>
+	</div><?
+
+	site_tests_summary(passed, failed, skipped, "The panel fixture under site/tests/components exercises default and named component entry points.");
+	site_tests_page_end();
+}

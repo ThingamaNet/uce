@@ -155,9 +155,7 @@ struct Request {
 	StringMap post;
 	StringMap cookies;
 	StringMap session;
-	String session_file_name = "";
-	String session_serialized = "";
-	int session_lock_fd = -1;
+	String session_loaded_hash = "";
 
 	DTree var;
 	DTree cfg;
@@ -211,6 +209,9 @@ struct Request {
 		String websocket_connection_id = "";
 		String websocket_scope = "";
 		DTree* websocket_connection_state = 0;
+		StringList websocket_scope_connection_ids;
+		DTree websocket_dispatch_commands;
+		bool websocket_dispatch_capture = false;
 		u8 websocket_opcode = 0;
 		bool websocket_is_binary = false;
 		bool websocket_is_text = false;

@@ -544,15 +544,21 @@ String session_file_path(String session_id)
 
 namespace {
 
-void session_release_lock(Request* request)
+String session_serialize(const StringMap& data)
 {
-	if(!request)
-		return;
-	if(request->session_lock_fd != -1)
-		file_close_locked(request->session_lock_fd);
-	request->session_lock_fd = -1;
-	request->session_file_name = "";
-	request->session_serialized = "";
+	return(encode_query(data));
+}
+
+String session_hash_serialized(String serialized)
+{
+	return(gen_sha1(serialized));
+}
+
+String session_load_serialized(String session_path)
+{
+	if(session_path == "" || !file_exists(session_path))
+		return("");
+	return(file_get_contents(session_path));
 }
 
 }
@@ -562,47 +568,36 @@ StringMap load_session_data(String session_id)
 	String session_path = session_file_path(session_id);
 	if(session_path == "")
 		return(StringMap());
-	if(context && context->session_lock_fd != -1 && context->session_file_name == session_path)
-		return(parse_query(file_get_contents_locked_fd(context->session_lock_fd)));
-	return(parse_query(file_get_contents(session_path)));
+	return(parse_query(session_load_serialized(session_path)));
 }
 
 void save_session_data(String session_id, StringMap data)
 {
 	String session_path = session_file_path(session_id);
-	String encoded = encode_query(data);
+	String encoded = session_serialize(data);
+	String encoded_hash = session_hash_serialized(encoded);
 	if(session_path == "")
 	{
 		printf("(!) Refusing to save invalid session id\n");
 		return;
 	}
-	if(context && context->session_lock_fd != -1 && context->session_file_name == session_path)
+	if(context && encoded_hash == context->session_loaded_hash)
+		return;
+	if(!file_put_contents(session_path, encoded))
 	{
-		if(encoded == context->session_serialized)
-			return;
-		if(file_put_contents_locked_fd(context->session_lock_fd, encoded))
-			context->session_serialized = encoded;
+		printf("(!) Refusing to save session file %s\n", session_path.c_str());
 		return;
 	}
-	int fd = file_open_locked(session_path, O_RDWR | O_CREAT, LOCK_EX, 0644);
-	if(fd == -1)
-	{
-		printf("(!) Refusing to save unreadable session file %s\n", session_path.c_str());
-		return;
-	}
-	if(file_get_contents_locked_fd(fd) != encoded)
-		file_put_contents_locked_fd(fd, encoded);
-	file_close_locked(fd);
+	if(context)
+		context->session_loaded_hash = encoded_hash;
 }
 
 String session_start(String session_name)
 {
-	if(context->session_lock_fd != -1 && context->session_name == session_name && context->session_id != "")
+	if(context->session_name == session_name && context->session_id != "")
 		return(context->session_id);
-	session_release_lock(context);
 	context->session.clear();
-	context->session_serialized = "";
-	context->session_file_name = "";
+	context->session_loaded_hash = "";
 	context->session_id = "";
 	context->session_name = "";
 
@@ -617,15 +612,10 @@ String session_start(String session_name)
 	}
 	context->session_id = session_id;
 	context->session_name = session_name;
-	context->session_file_name = session_file_path(context->session_id);
-	if(context->session_file_name != "")
-	{
-		context->session_lock_fd = file_open_locked(context->session_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
-		if(context->session_lock_fd == -1)
-			printf("(!) Could not lock session file %s\n", context->session_file_name.c_str());
-	}
-	context->session = load_session_data(context->session_id);
-	context->session_serialized = encode_query(context->session);
+	auto session_path = session_file_path(context->session_id);
+	auto serialized = session_load_serialized(session_path);
+	context->session_loaded_hash = session_hash_serialized(serialized);
+	context->session = parse_query(serialized);
 	return(context->session_id);
 }
 
@@ -636,7 +626,6 @@ void session_destroy(String session_name)
 		set_cookie(session_name, "", time() - int_val(context->server->config["SESSION_TIME"]));
 		context->session.clear();
 		save_session_data(context->session_id, context->session);
-		session_release_lock(context);
 		context->session_id = "";
 	}
 }

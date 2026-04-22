@@ -1,0 +1,11 @@
+#load "../lib/app.uce"
+
+RENDER(Request& context)
+{
+	starter_boot(context);
+	context.var["starter"]["page_type"] = "blank";
+	<>
+		<?= std::to_string((u64)time()) ?> - Page 2 Section 1 loaded
+		<pre>UCE starter AJAX fragment response</pre>
+	</>
+}

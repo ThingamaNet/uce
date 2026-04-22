@@ -1,0 +1,22 @@
+#load "../../lib/app.uce"
+
+COMPONENT(Request& context)
+{
+	starter_boot(context);
+	String title = first(context.var["starter"]["page_title"].to_string(), context.cfg.get_by_path("site/default_page_title").to_string());
+	String description = first(context.cfg.get_by_path("theme/meta_description").to_string(), "UCE starter example");
+	String theme_color = first(context.cfg.get_by_path("theme/theme_color").to_string(), "#0f172a");
+	String icon = starter_asset_url(context.cfg.get_by_path("theme/path").to_string() + "icon.png", context);
+
+	<>
+		<meta charset="utf-8">
+		<title><?= title + " | " + context.cfg.get_by_path("site/name").to_string() ?></title>
+		<meta name="description" content="<?= description ?>">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="theme-color" content="<?= theme_color ?>">
+		<link rel="apple-touch-icon" href="<?= icon ?>" />
+		<link rel="icon" type="image/png" sizes="32x32" href="<?= icon ?>" />
+		<? starter_render_registered_css(context); ?>
+		<? starter_render_registered_js(context); ?>
+	</>
+}

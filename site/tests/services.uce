@@ -1,0 +1,81 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	if(!test_demo_request_allowed(context))
+	{
+		site_tests_restricted(context, "Sockets And Services", "connect to local listeners and optional infrastructure services");
+		return;
+	}
+
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	site_tests_page_start("Sockets And Services", "Local-only probes for sockets and optional infrastructure integrations.");
+
+	auto mark = [&](String name, String status, String detail)
+	{
+		site_tests_case(name, status, detail);
+		if(status == "pass")
+			passed++;
+		else if(status == "skip")
+			skipped++;
+		else
+			failed++;
+	};
+
+	u64 sockfd = socket_connect("localhost", 80);
+	if(sockfd != 0)
+	{
+		bool write_ok = socket_write(sockfd, "GET /tests/index.uce HTTP/1.0\r\nHost: uce.openfu.com\r\n\r\n");
+		String response = socket_read(sockfd, 4096, 2);
+		socket_close(sockfd);
+		mark(
+			"socket_connect() / socket_write() / socket_read()",
+			(write_ok && response.find("200 OK") != String::npos) ? "pass" : "fail",
+			response.substr(0, response.length() > 220 ? 220 : response.length())
+		);
+	}
+	else
+	{
+		mark("socket_connect() / socket_write() / socket_read()", "fail", "socket_connect(localhost, 80) returned 0");
+	}
+
+	u64 memfd = memcache_connect();
+	if(memfd == 0)
+	{
+		mark("memcache_*", "skip", "memcache_connect() returned 0");
+	}
+	else
+	{
+		memcache_set(memfd, "site-tests-key", "value-1");
+		String mem_value = memcache_get(memfd, "site-tests-key");
+		memcache_delete(memfd, "site-tests-key");
+		mark(
+			"memcache_connect() / memcache_set() / memcache_get() / memcache_delete()",
+			mem_value == "value-1" ? "pass" : "fail",
+			"memcache value=" + mem_value
+		);
+	}
+
+	MySQL mysql;
+	mysql.connect("localhost", "root", "");
+	String mysql_error_text = trim(mysql.error());
+	if(mysql_error_text != "")
+	{
+		mark("mysql connect/query", "skip", mysql_error_text);
+	}
+	else
+	{
+		String dbs = var_dump(mysql.query("SHOW DATABASES"));
+		mark(
+			"mysql connect/query",
+			(dbs.find("information_schema") != String::npos || dbs.find("mysql") != String::npos) ? "pass" : "fail",
+			dbs.substr(0, dbs.length() > 220 ? 220 : dbs.length())
+		);
+	}
+
+	site_tests_summary(passed, failed, skipped, "Memcache or MySQL checks are allowed to skip cleanly when the corresponding service is not available on the development host.");
+	site_tests_page_end();
+}

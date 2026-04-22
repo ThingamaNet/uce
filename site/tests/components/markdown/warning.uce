@@ -1,0 +1,4 @@
+COMPONENT(Request& context)
+{
+	<><div class="tests-warning"><?= first(context.call["children_html"].to_string(), context.call["default_html"].to_string()) ?></div></>
+}

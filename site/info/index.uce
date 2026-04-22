@@ -1,0 +1,920 @@
+void render_nav_link(String href, String label)
+{
+	<><a href="<?= href ?>"><?= label ?></a></>
+}
+
+void render_feature_card(String eyebrow, String title, String body)
+{
+	<><article class="feature-card">
+		<div class="eyebrow"><?= eyebrow ?></div>
+		<h3><?= title ?></h3>
+		<p><?= body ?></p>
+	</article></>
+}
+
+void render_signal(String title, String body)
+{
+	<><article class="signal-card">
+		<strong><?= title ?></strong>
+		<span><?= body ?></span>
+	</article></>
+}
+
+void render_link_card(String href, String title, String body, String meta)
+{
+	<><a class="link-card" href="<?= href ?>">
+		<div class="link-meta"><?= meta ?></div>
+		<strong><?= title ?></strong>
+		<span><?= body ?></span>
+	</a></>
+}
+
+bool code_is_space(char ch)
+{
+	return(ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r');
+}
+
+bool code_is_digit(char ch)
+{
+	return(ch >= '0' && ch <= '9');
+}
+
+bool code_is_alpha(char ch)
+{
+	return((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
+}
+
+bool code_is_ident_start(char ch)
+{
+	return(code_is_alpha(ch) || ch == '_');
+}
+
+bool code_is_ident_char(char ch)
+{
+	return(code_is_ident_start(ch) || code_is_digit(ch));
+}
+
+bool markup_name_char(char ch)
+{
+	return(code_is_ident_char(ch) || ch == '-' || ch == ':' || ch == '@');
+}
+
+bool code_is_punct(char ch)
+{
+	return(ch == '{' || ch == '}' || ch == '[' || ch == ']' || ch == '(' || ch == ')' || ch == ',' || ch == ';');
+}
+
+bool code_is_operator(char ch)
+{
+	return(ch == '=' || ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' || ch == '!' || ch == '<' || ch == '>' || ch == '&' || ch == '|' || ch == '.' || ch == ':' || ch == '?' || ch == '^');
+}
+
+bool code_has_prefix(String src, u64 i, String prefix)
+{
+	if(i + prefix.length() > src.length())
+		return(false);
+	return(substr(src, i, prefix.length()) == prefix);
+}
+
+String code_wrap(String cls, String text)
+{
+	if(text == "")
+		return("");
+	return("<span class=\"tok tok-" + cls + "\">" + html_escape(text) + "</span>");
+}
+
+String uce_markup_open_token()
+{
+	return("<" ">");
+}
+
+String uce_markup_close_token()
+{
+	return("</" ">");
+}
+
+String uce_code_open_token()
+{
+	return("<" "?");
+}
+
+String uce_code_expr_token()
+{
+	return("<" "?=");
+}
+
+String uce_code_raw_token()
+{
+	return("<" "?:");
+}
+
+String uce_code_close_token()
+{
+	return("?" ">");
+}
+
+bool cpp_keyword(String word)
+{
+	String lower = to_lower(word);
+	return(
+		word == "RENDER" ||
+		word == "COMPONENT" ||
+		word == "WS" ||
+		lower == "if" ||
+		lower == "else" ||
+		lower == "for" ||
+		lower == "while" ||
+		lower == "return" ||
+		lower == "const" ||
+		lower == "auto" ||
+		lower == "void" ||
+		lower == "bool" ||
+		lower == "true" ||
+		lower == "false"
+	);
+}
+
+bool cpp_type(String word)
+{
+	return(
+		word == "String" ||
+		word == "DTree" ||
+		word == "Request" ||
+		word == "StringList" ||
+		word == "StringMap" ||
+		word == "u64" ||
+		word == "u32" ||
+		word == "s64" ||
+		word == "f64"
+	);
+}
+
+bool cpp_builtin_call(String word)
+{
+	return(
+		word == "component" ||
+		word == "component_render" ||
+		word == "component_exists" ||
+		word == "component_resolve" ||
+		word == "markdown_to_ast" ||
+		word == "markdown_to_html" ||
+		word == "json_decode" ||
+		word == "json_encode" ||
+		word == "time_format_utc" ||
+		word == "first" ||
+		word == "contains" ||
+		word == "ws_send" ||
+		word == "ws_send_to" ||
+		word == "ws_message" ||
+		word == "ws_connection_id"
+	);
+}
+
+bool cpp_context_field(String word)
+{
+	return(
+		word == "get" ||
+		word == "post" ||
+		word == "session" ||
+		word == "call" ||
+		word == "connection" ||
+		word == "params" ||
+		word == "cookies" ||
+		word == "header" ||
+		word == "cfg"
+	);
+}
+
+bool nginx_keyword(String word)
+{
+	return(
+		word == "location" ||
+		word == "include" ||
+		word == "fastcgi_param" ||
+		word == "fastcgi_pass" ||
+		word == "proxy_pass" ||
+		word == "proxy_set_header" ||
+		word == "proxy_http_version" ||
+		word == "error_page" ||
+		word == "if" ||
+		word == "return" ||
+		word == "root" ||
+		word == "index" ||
+		word == "server" ||
+		word == "listen" ||
+		word == "server_name" ||
+		word == "map"
+	);
+}
+
+String highlight_cpp_fragment(String code)
+{
+	String out;
+	for(u64 i = 0; i < code.length(); )
+	{
+		if(code_has_prefix(code, i, "//"))
+		{
+			u64 start = i;
+			while(i < code.length() && code[i] != '\n')
+				i += 1;
+			out += code_wrap("comment", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code_has_prefix(code, i, "/*"))
+		{
+			u64 start = i;
+			i += 2;
+			while(i < code.length() && !code_has_prefix(code, i, "*/"))
+				i += 1;
+			if(code_has_prefix(code, i, "*/"))
+				i += 2;
+			out += code_wrap("comment", substr(code, start, i - start));
+			continue;
+		}
+
+		char ch = code[i];
+		if(ch == '"' || ch == '\'' || ch == '`')
+		{
+			char quote = ch;
+			u64 start = i;
+			i += 1;
+			while(i < code.length())
+			{
+				if(code[i] == '\\' && i + 1 < code.length())
+				{
+					i += 2;
+					continue;
+				}
+				if(code[i] == quote)
+				{
+					i += 1;
+					break;
+				}
+				i += 1;
+			}
+			out += code_wrap("string", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code_is_space(ch))
+		{
+			out += substr(code, i, 1);
+			i += 1;
+			continue;
+		}
+
+		if(code_is_digit(ch))
+		{
+			u64 start = i;
+			i += 1;
+			while(i < code.length())
+			{
+				char next = code[i];
+				if(code_is_digit(next) || next == '.' || next == 'x' || next == 'X' || next == '_' || (next >= 'a' && next <= 'f') || (next >= 'A' && next <= 'F'))
+					i += 1;
+				else
+					break;
+			}
+			out += code_wrap("number", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code_is_ident_start(ch))
+		{
+			u64 start = i;
+			i += 1;
+			while(i < code.length() && code_is_ident_char(code[i]))
+				i += 1;
+			String word = substr(code, start, i - start);
+			u64 j = i;
+			while(j < code.length() && (code[j] == ' ' || code[j] == '\t'))
+				j += 1;
+
+			if(cpp_keyword(word))
+				out += code_wrap("keyword", word);
+			else if(cpp_type(word))
+				out += code_wrap("type", word);
+			else if(cpp_context_field(word))
+				out += code_wrap("field", word);
+			else if(word == "context" || word == "props" || word == "payload" || word == "ws")
+				out += code_wrap("variable", word);
+			else if(cpp_builtin_call(word))
+				out += code_wrap("builtin", word);
+			else if(j < code.length() && code[j] == '(')
+				out += code_wrap("call", word);
+			else
+				out += code_wrap("ident", word);
+			continue;
+		}
+
+		if(code_is_punct(ch))
+		{
+			out += code_wrap("punct", substr(code, i, 1));
+			i += 1;
+			continue;
+		}
+
+		if(code_is_operator(ch))
+		{
+			out += code_wrap("operator", substr(code, i, 1));
+			i += 1;
+			continue;
+		}
+
+		out += html_escape(substr(code, i, 1));
+		i += 1;
+	}
+	return(out);
+}
+
+String highlight_markup_tag(String tag)
+{
+	String out;
+	u64 i = 0;
+	if(code_has_prefix(tag, i, "</"))
+	{
+		out += code_wrap("delimiter", "</");
+		i += 2;
+	}
+	else
+	{
+		out += code_wrap("delimiter", "<");
+		i += 1;
+	}
+
+	u64 name_start = i;
+	while(i < tag.length() && markup_name_char(tag[i]))
+		i += 1;
+	if(i > name_start)
+		out += code_wrap("markup-tag", substr(tag, name_start, i - name_start));
+
+	while(i < tag.length())
+	{
+		if(code_is_space(tag[i]))
+		{
+			out += substr(tag, i, 1);
+			i += 1;
+			continue;
+		}
+
+		if(code_has_prefix(tag, i, "/>"))
+		{
+			out += code_wrap("delimiter", "/>" );
+			i += 2;
+			break;
+		}
+
+		if(code_has_prefix(tag, i, ">"))
+		{
+			out += code_wrap("delimiter", ">" );
+			i += 1;
+			break;
+		}
+
+		u64 attr_start = i;
+		while(i < tag.length() && markup_name_char(tag[i]))
+			i += 1;
+		if(i > attr_start)
+			out += code_wrap("markup-attr", substr(tag, attr_start, i - attr_start));
+
+		while(i < tag.length() && code_is_space(tag[i]))
+		{
+			out += substr(tag, i, 1);
+			i += 1;
+		}
+
+		if(i < tag.length() && tag[i] == '=')
+		{
+			out += code_wrap("operator", "=");
+			i += 1;
+			while(i < tag.length() && code_is_space(tag[i]))
+			{
+				out += substr(tag, i, 1);
+				i += 1;
+			}
+			if(i < tag.length() && (tag[i] == '"' || tag[i] == '\''))
+			{
+				char quote = tag[i];
+				u64 value_start = i;
+				i += 1;
+				while(i < tag.length() && tag[i] != quote)
+					i += 1;
+				if(i < tag.length())
+					i += 1;
+				out += code_wrap("string", substr(tag, value_start, i - value_start));
+			}
+			else
+			{
+				u64 value_start = i;
+				while(i < tag.length() && !code_is_space(tag[i]) && tag[i] != '>')
+					i += 1;
+				out += code_wrap("string", substr(tag, value_start, i - value_start));
+			}
+		}
+	}
+
+	return(out);
+}
+
+String highlight_uce_code(String code)
+{
+	String out;
+	bool in_markup = false;
+	String markup_open = uce_markup_open_token();
+	String markup_close = uce_markup_close_token();
+	String code_open = uce_code_open_token();
+	String code_expr = uce_code_expr_token();
+	String code_raw = uce_code_raw_token();
+	String code_close = uce_code_close_token();
+	for(u64 i = 0; i < code.length(); )
+	{
+		if(!in_markup)
+		{
+			s64 next_markup = strpos(code, markup_open, i);
+			if(next_markup < 0)
+			{
+				out += highlight_cpp_fragment(substr(code, i));
+				break;
+			}
+			if((u64)next_markup > i)
+				out += highlight_cpp_fragment(substr(code, i, (u64)next_markup - i));
+			out += code_wrap("delimiter", markup_open);
+			i = (u64)next_markup + 2;
+			in_markup = true;
+			continue;
+		}
+
+		if(code_has_prefix(code, i, markup_close))
+		{
+			out += code_wrap("delimiter", markup_close);
+			i += 3;
+			in_markup = false;
+			continue;
+		}
+
+		if(code_has_prefix(code, i, code_expr) || code_has_prefix(code, i, code_raw) || code_has_prefix(code, i, code_open))
+		{
+			String opener = code_has_prefix(code, i, code_expr) ? code_expr : (code_has_prefix(code, i, code_raw) ? code_raw : code_open);
+			out += code_wrap("delimiter", opener);
+			i += opener.length();
+			u64 island_start = i;
+			while(i < code.length() && !code_has_prefix(code, i, code_close))
+				i += 1;
+			out += highlight_cpp_fragment(substr(code, island_start, i - island_start));
+			if(code_has_prefix(code, i, code_close))
+			{
+				out += code_wrap("delimiter", code_close);
+				i += 2;
+			}
+			continue;
+		}
+
+		if(code_has_prefix(code, i, "<"))
+		{
+			u64 tag_start = i;
+			char quote = 0;
+			i += 1;
+			while(i < code.length())
+			{
+				if(quote != 0)
+				{
+					if(code[i] == quote)
+						quote = 0;
+					i += 1;
+					continue;
+				}
+				if(code[i] == '"' || code[i] == '\'')
+				{
+					quote = code[i];
+					i += 1;
+					continue;
+				}
+				if(code[i] == '>')
+				{
+					i += 1;
+					break;
+				}
+				i += 1;
+			}
+			out += highlight_markup_tag(substr(code, tag_start, i - tag_start));
+			continue;
+		}
+
+		u64 text_start = i;
+		while(i < code.length() && code[i] != '<')
+			i += 1;
+		out += code_wrap("markup-text", substr(code, text_start, i - text_start));
+	}
+	return(out);
+}
+
+String highlight_nginx_code(String code)
+{
+	String out;
+	for(u64 i = 0; i < code.length(); )
+	{
+		if(code[i] == '#')
+		{
+			u64 start = i;
+			while(i < code.length() && code[i] != '\n')
+				i += 1;
+			out += code_wrap("comment", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code[i] == '"' || code[i] == '\'')
+		{
+			char quote = code[i];
+			u64 start = i;
+			i += 1;
+			while(i < code.length() && code[i] != quote)
+				i += 1;
+			if(i < code.length())
+				i += 1;
+			out += code_wrap("string", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code_is_space(code[i]))
+		{
+			out += substr(code, i, 1);
+			i += 1;
+			continue;
+		}
+
+		if(code[i] == '$' || code[i] == '@')
+		{
+			u64 start = i;
+			i += 1;
+			while(i < code.length() && markup_name_char(code[i]))
+				i += 1;
+			out += code_wrap("variable", substr(code, start, i - start));
+			continue;
+		}
+
+		if(code_is_digit(code[i]))
+		{
+			u64 start = i;
+			i += 1;
+			while(i < code.length() && (code_is_digit(code[i]) || code[i] == '.'))
+				i += 1;
+			out += code_wrap("number", substr(code, start, i - start));
+			continue;
+		}
+
+		if(markup_name_char(code[i]))
+		{
+			u64 start = i;
+			i += 1;
+			while(i < code.length() && markup_name_char(code[i]))
+				i += 1;
+			String word = substr(code, start, i - start);
+			if(nginx_keyword(word))
+				out += code_wrap("keyword", word);
+			else
+				out += code_wrap("ident", word);
+			continue;
+		}
+
+		if(code_is_punct(code[i]))
+		{
+			out += code_wrap("punct", substr(code, i, 1));
+			i += 1;
+			continue;
+		}
+
+		if(code_is_operator(code[i]))
+		{
+			out += code_wrap("operator", substr(code, i, 1));
+			i += 1;
+			continue;
+		}
+
+		out += html_escape(substr(code, i, 1));
+		i += 1;
+	}
+	return(out);
+}
+
+String highlight_code(String code)
+{
+	if(contains(code, "fastcgi_pass") || contains(code, "proxy_pass"))
+		return(highlight_nginx_code(code));
+	return(highlight_uce_code(code));
+}
+
+String highlight_code(String code, String language)
+{
+	if(language == "nginx")
+		return(highlight_nginx_code(code));
+	if(language == "uce")
+		return(highlight_uce_code(code));
+	return(highlight_code(code));
+}
+
+String code_language_label(String language)
+{
+	if(language == "nginx")
+		return("nginx");
+	return("uce");
+}
+
+void render_code_example(String eyebrow, String title, String summary, String code, String note, String language = "uce")
+{
+	<><article class="code-card">
+		<div class="eyebrow"><?= eyebrow ?></div>
+		<h3><?= title ?></h3>
+		<p><?= summary ?></p>
+		<div class="code-toolbar">
+			<span class="code-lang"><?= code_language_label(language) ?></span>
+		</div>
+		<pre class="syntax-block"><code class="syntax-code"><?: highlight_code(code, language) ?></code></pre>
+		<? if(note != "") { ?><div class="code-note"><?= note ?></div><? } ?>
+	</article></>
+}
+
+RENDER(Request& context)
+{
+	String page_title = "UCE: make dynamic websites like it's 2006";
+	String generated_at = time_format_utc("%Y-%m-%d %H:%M:%S UTC");
+
+	String snippet_minimal =
+		"RENDER(Request& context)\n"
+		"{\n"
+		"\tString name = first(context.get[\"name\"].to_string(), \"guest\");\n"
+		"\t<>\n"
+		"\t\t<h1>Hello, <?= name ?>.</h1>\n"
+		"\t\t<p>Rendered at <?= time_format_utc(\"%F %T\") ?></p>\n"
+		"\t</>\n"
+		"}\n";
+
+	String snippet_forms =
+		"RENDER(Request& context)\n"
+		"{\n"
+		"\tif(context.post.has(\"email\"))\n"
+		"\t\tcontext.session[\"flash\"] = \"Saved \" + context.post[\"email\"].to_string();\n"
+		"\t<>\n"
+		"\t\t<form method=\"post\">\n"
+		"\t\t\t<input name=\"email\" placeholder=\"you@example.com\"></input>\n"
+		"\t\t\t<button>Save</button>\n"
+		"\t\t</form>\n"
+		"\t\t<? if(context.session.has(\"flash\")) { ?>\n"
+		"\t\t\t<p><?= context.session[\"flash\"] ?></p>\n"
+		"\t\t<? } ?>\n"
+		"\t</>\n"
+		"}\n";
+
+	String snippet_components =
+		"COMPONENT(Request& context)\n"
+		"{\n"
+		"\t<>\n"
+		"\t\t<article class=\"card\">\n"
+		"\t\t\t<h3><?= context.call[\"title\"] ?></h3>\n"
+		"\t\t\t<p><?= context.call[\"body\"] ?></p>\n"
+		"\t\t</article>\n"
+		"\t</>\n"
+		"}\n\n"
+		"RENDER(Request& context)\n"
+		"{\n"
+		"\tDTree props;\n"
+		"\tprops[\"title\"] = \"Shipping note\";\n"
+		"\tprops[\"body\"] = \"Components are just .uce files with structured props.\";\n"
+		"\t<>\n"
+		"\t\t<?: component(\"components/card\", props, context) ?>\n"
+		"\t</>\n"
+		"}\n";
+
+	String snippet_markdown =
+		"RENDER(Request& context)\n"
+		"{\n"
+		"\tString src = \"# Release Notes\\n\\n- fast path\\n- docs\\n- demos\";\n"
+		"\t<>\n"
+		"\t\t<section class=\"prose\">\n"
+		"\t\t\t<?: markdown_to_html(src) ?>\n"
+		"\t\t</section>\n"
+		"\t</>\n"
+		"}\n";
+
+	String snippet_websocket =
+		"RENDER(Request& context)\n"
+		"{\n"
+		"\t<>\n"
+		"\t\t<script>\n"
+		"\t\t\tconst ws = new WebSocket(`ws://${window.location.host}${window.location.pathname}`);\n"
+		"\t\t\tws.onopen = () => ws.send(JSON.stringify({ type: \"join\", name: \"guest\" }));\n"
+		"\t\t</script>\n"
+		"\t</>\n"
+		"}\n\n"
+		"WS(Request& context)\n"
+		"{\n"
+		"\tDTree payload = json_decode(ws_message());\n"
+		"\tcontext.connection[\"name\"] = payload[\"name\"];\n"
+		"\tws_send(json_encode(payload));\n"
+		"}\n";
+
+	String snippet_nginx =
+		"location ~ \\.ws\\.uce$ {\n"
+		"\terror_page 418 = @uce_websocket;\n"
+		"\tif ($http_upgrade = \"websocket\") { return 418; }\n"
+		"\tinclude fastcgi_params;\n"
+		"\tfastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n"
+		"\tfastcgi_pass unix:/run/uce/fastcgi.sock;\n"
+		"}\n\n"
+		"location @uce_websocket {\n"
+		"\tproxy_http_version 1.1;\n"
+		"\tproxy_set_header Upgrade $http_upgrade;\n"
+		"\tproxy_set_header Connection $connection_upgrade;\n"
+		"\tproxy_pass http://127.0.0.1:8080;\n"
+		"}\n";
+
+	<><!doctype html>
+	<html lang="en">
+	<head>
+		<meta charset="utf-8"></meta>
+		<meta name="viewport" content="width=device-width, initial-scale=1"></meta>
+		<title><?= page_title ?></title>
+		<meta name="description" content="UCE is a PHP-inspired C++ web runtime for building dynamic websites with templates, components, FastCGI, and built-in WebSockets."></meta>
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+	</head>
+	<body>
+		<div class="page-shell">
+			<header class="topbar">
+				<a class="brand" href="index.uce">UCE</a>
+				<nav>
+					<? render_nav_link("#why", "Why"); ?>
+					<? render_nav_link("#examples", "Examples"); ?>
+					<? render_nav_link("#deploy", "Deploy"); ?>
+					<? render_nav_link("#explore", "Explore"); ?>
+				</nav>
+				<a class="topbar-link" href="../doc/index.uce">Docs</a>
+			</header>
+
+			<main>
+				<section class="hero-panel">
+					<div class="hero-copy">
+						<div class="eyebrow">PHP energy, C++ runtime</div>
+						<h1>Make dynamic websites like it's 2006.</h1>
+						<p class="hero-lead">
+							UCE is a deliberately direct web runtime: files are pages, templates live next to control flow,
+							nginx fronts the whole thing, and a request can compile into a shared object on first hit.
+							It is built in the image of PHP's non-architecture, but with an explicit request object,
+							component rendering, and a built-in WebSocket broker.
+						</p>
+						<div class="hero-actions">
+							<a class="button button-primary" href="../demo/index.uce">Open the demo area</a>
+							<a class="button button-secondary" href="../doc/index.uce">Read the docs</a>
+							<a class="button button-secondary" href="../examples/uce-starter/index.uce">Browse the starter</a>
+						</div>
+						<div class="signal-grid">
+							<? render_signal("Files are routes", "A .uce page is the thing you edit and the thing nginx serves."); ?>
+							<? render_signal("Compile on demand", "First request builds a shared object, later requests reuse it."); ?>
+							<? render_signal("WebSockets included", "Same runtime, same page path, broker-managed connection state."); ?>
+						</div>
+					</div>
+					<aside class="hero-aside">
+						<div class="manual-card">
+							<div class="eyebrow">The pitch</div>
+							<h2>Dynamic pages without the ceremony</h2>
+							<ul>
+								<li>Write request handlers as normal C++ functions.</li>
+								<li>Drop into HTML with <code>&lt;&gt; ... &lt;/&gt;</code> and template tags.</li>
+								<li>Keep subviews and components as ordinary `.uce` files.</li>
+								<li>Run behind nginx over FastCGI and opt into WebSockets when needed.</li>
+							</ul>
+						</div>
+						<div class="manual-card compact">
+							<div class="eyebrow">Runtime shape</div>
+							<p>Generated <?= generated_at ?></p>
+							<p>Shared-nothing request model. Request-local state. Small surface area. Weird on purpose.</p>
+						</div>
+					</aside>
+				</section>
+
+				<section class="section" id="why">
+					<div class="section-heading">
+						<div class="eyebrow">Why UCE</div>
+						<h2>The old web had the right instincts.</h2>
+						<p>
+							Put code where the page lives. Let runtime state die with the request. Keep deployment boring.
+							Treat server-rendered HTML as the default, and add richer behavior only where it pays for itself.
+						</p>
+					</div>
+					<div class="feature-grid">
+						<? render_feature_card("templating", "Inline markup without framework tax", "UCE templates live directly inside handler code with escaped and raw output modes, so rendering stays local to the request logic that decides it."); ?>
+						<? render_feature_card("composition", "Components and sub-rendering", "Components are just .uce files. Props flow through context.call. Full pages can call other units without inventing a second application runtime."); ?>
+						<? render_feature_card("transport", "FastCGI for pages, HTTP for sockets", "Normal page renders stay on the FastCGI socket. Real WebSocket upgrades on .ws.uce endpoints are proxied to the built-in HTTP listener."); ?>
+						<? render_feature_card("operations", "nginx in front, systemd behind", "Static files stay static, nginx does the edge work, and the runtime handles compilation, request execution, and socket fan-out."); ?>
+					</div>
+				</section>
+
+				<section class="section manifesto">
+					<div class="section-heading">
+						<div class="eyebrow">Non-architecture</div>
+						<h2>It is not trying to save you from the web.</h2>
+					</div>
+					<div class="manifesto-grid">
+						<div class="manifesto-card">
+							<h3>What it leans into</h3>
+							<p>Files on disk, explicit request handlers, template tags, reusable partials, request-scoped state, and operationally plain deployment.</p>
+						</div>
+						<div class="manifesto-card">
+							<h3>What it resists</h3>
+							<p>Mandatory client-side hydration, giant application shells, hidden routing layers, and pretending every website is a desktop app in a trench coat.</p>
+						</div>
+						<div class="manifesto-card emphasis">
+							<h3>What it adds</h3>
+							<p>Built-in components, markdown rendering, current request data in one place, and a broker-backed WebSocket story that stays inside the same runtime.</p>
+						</div>
+					</div>
+				</section>
+
+				<section class="section" id="examples">
+					<div class="section-heading">
+						<div class="eyebrow">Code first</div>
+						<h2>Common things in UCE</h2>
+						<p>
+							The examples below are modeled on the current runtime API and the published demo pages.
+							The point is not abstraction depth. The point is that the code stays obvious.
+						</p>
+					</div>
+					<div class="code-grid">
+						<? render_code_example("templating", "A page with request data", "Drop from C++ into markup, escape output by default, and keep request handling next to the HTML it controls.", snippet_minimal, "See the live demos for forms, headers, sessions, JSON, markdown, and more."); ?>
+						<? render_code_example("forms", "POST + session flash", "Old-school dynamic websites still matter. UCE keeps form handling and page rendering in one file when that is the simplest thing.", snippet_forms, "Request data lives on context.get, context.post, context.cookies, and context.session."); ?>
+						<? render_code_example("components", "Reusable UI without a second framework", "Components are ordinary .uce files. Pass props through context.call and decide when to render or return markup.", snippet_components, "Named handlers and component_render() are also available for direct output flows."); ?>
+						<? render_code_example("content", "Markdown when you want it", "UCE also ships a markdown module, so content-heavy pages do not need an external rendering stack.", snippet_markdown, "The runtime supports markdown_to_ast() and markdown_to_html() for content pipelines and component hooks."); ?>
+						<? render_code_example("realtime", "WebSockets with broker-owned state", "A .ws.uce page can render HTML and also accept live socket messages. Connection-local state lives on context.connection.", snippet_websocket, "The published demo includes a full chat example with reconnect logic and per-connection metadata."); ?>
+						<? render_code_example("deploy", "nginx wiring", "Use FastCGI for ordinary requests and only send actual websocket upgrades to the runtime's built-in HTTP listener.", snippet_nginx, "Match .ws.uce before the generic .uce location so normal page loads and upgrades split correctly.", "nginx"); ?>
+					</div>
+				</section>
+
+				<section class="section deployment" id="deploy">
+					<div class="section-heading">
+						<div class="eyebrow">Deployment</div>
+						<h2>Put nginx in front. Keep the runtime focused.</h2>
+					</div>
+					<div class="deploy-grid">
+						<div class="deploy-card">
+							<h3>The intended shape</h3>
+							<ul>
+								<li>nginx serves static files directly from `site/`</li>
+								<li>ordinary `.uce` and plain `.ws.uce` page loads go through FastCGI</li>
+								<li>real websocket upgrade traffic goes to the built-in HTTP listener</li>
+								<li>systemd manages the runtime binary and restart policy</li>
+							</ul>
+						</div>
+						<div class="deploy-card">
+							<h3>The practical settings</h3>
+							<ul>
+								<li>`FCGI_SOCKET_PATH=/run/uce/fastcgi.sock` for normal requests</li>
+								<li>`HTTP_PORT=8080` for `.ws.uce` websocket upgrades</li>
+								<li>`scripts/systemd/manage-uce-service.sh` for build and service control</li>
+								<li>published root should be `site/`, not the repo root</li>
+							</ul>
+						</div>
+					</div>
+				</section>
+
+				<section class="section" id="explore">
+					<div class="section-heading">
+						<div class="eyebrow">Explore</div>
+						<h2>Go straight to the useful parts.</h2>
+					</div>
+					<div class="link-grid">
+							<? render_link_card("../demo/index.uce", "Demo Area", "Open the published UCE demo pages for strings, forms, sessions, JSON, components, markdown, and runtime behavior.", "Try things"); ?>
+							<? render_link_card("../demo/websockets.ws.uce", "WebSocket Demo", "See the built-in broker model in a real page that renders HTML, upgrades the same route, and broadcasts chat events.", "Realtime"); ?>
+							<? render_link_card("../doc/index.uce", "Reference Docs", "Browse the manual-style function and concept docs for the current runtime surface.", "Manual"); ?>
+							<? render_link_card("../doc/singlepage.uce", "Single-Page Docs", "Read the reference as one long page if you want the PHP-manual energy without the clicking.", "Reference"); ?>
+							<? render_link_card("../examples/uce-starter/index.uce", "UCE Starter", "Browse the larger example app built in UCE using components, themes, views, and richer page composition.", "Starter"); ?>
+							<? render_link_card("../README.md", "Repository README", "The repo README covers runtime shape, deployment, WebSockets, and the current project status in one place.", "Source"); ?>
+					</div>
+				</section>
+
+				<section class="section faq">
+					<div class="section-heading">
+						<div class="eyebrow">Reality check</div>
+						<h2>What this is and what it is not</h2>
+					</div>
+					<details open>
+						<summary>Is UCE production ready?</summary>
+						<p>The runtime is still experimental. The point of this site is to explain the model, show the current surface area, and make it easy to evaluate the demos and docs.</p>
+					</details>
+					<details>
+						<summary>Why compare it to PHP?</summary>
+						<p>Because the design instinct is similar: dynamic pages as files, shallow deployment, and a bias toward solving the request in front of you instead of building an application architecture altar.</p>
+					</details>
+					<details>
+						<summary>What makes it different from old PHP?</summary>
+						<p>The request object is explicit, components and named handlers are native, markdown support is built in, and WebSockets use a broker-owned connection model inside the runtime.</p>
+					</details>
+				</section>
+			</main>
+
+			<footer class="page-footer">
+				<p>UCE is a web runtime for people who still think pages, handlers, sockets, and deployment scripts should be understandable.</p>
+				<p><a href="../demo/index.uce">Demo</a> <span>/</span> <a href="../doc/index.uce">Docs</a> <span>/</span> <a href="../examples/uce-starter/index.uce">Starter</a></p>
+			</footer>
+		</div>
+	</body>
+	</html></>
+}

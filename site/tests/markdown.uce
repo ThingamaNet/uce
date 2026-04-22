@@ -1,0 +1,41 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	String markdown_src = "# Site Test Heading\n\nParagraph with **bold** content.\n\n:::warning\nWatch the component hook\n:::\n\n```txt\ncode block\n```\n";
+	DTree options;
+	options["components"][":::warning"] = "components/markdown/warning";
+	options["components"]["node.code_block"] = "components/markdown/code_block";
+
+	DTree ast = markdown_to_ast(markdown_src, options);
+	String ast_json = json_encode(ast);
+	String html = markdown_to_html(markdown_src, options);
+	String ast_excerpt = ast_json.substr(0, ast_json.length() > 220 ? 220 : ast_json.length());
+
+	site_tests_page_start("Markdown", "Markdown parser coverage with component-backed directive and node hooks.");
+
+	check("markdown_to_ast()", ast_json.find("heading") != String::npos || ast_json.find("code_block") != String::npos, ast_excerpt);
+	check("markdown_to_html()", html.find("<h1") != String::npos && html.find("tests-warning") != String::npos, html);
+	check("component hook output", html.find("tests-code-block") != String::npos, html);
+
+	?><div class="tests-section">
+		<h3>Rendered HTML</h3>
+		<?: html ?>
+	</div><?
+
+	site_tests_summary(passed, failed, skipped, "The warning directive and code-block renderer both run through local component fixtures under site/tests/components/markdown.");
+	site_tests_page_end();
+}

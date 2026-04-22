@@ -1,0 +1,60 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	String action = first(context.get["action"], "touch");
+	String session_id = session_start("uce-site-tests");
+	if(action == "destroy")
+		session_destroy();
+	else
+		context.session["suite"] = "http";
+
+	set_cookie("site-tests-cookie", "cookie-value", time() + 300);
+	context.header["X-Site-Tests"] = "http-suite";
+
+	String query_src = "alpha=1&beta=two%20words&gamma=ok";
+	StringMap query = parse_query(query_src);
+	String uri_input = "alpha beta/?x=1&y=2";
+	String encoded = uri_encode(uri_input);
+	String decoded = uri_decode(encoded);
+	String generated_session = session_id_create();
+	String query_dump = var_dump(query);
+	String set_cookie_dump = var_dump(context.set_cookies);
+	String header_dump = var_dump(context.header);
+	String session_dump = var_dump(context.session);
+
+	site_tests_page_start("HTTP And Session", "Request helpers, cookies, headers, URI parsing, and session lifecycle checks.");
+
+	check("uri_encode() / uri_decode()", decoded == uri_input, encoded + " => " + decoded);
+	check("parse_query()", query["alpha"] == "1" && query["beta"] == "two words", query_dump);
+	check("set_cookie()", set_cookie_dump.find("site-tests-cookie") != String::npos && set_cookie_dump.find("cookie-value") != String::npos, set_cookie_dump);
+	check("response header mutation", context.header["X-Site-Tests"] == "http-suite", header_dump);
+	check("session_start()", session_id != "", "session_id=" + session_id);
+	check("session_id_create()", generated_session.length() >= 16, generated_session);
+
+	if(action == "destroy")
+		check("session_destroy()", session_dump.find("suite") == String::npos, session_dump);
+	else
+		check("context.session writes", context.session["suite"] == "http", session_dump);
+
+	?><div class="tests-section">
+		<a class="button" href="?">Refresh Session Test</a>
+		<a class="button" href="?action=destroy">Destroy Session</a>
+	</div><?
+
+	site_tests_summary(passed, failed, skipped, "This page intentionally mutates only response headers and the test cookie/session namespace used by the suite.");
+	site_tests_page_end();
+}
