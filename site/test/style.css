@@ -1,5 +1,33 @@
 /* UCE Test Suite — Theme
    Color palette: deep blue gradient · warm gold accents · frosted glass surfaces */
+@font-face {
+	font-family: 'default_sans';
+	src: url('../examples/uce-starter/themes/common/fonts/b612/b612-regular.ttf') format('truetype');
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'default_sans';
+	src: url('../examples/uce-starter/themes/common/fonts/b612/b612-bold.ttf') format('truetype');
+	font-style: normal;
+	font-weight: 700;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'default_mono';
+	src: url('../examples/uce-starter/themes/common/fonts/b612/b612-mono-regular.ttf') format('truetype');
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'default_mono';
+	src: url('../examples/uce-starter/themes/common/fonts/b612/b612-mono-bold.ttf') format('truetype');
+	font-style: normal;
+	font-weight: 700;
+	font-display: swap;
+}
 
 :root {
 	--bg: #113399;
@@ -19,8 +47,8 @@
 	--border-strong: rgba(255, 255, 255, 0.14);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
 	--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
-	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-	--font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+	--font-sans: 'default_sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+	--font-mono: 'default_mono', 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
 	--radius: 10px;
 	--radius-lg: 16px;
 	--ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -380,6 +408,223 @@ section h2 {
 	border-bottom: none;
 	margin: 0 0 12px;
 	padding: 0;
+}
+
+/* ── Unit Browser ── */
+
+.unit-toolbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 16px;
+}
+
+.unit-toolbar p {
+	margin: 0;
+	color: var(--text-dim);
+}
+
+.unit-count {
+	font-family: var(--font-mono);
+	font-size: 0.82rem;
+	color: var(--text-dim);
+	padding: 6px 10px;
+	background: var(--bg-code);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+}
+
+.status-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	border: 1px solid var(--border);
+	background: var(--bg-code);
+	white-space: nowrap;
+}
+
+.status-ok {
+	color: #9ff0b3;
+	border-color: rgba(159, 240, 179, 0.25);
+	background: rgba(38, 105, 58, 0.22);
+}
+
+.status-warn {
+	color: #ffd97a;
+	border-color: rgba(255, 217, 122, 0.26);
+	background: rgba(120, 88, 22, 0.25);
+}
+
+.status-error {
+	color: #ff9e9e;
+	border-color: rgba(255, 158, 158, 0.3);
+	background: rgba(122, 34, 34, 0.28);
+}
+
+.status-muted {
+	color: var(--text-dim);
+	border-color: var(--border);
+	background: var(--bg-code);
+}
+
+.unit-browser-layout {
+	display: grid;
+	grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+	gap: 18px;
+	align-items: start;
+}
+
+.unit-sidebar,
+.unit-detail-pane {
+	min-width: 0;
+}
+
+.unit-sidebar-header,
+.unit-detail-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.unit-sidebar-header h2,
+.unit-detail-pane h2,
+.unit-detail-header h3 {
+	margin: 0;
+}
+
+.unit-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.unit-list-item {
+	display: block;
+	text-decoration: none;
+}
+
+.unit-list-item:hover {
+	text-decoration: none;
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.unit-list-item.is-selected {
+	border-color: rgba(240, 196, 48, 0.32);
+	background: rgba(240, 196, 48, 0.08);
+	box-shadow: 0 0 0 1px rgba(240, 196, 48, 0.08), var(--shadow-sm);
+}
+
+.unit-list-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.unit-list-title-row strong {
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	color: var(--text);
+	word-break: break-word;
+}
+
+.unit-list-path {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	word-break: break-word;
+	margin-bottom: 6px;
+	line-height: 1.45;
+}
+
+.unit-list-meta {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	font-size: 0.74rem;
+	color: var(--text-dim);
+}
+
+.unit-list-meta span {
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.unit-list-error {
+	margin-top: 8px;
+	font-size: 0.74rem;
+	color: #ffb7b7;
+	line-height: 1.4;
+}
+
+.unit-actions {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.unit-actions a {
+	font-size: 0.82rem;
+	font-family: var(--font-mono);
+}
+
+.unit-detail-path {
+	margin: 6px 0 0;
+	color: var(--text-dim);
+}
+
+.detail-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.detail-card {
+	padding: 16px 18px;
+	background: var(--bg-code);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-sm);
+}
+
+.detail-card strong {
+	display: block;
+	font-family: var(--font-mono);
+	font-size: 0.74rem;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	margin-bottom: 8px;
+}
+
+.detail-card span,
+.detail-card code {
+	font-size: 0.88rem;
+	word-break: break-word;
+}
+
+@media (max-width: 920px) {
+	.unit-browser-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.unit-sidebar-header,
+	.unit-detail-header {
+		flex-direction: column;
+	}
 }
 
 /* ── Scrollbar ── */

@@ -1,0 +1,111 @@
+:sig
+DTree
+
+:desc
+Dynamic tree/container type used throughout UCE for structured data.
+
+:Overview
+`DTree` is UCE's general-purpose structured value type.
+
+This is the runtime's default container for nested data such as configuration trees, call payloads, decoded JSON, connection state, and metadata returned by runtime helpers.
+
+:Value Kinds
+- `DTree` can hold:
+- `String`
+- `f64`
+- `bool`
+- pointer
+- nested map of child `DTree` values (map-shaped `DTree` values can be used to represent list-like data when the keys are numeric strings in sequence)
+
+:Used in
+`context.var`
+`context.cfg`
+`context.call`
+`context.connection`
+`json_decode()` results
+`unit_call()` return values
+`unit_info()`
+
+:Reading Values
+`["key"]` accesses or creates a child node.
+`.has("key")` checks whether a child exists without creating it.
+`.key("key")` returns a child pointer when it already exists.
+`.get_or_create("key")` returns a child pointer and creates it when missing.
+`.get_by_path("a/b/c")` traverses nested children without creating missing keys.
+`.to_string()` reads scalar content as text.
+`.to_s64()`, `.to_u64()`, and `.to_f64()` perform best-effort numeric conversion.
+`.to_bool()` performs best-effort boolean conversion.
+`.to_stringmap()` converts a map-shaped tree into `StringMap`.
+
+`operator[]` creates missing entries, just like `std::map`.
+`.has()` and `.key()` are the non-mutating lookup helpers.
+`.get_by_path()` is the non-creating traversal helper.
+`.json_decode()` currently stores JSON numbers as string-valued `DTree` nodes, so typed numeric conversion is the normal way to consume those values.
+References are dereferenced automatically in most normal reads.
+
+:Conversion Rules
+Scalar-looking strings are trimmed before numeric and boolean parsing.
+`.to_bool()` understands common textual forms such as `true`, `false`, `yes`, `no`, `1`, and `0`.
+`bool` values convert numerically to `1` / `0`.
+Pointer values convert numerically when read as numbers.
+Single-value maps can act as scalar wrappers for numeric and boolean conversion.
+Invalid numeric input falls back to `0`.
+`.to_stringmap()` converts map children key-by-key using each child's `to_string()`.
+
+:Writing Values
+`.set(String)`
+`.set(f64)`
+`.set_bool(bool)`
+`.set(StringMap)`
+`.set_array()`
+`.push(...)`
+`.pop()`
+`.remove(key)`
+`.clear()`
+
+Use `.set_array()` when you want list-style behavior with `push()` / `pop()`.
+
+:Inspection Helpers
+`.has(key)`
+`.key(key)`
+`.get_or_create(key)`
+`.get_type_name()`
+`.is_array()`
+`.is_list()`
+`.to_json()`
+
+:each()
+`each(std::function<void (DTree t, String key)> f)` iterates over the current tree value.
+
+For map-shaped `DTree` values, the callback is invoked once for each child entry and receives:
+`t` as the child value
+`key` as the child key
+
+For non-map values, `each()` still invokes the callback once:
+`t` is the current value
+`key` is an empty string
+
+Typical usage:
+`context.var["items"].each([&](DTree item, String key) { print(key, ": ", item.to_string(), "\n"); });`
+
+:Examples
+`String theme = context.cfg.get_by_path("theme/key").to_string()`
+
+`u64 compiled_mtime = unit_info("test/hello.uce")["compiled_mtime"].to_u64()`
+
+`bool dark_mode = context.call["dark_mode"].to_bool()`
+
+`if(DTree* user = payload.key("user")) { print(user->to_json()); }`
+
+`payload.get_or_create("headers")->get_or_create("Content-Type")->set("text/plain")`
+
+`StringMap headers = payload["headers"].to_stringmap()`
+
+:related
+**PHP:** Nested associative arrays, `stdClass`, decoded JSON trees, and helper accessors for deep array paths.
+**JavaScript / Node.js:** Plain objects, arrays, `Map`, and JSON-shaped data passed between handlers.
+
+:see
+>types
+get_by_path
+json_decode

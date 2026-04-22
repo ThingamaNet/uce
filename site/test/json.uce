@@ -15,13 +15,13 @@ RENDER(Request& context)
 
 		<pre style="white-space: pre-wrap"><?
 
-		t.key("a")->set("valueA");
-		t.key("b")->set("valueB");
-		t.key("c")->key("c-dt")->set_bool(true);
-		t.key("c")->key("c-df")->set_bool(false);
-		t.key("c")->key("c-e")->set("valueCE");
-		t.key("c")->key("c-f")->set(&t);
-		t.key("g")->key("g-h")->key("h-i")->set("valueHI");
+		t.get_or_create("a")->set("valueA");
+		t.get_or_create("b")->set("valueB");
+		t.get_or_create("c")->get_or_create("c-dt")->set_bool(true);
+		t.get_or_create("c")->get_or_create("c-df")->set_bool(false);
+		t.get_or_create("c")->get_or_create("c-e")->set("valueCE");
+		t.get_or_create("c")->get_or_create("c-f")->set(&t);
+		t.get_or_create("g")->get_or_create("g-h")->get_or_create("h-i")->set("valueHI");
 		t["g"]["x"]["y1"] = "XYZ1";
 		t["g"]["x"]["y2"] = &t;
 		t["g"]["x"]["y3"] = time();

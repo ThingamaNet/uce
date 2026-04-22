@@ -1,9 +1,11 @@
 #include "compiler.h"
 #include "compiler-parser.h"
+#include "hash.h"
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <sys/file.h>
+#include <unistd.h>
 
 namespace {
 
@@ -17,11 +19,14 @@ struct SharedUnitFilesystemState
 {
 	bool source_exists = false;
 	bool metadata_exists = false;
+	bool compile_output_exists = false;
 	bool metadata_parsed = false;
 	bool abi_compatible = false;
+	bool input_signature_matches = false;
 	time_t source_time = 0;
 	time_t compiled_time = 0;
 	time_t metadata_time = 0;
+	time_t compile_output_time = 0;
 	time_t setup_template_time = 0;
 	time_t compiler_header_time = 0;
 	time_t compiler_source_time = 0;
@@ -30,7 +35,50 @@ struct SharedUnitFilesystemState
 	time_t required_time = 0;
 	u64 metadata_abi_version = 0;
 	u64 runtime_abi_version = UCE_UNIT_ABI_VERSION;
+	String metadata_content;
+	String compile_output_content;
+	String metadata_build_token;
+	String metadata_input_signature;
+	String current_input_signature;
 };
+
+struct SharedUnitCompileCheck
+{
+	bool source_missing = false;
+	bool needs_compile = false;
+};
+
+bool compiler_config_truthy(String raw, bool default_value)
+{
+	raw = to_lower(trim(raw));
+	if(raw == "")
+		return(default_value);
+	if(raw == "1" || raw == "true" || raw == "yes" || raw == "on")
+		return(true);
+	if(raw == "0" || raw == "false" || raw == "no" || raw == "off")
+		return(false);
+	return(default_value);
+}
+
+bool compiler_jit_compile_on_request_enabled(Request* context)
+{
+	if(!context || !context->server)
+		return(true);
+	return(compiler_config_truthy(context->server->config["JIT_COMPILE_ON_REQUEST"], true));
+}
+
+u64 compiler_failure_retry_seconds(Request* context)
+{
+	if(!context || !context->server)
+		return(10);
+	auto raw = trim(context->server->config["COMPILE_FAILURE_RETRY_SECONDS"]);
+	if(raw == "")
+		return(10);
+	auto value = int_val(raw);
+	if(value < 0)
+		return(0);
+	return((u64)value);
+}
 
 bool compiler_is_u64_string(String value)
 {
@@ -45,11 +93,12 @@ bool compiler_is_u64_string(String value)
 	return(true);
 }
 
-bool compiler_parse_unit_metadata_abi(String content, u64& abi_out)
+StringMap compiler_parse_unit_metadata(String content)
 {
+	StringMap metadata;
 	content = trim(content);
 	if(content == "")
-		return(false);
+		return(metadata);
 
 	auto lines = split(content, "\n");
 	for(auto& raw_line : lines)
@@ -62,37 +111,97 @@ bool compiler_parse_unit_metadata_abi(String content, u64& abi_out)
 			continue;
 		auto key = trim(line.substr(0, split_pos));
 		auto value = trim(line.substr(split_pos + 1));
-		if(key != "unit_abi_version" || !compiler_is_u64_string(value))
-			continue;
-		abi_out = (u64)atoll(value.c_str());
-		return(true);
+		if(key != "")
+			metadata[key] = value;
 	}
-	return(false);
+	return(metadata);
 }
 
-String compiler_unit_metadata_text()
+String compiler_unit_input_signature(Request* context, SharedUnit* su)
+{
+	if(!context || !su || !file_exists(su->file_name))
+		return("");
+
+	String setup_template = context->server->config["COMPILER_SYS_PATH"] + "/" + context->server->config["SETUP_TEMPLATE"];
+	return(
+		gen_sha1(file_get_contents(su->file_name)) + ":" +
+		gen_sha1(file_get_contents(setup_template)) + ":" +
+		std::to_string(UCE_UNIT_ABI_VERSION)
+	);
+}
+
+String compiler_unit_build_token()
+{
+	return(
+		std::to_string(getpid()) + ":" +
+		std::to_string((u64)(time_precise() * 1000000.0))
+	);
+}
+
+String compiler_unit_metadata_text(Request* context, SharedUnit* su)
 {
 	return(
 		"format=uce-unit-metadata-v1\n"
 		"unit_abi_version=" + std::to_string(UCE_UNIT_ABI_VERSION) + "\n"
+		"input_signature=" + compiler_unit_input_signature(context, su) + "\n"
+		"build_token=" + compiler_unit_build_token() + "\n"
 	);
 }
 
-bool shared_unit_filesystem_requires_recompile(const SharedUnitFilesystemState& state)
+SharedUnitCompileCheck shared_unit_compile_check(const SharedUnitFilesystemState& state)
 {
-	if(!state.source_exists)
-		return(true);
-	if(state.compiled_time == 0)
-		return(true);
-	if(state.compiled_time < state.required_time)
-		return(true);
-	if(!state.metadata_exists)
-		return(true);
-	if(!state.metadata_parsed)
-		return(true);
-	if(!state.abi_compatible)
-		return(true);
-	return(false);
+	SharedUnitCompileCheck result;
+	result.source_missing = !state.source_exists;
+	result.needs_compile =
+		!state.source_exists ||
+		state.compiled_time == 0 ||
+		state.compiled_time < state.required_time ||
+		!state.metadata_exists ||
+		!state.metadata_parsed ||
+		!state.abi_compatible ||
+		!state.input_signature_matches;
+	return(result);
+}
+
+bool compiler_failure_retry_deferred(Request* context, SharedUnit* su, const SharedUnitFilesystemState& state)
+{
+	if(!context || !su)
+		return(false);
+	auto retry_seconds = compiler_failure_retry_seconds(context);
+	if(retry_seconds == 0)
+		return(false);
+	if(!state.compile_output_exists || state.compile_output_time == 0)
+		return(false);
+	if(state.source_time == 0)
+		return(false);
+	if(state.source_time > state.compile_output_time)
+		return(false);
+	return(time() < (u64)state.compile_output_time + retry_seconds);
+}
+
+String compiler_failure_output_for_state(SharedUnit* su, const SharedUnitFilesystemState& state)
+{
+	if(!state.compile_output_exists)
+		return("");
+	auto content = trim(state.compile_output_content);
+	if(content != "")
+		return(content);
+	if(su)
+		return(trim(su->compile_error_status));
+	return("");
+}
+
+void compiler_restore_persisted_failure(SharedUnit* su, const SharedUnitFilesystemState& state, String status = "compile_error")
+{
+	if(!su)
+		return;
+	auto message = compiler_failure_output_for_state(su, state);
+	if(message == "")
+		message = "recent compilation failed";
+	su->compiler_messages = message;
+	su->compile_status = status;
+	su->compile_error_status = message;
+	su->last_error = (state.compile_output_time != 0 ? state.compile_output_time : time());
 }
 
 time_t compiler_runtime_abi_time(Request* context)
@@ -196,6 +305,16 @@ auto compiler_with_registry_lock(Request* context, TCallback callback) -> declty
 	return(result);
 }
 
+bool compiler_has_known_unit_cached(Request* context, String file_name)
+{
+	if(!context)
+		return(false);
+	return(compiler_with_registry_lock(context, [&]() {
+		auto files = compiler_read_known_units_unlocked(context);
+		return(std::find(files.begin(), files.end(), file_name) != files.end());
+	}));
+}
+
 SharedUnitFilesystemState inspect_shared_unit_filesystem(Request* context, SharedUnit* su)
 {
 	SharedUnitFilesystemState state;
@@ -211,16 +330,47 @@ SharedUnitFilesystemState inspect_shared_unit_filesystem(Request* context, Share
 	state.runtime_binary_time = file_mtime(context->server->config["COMPILER_SYS_PATH"] + "/bin/uce_fastcgi.linux.bin");
 	state.compiler_abi_time = compiler_runtime_abi_time(context);
 	state.metadata_time = file_mtime(su->meta_file_name);
+	state.compile_output_time = file_mtime(su->compile_output_file_name);
+	state.current_input_signature = compiler_unit_input_signature(context, su);
 	state.metadata_exists = (state.metadata_time != 0);
+	state.compile_output_exists = (state.compile_output_time != 0);
 	if(state.metadata_exists)
-		state.metadata_parsed = compiler_parse_unit_metadata_abi(
-			file_get_contents(su->meta_file_name),
-			state.metadata_abi_version
-		);
+	{
+		state.metadata_content = file_get_contents(su->meta_file_name);
+		auto metadata = compiler_parse_unit_metadata(state.metadata_content);
+		auto abi_it = metadata.find("unit_abi_version");
+		if(abi_it != metadata.end() && compiler_is_u64_string(abi_it->second))
+		{
+			state.metadata_abi_version = (u64)atoll(abi_it->second.c_str());
+			state.metadata_parsed = true;
+		}
+		auto input_it = metadata.find("input_signature");
+		if(input_it != metadata.end())
+			state.metadata_input_signature = input_it->second;
+		auto build_it = metadata.find("build_token");
+		if(build_it != metadata.end())
+			state.metadata_build_token = build_it->second;
+	}
+	if(state.compile_output_exists)
+		state.compile_output_content = file_get_contents(su->compile_output_file_name);
 	state.abi_compatible = (state.metadata_parsed && state.metadata_abi_version == state.runtime_abi_version);
+	state.input_signature_matches = (
+		state.metadata_parsed &&
+		state.metadata_input_signature != "" &&
+		state.current_input_signature != "" &&
+		state.metadata_input_signature == state.current_input_signature
+	);
 	state.required_time = std::max({state.source_time, state.setup_template_time, state.compiler_abi_time});
 	state.compiled_time = file_mtime(su->so_name);
 	return(state);
+}
+
+void compiler_record_observed_filesystem_state(SharedUnit* su, const SharedUnitFilesystemState& state)
+{
+	if(!su)
+		return;
+	su->observed_compiled_time = state.compiled_time;
+	su->observed_metadata_content = state.metadata_content;
 }
 
 bool shared_unit_cache_is_stale(Request* context, SharedUnit* su)
@@ -229,9 +379,11 @@ bool shared_unit_cache_is_stale(Request* context, SharedUnit* su)
 		return(true);
 
 	auto state = inspect_shared_unit_filesystem(context, su);
-	if(shared_unit_filesystem_requires_recompile(state))
+	if(shared_unit_compile_check(state).needs_compile)
 		return(true);
-	if(su->last_compiled != 0 && state.compiled_time != su->last_compiled)
+	if(state.compiled_time != su->observed_compiled_time)
+		return(true);
+	if(state.metadata_content != su->observed_metadata_content)
 		return(true);
 	return(false);
 }
@@ -243,6 +395,45 @@ void release_shared_unit_cache_entry(Request* context, String file_name)
 		return;
 	delete it->second;
 	context->server->units.erase(it);
+}
+
+SharedUnit* compiler_cached_unit(Request* context, String file_name)
+{
+	auto it = context->server->units.find(file_name);
+	if(it == context->server->units.end())
+		return(0);
+	return(it->second);
+}
+
+bool compiler_cache_mode_matches(SharedUnit* su, bool opt_so_optional)
+{
+	return(su && su->opt_so_optional == opt_so_optional);
+}
+
+bool compiler_cached_unit_is_reusable(Request* context, SharedUnit* su, bool opt_so_optional, bool force_recompile)
+{
+	return(
+		!force_recompile &&
+		compiler_cache_mode_matches(su, opt_so_optional) &&
+		!shared_unit_cache_is_stale(context, su)
+	);
+}
+
+SharedUnit* compiler_reusable_cached_unit(Request* context, String file_name, bool opt_so_optional, bool force_recompile)
+{
+	auto su = compiler_cached_unit(context, file_name);
+	if(compiler_cached_unit_is_reusable(context, su, opt_so_optional, force_recompile))
+		return(su);
+	return(0);
+}
+
+void compiler_release_cached_unit_if_needed(Request* context, String file_name, bool opt_so_optional, bool force_recompile)
+{
+	auto su = compiler_cached_unit(context, file_name);
+	if(!su)
+		return;
+	if(force_recompile || !compiler_cache_mode_matches(su, opt_so_optional) || shared_unit_cache_is_stale(context, su))
+		release_shared_unit_cache_entry(context, file_name);
 }
 
 String compiler_current_unit_path(Request* context)
@@ -354,11 +545,12 @@ String compiler_error_status(SharedUnit* su)
 
 String compiler_status_from_filesystem(const SharedUnitFilesystemState& state, SharedUnit* su = 0)
 {
+	auto compile_check = shared_unit_compile_check(state);
 	if(!state.source_exists)
 		return("missing_source");
 	if(state.compiled_time == 0 || !state.metadata_exists)
 		return("not_compiled");
-	if(shared_unit_filesystem_requires_recompile(state))
+	if(compile_check.needs_compile)
 		return("stale");
 	if(su && su->so_handle)
 		return("loaded");
@@ -453,13 +645,12 @@ void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 	su->so_name = su->bin_path + "/" + su->bin_file_name;
 	su->api_file_name = su->bin_path + "/" + su->src_file_name + ".exports.txt";
 	su->meta_file_name = su->bin_path + "/" + su->src_file_name + ".meta.txt";
+	su->compile_output_file_name = su->bin_path + "/" + su->src_file_name + ".compile.txt";
 	//su->setup_file_name = su->bin_path + "/" + su->src_file_name + ".setup.h";
 }
 
-void load_shared_unit(Request* context, SharedUnit* su, String file_name)
+void load_shared_unit(Request* context, SharedUnit* su)
 {
-	//setup_unit_paths(context, su, file_name);
-
 	su->on_render = 0;
 	su->on_component = 0;
 	su->on_websocket = 0;
@@ -472,6 +663,12 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 		if(su->opt_so_optional)
 		{
 			su->compile_status = "not_compiled";
+			return;
+		}
+		auto fs_state = inspect_shared_unit_filesystem(context, su);
+		if(compiler_failure_retry_deferred(context, su, fs_state))
+		{
+			compiler_restore_persisted_failure(su, fs_state);
 			return;
 		}
 		//printf("(i) unit file not found: %s\n", su->so_name.c_str());
@@ -525,14 +722,14 @@ void load_shared_unit(Request* context, SharedUnit* su, String file_name)
 	return(result);
 }*/
 
-void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
+void compile_shared_unit(Request* context, SharedUnit* su)
 {
-	//setup_unit_paths(context, su, file_name);
 	f64 comp_start = time_precise();
 
 	if(!file_exists(su->file_name))
 	{
 		su->compiler_messages = "source file not found (" + su->file_name + ")";
+		file_put_contents(su->compile_output_file_name, su->compiler_messages + "\n");
 		compiler_untrack_known_unit(context, su->file_name);
 		compiler_record_compile_result(su, time_precise() - comp_start, false, "missing_source", su->compiler_messages);
 		return;
@@ -554,14 +751,22 @@ void compile_shared_unit(Request* context, SharedUnit* su, String file_name)
 
 	if(su->compiler_messages.length() > 0)
 	{
+		file_put_contents(su->compile_output_file_name, su->compiler_messages + "\n");
 		compiler_record_compile_result(su, time_precise() - comp_start, false, "compile_error", su->compiler_messages);
 		printf("%s \n", su->compiler_messages.c_str());
 	}
 	else
 	{
-		load_shared_unit(context, su, file_name);
+		load_shared_unit(context, su);
 		if(su->so_handle)
-			file_put_contents(su->meta_file_name, compiler_unit_metadata_text());
+		{
+			file_put_contents(su->meta_file_name, compiler_unit_metadata_text(context, su));
+			file_unlink(su->compile_output_file_name);
+		}
+		else if(trim(su->compiler_messages) != "")
+		{
+			file_put_contents(su->compile_output_file_name, su->compiler_messages + "\n");
+		}
 		compiler_record_compile_result(
 			su,
 			time_precise() - comp_start,
@@ -579,16 +784,11 @@ SharedUnit* compiler_get_shared_unit_internal(Request* context, String file_name
 {
 	file_name = compiler_normalize_unit_path(context, file_name);
 
-	auto existing = context->server->units.find(file_name);
-	bool cache_mode_matches = (
-		existing != context->server->units.end() &&
-		existing->second->opt_so_optional == opt_so_optional
-	);
-	if(!force_recompile && existing != context->server->units.end() && cache_mode_matches && !shared_unit_cache_is_stale(context, existing->second))
-		return(existing->second);
+	auto cached = compiler_reusable_cached_unit(context, file_name, opt_so_optional, force_recompile);
+	if(cached)
+		return(cached);
 
-	if(existing != context->server->units.end())
-		release_shared_unit_cache_entry(context, file_name);
+	compiler_release_cached_unit_if_needed(context, file_name, opt_so_optional, force_recompile);
 
 	SharedUnit* su = new SharedUnit();
 	setup_unit_paths(context, su, file_name);
@@ -598,37 +798,60 @@ SharedUnit* compiler_get_shared_unit_internal(Request* context, String file_name
 	if(fdlock != -1)
 		flock(fdlock, LOCK_EX);
 
-	existing = context->server->units.find(file_name);
-	cache_mode_matches = (
-		existing != context->server->units.end() &&
-		existing->second->opt_so_optional == opt_so_optional
-	);
-	if(existing != context->server->units.end() && (force_recompile || !cache_mode_matches || shared_unit_cache_is_stale(context, existing->second)))
-		release_shared_unit_cache_entry(context, file_name);
-	existing = context->server->units.find(file_name);
-	cache_mode_matches = (
-		existing != context->server->units.end() &&
-		existing->second->opt_so_optional == opt_so_optional
-	);
-	if(!force_recompile && existing != context->server->units.end() && cache_mode_matches && !shared_unit_cache_is_stale(context, existing->second))
+	cached = compiler_reusable_cached_unit(context, file_name, opt_so_optional, force_recompile);
+	if(cached)
 	{
 		compiler_close_lock_file(fdlock);
 		delete su;
-		return(existing->second);
+		return(cached);
 	}
 
+	compiler_release_cached_unit_if_needed(context, file_name, opt_so_optional, force_recompile);
+
 	auto state = inspect_shared_unit_filesystem(context, su);
-	bool do_recompile = force_recompile || !state.source_exists || state.compiled_time == 0 || state.compiled_time < state.required_time;
+	auto compile_check = shared_unit_compile_check(state);
+	bool retry_deferred = compiler_failure_retry_deferred(context, su, state);
+	bool jit_enabled = compiler_jit_compile_on_request_enabled(context);
+	bool do_recompile = force_recompile || compile_check.needs_compile;
 	if(do_recompile)
 	{
-		compile_shared_unit(context, su, file_name);
+		if(!force_recompile && retry_deferred)
+			compiler_restore_persisted_failure(su, state);
+		else if(!force_recompile && !jit_enabled)
+		{
+			compiler_restore_persisted_failure(su, state, "jit_compile_disabled");
+			if(trim(su->compiler_messages) == "")
+			{
+				su->compiler_messages = "JIT compilation on request is disabled";
+				su->compile_error_status = su->compiler_messages;
+			}
+		}
+		else
+			compile_shared_unit(context, su);
 	}
 	else
 	{
-		load_shared_unit(context, su, file_name);
+		load_shared_unit(context, su);
 		if(!su->so_handle)
-			compile_shared_unit(context, su, file_name);
+		{
+			if(!force_recompile && retry_deferred)
+				compiler_restore_persisted_failure(su, state);
+			else if(!force_recompile && !jit_enabled)
+			{
+				compiler_restore_persisted_failure(su, state, "jit_compile_disabled");
+				if(trim(su->compiler_messages) == "")
+				{
+					su->compiler_messages = "JIT compilation on request is disabled";
+					su->compile_error_status = su->compiler_messages;
+				}
+			}
+			else
+				compile_shared_unit(context, su);
+		}
 	}
+
+	auto observed_state = inspect_shared_unit_filesystem(context, su);
+	compiler_record_observed_filesystem_state(su, observed_state);
 
 	compiler_close_lock_file(fdlock);
 
@@ -728,13 +951,9 @@ StringList compiler_scan_site_units(Request* context)
 
 StringList compiler_list_known_units(Request* context)
 {
-	auto files = compiler_with_registry_lock(context, [&]() {
+	return(compiler_with_registry_lock(context, [&]() {
 		return(compiler_read_known_units_unlocked(context));
-	});
-	context->server->known_unit_files.clear();
-	for(auto& file_name : files)
-		context->server->known_unit_files[file_name] = true;
-	return(files);
+	}));
 }
 
 void compiler_set_known_units(Request* context, StringList files)
@@ -744,24 +963,22 @@ void compiler_set_known_units(Request* context, StringList files)
 		compiler_write_known_units_unlocked(context, files);
 		return(0);
 	});
-	context->server->known_unit_files.clear();
-	for(auto& file_name : files)
-		context->server->known_unit_files[file_name] = true;
 }
 
 void compiler_track_known_unit(Request* context, String file_name)
 {
 	file_name = compiler_normalize_unit_path(context, file_name);
-	if(file_name == "" || !compiler_is_known_unit_file(file_name) || context->server->known_unit_files[file_name])
+	if(file_name == "" || !compiler_is_known_unit_file(file_name))
 		return;
 
 	compiler_with_registry_lock(context, [&]() {
 		auto files = compiler_read_known_units_unlocked(context);
+		if(std::find(files.begin(), files.end(), file_name) != files.end())
+			return(0);
 		files.push_back(file_name);
 		compiler_write_known_units_unlocked(context, files);
 		return(0);
 	});
-	context->server->known_unit_files[file_name] = true;
 }
 
 void compiler_untrack_known_unit(Request* context, String file_name)
@@ -776,7 +993,6 @@ void compiler_untrack_known_unit(Request* context, String file_name)
 		compiler_write_known_units_unlocked(context, files);
 		return(0);
 	});
-	context->server->known_unit_files.erase(file_name);
 }
 
 bool compiler_unit_needs_recompile(Request* context, String file_name, bool* source_missing)
@@ -785,13 +1001,14 @@ bool compiler_unit_needs_recompile(Request* context, String file_name, bool* sou
 	SharedUnit su;
 	setup_unit_paths(context, &su, file_name);
 	auto state = inspect_shared_unit_filesystem(context, &su);
+	auto compile_check = shared_unit_compile_check(state);
 	if(source_missing)
-		*source_missing = !state.source_exists;
-	if(!state.source_exists)
+		*source_missing = compile_check.source_missing;
+	if(compile_check.source_missing)
 		return(false);
-	if(state.compiled_time == 0)
-		return(true);
-	return(state.compiled_time < state.required_time);
+	if(compiler_failure_retry_deferred(context, &su, state))
+		return(false);
+	return(compile_check.needs_compile);
 }
 
 DTree unit_info(String path)
@@ -825,6 +1042,8 @@ DTree unit_info(String path)
 	}
 
 	auto fs_state = inspect_shared_unit_filesystem(context, su);
+	if(su->compile_status == "unknown" && compiler_failure_retry_deferred(context, su, fs_state))
+		compiler_restore_persisted_failure(su, fs_state);
 	auto exports_text = compiler_unit_exports_text(su);
 	auto exports = compiler_unit_exports(su);
 	if(exports.size() == 0 && exports_text != "")
@@ -841,6 +1060,7 @@ DTree unit_info(String path)
 	info["so_name"] = su->so_name;
 	info["api_file_name"] = su->api_file_name;
 	info["meta_file_name"] = su->meta_file_name;
+	info["compile_output_file_name"] = su->compile_output_file_name;
 	info["compile_status"] = (su->compile_status != "unknown" ? su->compile_status : compiler_status_from_filesystem(fs_state, su));
 	info["compile_error_status"] = su->compile_error_status;
 	info["runtime_error_status"] = su->runtime_error_status;
@@ -867,11 +1087,15 @@ DTree unit_info(String path)
 	info["source_mtime"] = (f64)fs_state.source_time;
 	info["compiled_mtime"] = (f64)fs_state.compiled_time;
 	info["metadata_mtime"] = (f64)fs_state.metadata_time;
+	info["compile_output_mtime"] = (f64)fs_state.compile_output_time;
 	info["setup_template_mtime"] = (f64)fs_state.setup_template_time;
 	info["required_mtime"] = (f64)fs_state.required_time;
 	info["runtime_abi_version"] = (f64)fs_state.runtime_abi_version;
 	info["metadata_abi_version"] = (f64)fs_state.metadata_abi_version;
-	compiler_tree_set_bool(info, "known", context->server->known_unit_files[resolved_path]);
+	info["current_input_signature"] = fs_state.current_input_signature;
+	info["metadata_input_signature"] = fs_state.metadata_input_signature;
+	info["metadata_build_token"] = fs_state.metadata_build_token;
+	compiler_tree_set_bool(info, "known", compiler_has_known_unit_cached(context, resolved_path));
 	compiler_tree_set_bool(info, "current_unit", resolved_path == compiler_current_unit_path(context));
 	compiler_tree_set_bool(info, "loaded", su->so_handle != 0);
 	compiler_tree_set_bool(info, "source_exists", fs_state.source_exists);
@@ -879,7 +1103,10 @@ DTree unit_info(String path)
 	compiler_tree_set_bool(info, "metadata_exists", fs_state.metadata_exists);
 	compiler_tree_set_bool(info, "metadata_parsed", fs_state.metadata_parsed);
 	compiler_tree_set_bool(info, "abi_compatible", fs_state.abi_compatible);
-	compiler_tree_set_bool(info, "stale", shared_unit_cache_is_stale(context, su));
+	compiler_tree_set_bool(info, "input_signature_matches", fs_state.input_signature_matches);
+	compiler_tree_set_bool(info, "stale", shared_unit_compile_check(fs_state).needs_compile && !compiler_failure_retry_deferred(context, su, fs_state));
+	compiler_tree_set_bool(info, "retry_deferred", compiler_failure_retry_deferred(context, su, fs_state));
+	compiler_tree_set_bool(info, "cache_stale", shared_unit_cache_is_stale(context, su));
 	compiler_tree_set_bool(info, "has_render", su->on_render != 0);
 	compiler_tree_set_bool(info, "has_component", su->on_component != 0);
 	compiler_tree_set_bool(info, "has_websocket", su->on_websocket != 0);

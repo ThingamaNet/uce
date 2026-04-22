@@ -23,6 +23,8 @@ RENDER(Request& context)
 {
 
 	String page = first(context.get["p"], "index");
+	String page_title = page;
+	nibble(page_title, "_");
 
 	<><html>
 	<head>
@@ -34,7 +36,7 @@ RENDER(Request& context)
 			<a href="index.uce">UCE Docs</a><?
 			if(page != "index")
 			{
-				?><span class="dim"> / </span><?= page ?><?
+				?><span class="dim"> / </span><?= page_title ?><?
 			}
 		?>
 		</h1>
@@ -76,6 +78,14 @@ RENDER(Request& context)
 					String pre = nibble(fn, "_");
 					?>
 					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">directive</span></a></div>
+					<?
+				}
+				else if(ft.substr(0, 2) == "3_")
+				{
+					String fn = ft;
+					String pre = nibble(fn, "_");
+					?>
+					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">info</span></a></div>
 					<?
 				}
 				else
@@ -135,18 +145,28 @@ RENDER(Request& context)
 		{
 			auto doc = split(file_get_contents("pages/"+page+".txt"), "\n");
 
-			// Pre-extract related lines for sidebar
-			StringList rel_lines;
-			bool in_rel = false;
+			// Pre-extract sidebar-only sections so the article body stays focused.
+			StringList equiv_lines;
+			StringList see_lines;
+			String sidebar_section = "";
 			for(auto s : doc)
 			{
-				if(s == ":related") { in_rel = true; }
-				else if(s != "" && s.substr(0, 1) == ":") { in_rel = false; }
-				else if(in_rel && s != "") { rel_lines.push_back(s); }
+				if(s != "" && s.substr(0, 1) == ":")
+				{
+					sidebar_section = s.substr(1);
+				}
+				else if(sidebar_section == "related" && s != "")
+				{
+					equiv_lines.push_back(s);
+				}
+				else if(sidebar_section == "see" && s != "")
+				{
+					see_lines.push_back(s);
+				}
 			}
 
 			String detail_class = "detail-layout";
-			if(rel_lines.size() == 0) detail_class += " no-sidebar";
+			if(equiv_lines.size() == 0 && see_lines.size() == 0) detail_class += " no-sidebar";
 			?><div class="<?= detail_class ?>">
 			<article class="doc-detail"><?
 			String layout_class = "text";
@@ -169,7 +189,7 @@ RENDER(Request& context)
 						?></div><?
 					}
 
-					section_hidden = (new_class == "related");
+					section_hidden = (new_class == "related" || new_class == "see");
 					layout_class = new_class;
 
 					if(!section_hidden)
@@ -190,10 +210,6 @@ RENDER(Request& context)
 						else if(layout_class == "desc")
 						{
 							?><h3>Description</h3><?
-						}
-						else if(layout_class == "see")
-						{
-							?><h3>Related</h3><?
 						}
 						else
 						{
@@ -216,17 +232,6 @@ RENDER(Request& context)
 					{
 						?><div><b><?= trim(nibble(s, ":")) ?></b> : <?= trim(s) ?></div><?
 					}
-					else if(layout_class == "see")
-					{
-						if(s[0] == '>')
-						{
-							render_see_section(s.substr(1));
-						}
-						else
-						{
-							?><div><a href="index.uce?p=<?= trim(s) ?>"><?= trim(s) ?><span class="dim">()</span></a></div><?
-						}
-					}
 					else
 					{
 						?><div><?: markdown_to_html(s) ?></div><?
@@ -239,14 +244,33 @@ RENDER(Request& context)
 			}
 			?></article><?
 
-			if(rel_lines.size() > 0)
+			if(equiv_lines.size() > 0 || see_lines.size() > 0)
 			{
 				?><aside class="detail-sidebar">
-				<div class="sidebar-card">
-				<h3>PHP &amp; JS Equivalents</h3><?
-				for(auto rl : rel_lines)
+				<div class="sidebar-card"><?
+				if(equiv_lines.size() > 0)
 				{
-					?><div><?: markdown_to_html(rl) ?></div><?
+					?><h3>PHP &amp; JS Equivalents</h3><?
+					for(auto rl : equiv_lines)
+					{
+						?><div><?: markdown_to_html(rl) ?></div><?
+					}
+				}
+
+				if(see_lines.size() > 0)
+				{
+					?><h3 class="sidebar-subhead">Related</h3><?
+					for(auto sl : see_lines)
+					{
+						if(sl[0] == '>')
+						{
+							render_see_section(sl.substr(1));
+						}
+						else
+						{
+							?><div><a href="index.uce?p=<?= trim(sl) ?>"><?= trim(sl) ?><span class="dim">()</span></a></div><?
+						}
+					}
 				}
 				?></div>
 				</aside><?

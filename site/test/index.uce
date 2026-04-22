@@ -56,6 +56,7 @@ RENDER(Request& context)
 
 			<div class="grid-heading">Advanced</div>
 			<? render_card("call_file.uce", "unit_call()", "Dynamic file inclusion"); ?>
+			<? render_card("unit-browser.uce", "Unit Browser", "units_list(), unit_info(), unit_compile()"); ?>
 			<? render_card("components.uce", "Components", "Reusable component system"); ?>
 			<? render_card("markdown.uce", "Markdown", "Markdown parsing with components"); ?>
 			<? render_card("script.uce", "Script", "UCE script integration"); ?>

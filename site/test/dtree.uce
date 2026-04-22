@@ -18,7 +18,7 @@ RENDER(Request& context)
 		t.set("String test");
 		print("String:  ", t.to_string(), "\n");
 
-		t.set(true);
+		t.set_bool(true);
 		print("bool:    ", t.to_string(), "\n");
 
 		t.set(1234.5678);
@@ -29,16 +29,55 @@ RENDER(Request& context)
 
 		?></pre>
 
+		<h2>Typed Conversions</h2>
+
+		<pre><?
+
+		DTree scalar_text;
+		scalar_text = "42.75";
+		print("text -> f64: ", scalar_text.to_f64(), "\n");
+		print("text -> u64: ", scalar_text.to_u64(), "\n");
+		print("text -> s64: ", scalar_text.to_s64(), "\n");
+
+		DTree bool_text;
+		bool_text = "yes";
+		print("yes -> bool: ", bool_text.to_bool() ? "true" : "false", "\n");
+
+		DTree single_value_map;
+		single_value_map["value"] = "123";
+		print("{value:123} -> u64: ", single_value_map.to_u64(), "\n");
+
+		DTree headers;
+		headers["Content-Type"] = "text/plain";
+		headers["X-Test"] = "123";
+		print("map -> StringMap:\n", var_dump(headers.to_stringmap()), "\n");
+
+		?></pre>
+
+		<h2>Lookup Helpers</h2>
+
+		<pre><?
+
+		DTree lookup;
+		print("has(user) before create: ", lookup.has("user") ? "true" : "false", "\n");
+		print("key(user) before create: ", lookup.key("user") ? "present" : "missing", "\n");
+		lookup.get_or_create("user")->set("Ada");
+		print("has(user) after create: ", lookup.has("user") ? "true" : "false", "\n");
+		if(DTree* user = lookup.key("user"))
+			print("key(user) after create: ", user->to_string(), "\n");
+
+		?></pre>
+
 		<h2>Nested Tree</h2>
 
 		<pre><?
 
-		t.key("a")->set("valueA");
-		t.key("b")->set("valueB");
-		t.key("c")->key("c-d")->set("valueCD");
-		t.key("c")->key("c-e")->set("valueCE");
-		t.key("c")->key("c-f")->set(&t);
-		t.key("g")->key("g-h")->key("h-i")->set("valueHI");
+		t.get_or_create("a")->set("valueA");
+		t.get_or_create("b")->set("valueB");
+		t.get_or_create("c")->get_or_create("c-d")->set("valueCD");
+		t.get_or_create("c")->get_or_create("c-e")->set("valueCE");
+		t.get_or_create("c")->get_or_create("c-f")->set(&t);
+		t.get_or_create("g")->get_or_create("g-h")->get_or_create("h-i")->set("valueHI");
 		t["g"]["x"]["y1"] = "XYZ1";
 		t["g"]["x"]["y2"] = &t;
 		t["g"]["x"]["y3"] = time();

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <sys/file.h>
 #include <signal.h>
+#include <sstream>
 
 String shell_exec(String cmd);
 String shell_escape(String raw);
@@ -9,17 +11,19 @@ String dirname(String fn);
 String path_join(String base, String child);
 bool mkdir(String path);
 bool file_exists(String path);
+int file_open_locked(String file_name, int open_flags, int lock_type = LOCK_SH, int create_mode = 0644);
+void file_close_locked(int fd);
+String file_get_contents_locked_fd(int fd);
+bool file_put_contents_locked_fd(int fd, String content);
 String file_get_contents(String file_name);
 bool file_put_contents(String file_name, String content);
-#include <fstream>
+bool file_append_contents(String file_name, String content);
 template <typename... Ts>
 bool file_append(String file_name, Ts... args)
 {
-	std::ofstream fout;
-	fout.open(file_name.c_str(), std::ios_base::app);
-	((fout << args), ...);
-	fout.close();
-	return(true);
+	std::ostringstream out;
+	((out << args), ...);
+	return(file_append_contents(file_name, out.str()));
 }
 String cwd_get();
 void cwd_set(String path);
@@ -32,6 +36,7 @@ f64 time_precise();
 u64 time();
 String time_format_local(String format = "", u64 timestamp = 0);
 String time_format_utc(String format = "", u64 timestamp = 0);
+String time_format_relative(u64 timestamp, String format_very_recent = "", u64 medium_recency_seconds = 0, String format_medium_recent = "", u64 not_recent_seconds = 0, String format_not_recent = "");
 u64 time_parse(String time_String);
 
 u64 socket_connect(String host, short port);

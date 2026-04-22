@@ -105,6 +105,18 @@ Returns a formatted date. This is based on the Linux date() command. The formatt
 
        %Z     alphabetic time zone abbreviation (e.g., EDT)
 
+       %deltaS total elapsed seconds between the timestamp and now
+
+       %deltaM total elapsed minutes between the timestamp and now
+
+       %deltaH total elapsed hours between the timestamp and now
+
+       %deltad total elapsed days between the timestamp and now
+
+       %deltam total elapsed 30-day months between the timestamp and now
+
+       %deltaY total elapsed 365-day years between the timestamp and now
+
        By default, date pads numeric fields with zeroes.  The following
        optional flags may follow '%':
 
@@ -123,6 +135,7 @@ Returns a formatted date. This is based on the Linux date() command. The formatt
 
 :see
 >time
+>time_format_relative
 
 :related
 **PHP:** `date()` and `DateTime` formatting in the server local timezone

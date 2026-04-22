@@ -31,7 +31,7 @@ String capture_backtrace_string(u32 max_frames, u32 skip_frames)
 		trace += "\n";
 	}
 	free(symbols);
-	return(trace);
+ 	return(trace);
 }
 
 String signal_name(int sig)
@@ -47,6 +47,40 @@ String signal_name(int sig)
 		case SIGTERM: return("SIGTERM");
 		default: return("");
 	}
+}
+
+namespace {
+
+String time_format_expand_delta_tokens(String format, u64 timestamp, u64 now_timestamp)
+{
+	u64 delta_seconds = 0;
+	if(now_timestamp > timestamp)
+		delta_seconds = now_timestamp - timestamp;
+
+	format = replace(format, "%deltaY", std::to_string(delta_seconds / (60 * 60 * 24 * 365)));
+	format = replace(format, "%deltam", std::to_string(delta_seconds / (60 * 60 * 24 * 30)));
+	format = replace(format, "%deltad", std::to_string(delta_seconds / (60 * 60 * 24)));
+	format = replace(format, "%deltaH", std::to_string(delta_seconds / (60 * 60)));
+	format = replace(format, "%deltaM", std::to_string(delta_seconds / 60));
+	format = replace(format, "%deltaS", std::to_string(delta_seconds));
+	return(format);
+}
+
+String time_format_shell(String format, u64 timestamp, bool use_utc)
+{
+	String ts;
+	String fmt;
+	u64 effective_timestamp = (timestamp > 0 ? timestamp : time());
+	String expanded_format = time_format_expand_delta_tokens(format, effective_timestamp, time());
+
+	if(timestamp > 0)
+		ts = String("-d '@")+std::to_string(timestamp)+"'";
+	if(expanded_format != "")
+		fmt = String("+'")+expanded_format+"'";
+
+	return(trim(shell_exec(String("date ") + (use_utc ? "-u " : "") + ts + " " + fmt)));
+}
+
 }
 
 String shell_exec(String cmd)
@@ -154,63 +188,117 @@ bool file_exists(String path)
 	return(std::filesystem::exists(fp));
 }
 
-String file_get_contents(String file_name)
+int file_open_locked(String file_name, int open_flags, int lock_type, int create_mode)
 {
-	/*std::ifstream ifs(file_name);
-	printf("stream file desc %i\n", ifs.filedesc());
-	String content(
-		(std::istreambuf_iterator<char>(ifs) ),
-		(std::istreambuf_iterator<char>()    ) );*/
+	int fd = open(file_name.c_str(), open_flags, create_mode);
+	if(fd == -1)
+		return(-1);
+	if(flock(fd, lock_type) == -1)
+	{
+		close(fd);
+		return(-1);
+	}
+	return(fd);
+}
+
+void file_close_locked(int fd)
+{
+	if(fd == -1)
+		return;
+	flock(fd, LOCK_UN);
+	close(fd);
+}
+
+String file_get_contents_locked_fd(int fd)
+{
+	if(fd == -1)
+		return("");
+
 	char buf[512];
 	String content;
-	s32 fd = open(file_name.c_str(), O_RDONLY);
+	s64 bytes_read = 0;
+	lseek(fd, 0, SEEK_SET);
+	while((bytes_read = read(fd, buf, sizeof(buf))) > 0)
+		content.append(buf, bytes_read);
+	return(content);
+}
+
+namespace {
+
+bool file_write_all(int fd, const char* data, size_t remaining)
+{
+	while(remaining > 0)
+	{
+		auto bytes_written = write(fd, data, remaining);
+		if(bytes_written < 0)
+			return(false);
+		data += bytes_written;
+		remaining -= bytes_written;
+	}
+	return(true);
+}
+
+}
+
+bool file_put_contents_locked_fd(int fd, String content)
+{
+	if(fd == -1)
+		return(false);
+	lseek(fd, 0, SEEK_SET);
+	if(ftruncate(fd, 0) != 0)
+		return(false);
+	if(!file_write_all(fd, content.data(), content.length()))
+		return(false);
+	return(true);
+}
+
+String file_get_contents(String file_name)
+{
+	s32 fd = file_open_locked(file_name, O_RDONLY, LOCK_SH);
 	if(fd == -1)
 	{
 		printf("(!) Could not read %s\n", file_name.c_str());
 		return("");
 	}
-	flock(fd, LOCK_SH);
-	s64 bytes_read = 0;
-	//s64 size = lseek(fd, 0, SEEK_END);
-	//lseek(fd, 0, SEEK_SET);
-	//content.reserve(size+1);
-
-	while((bytes_read = read(fd, buf, 512)) > 0)
-	{
-		content.append(buf, bytes_read);
-	}
-
-	flock(fd, LOCK_UN);
-	close(fd);
+	String content = file_get_contents_locked_fd(fd);
+	file_close_locked(fd);
 	return(content);
 }
 
 bool file_put_contents(String file_name, String content)
 {
-	s32 fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
 	if(fd == -1)
 	{
 		printf("(!) Could not write %s\n", file_name.c_str());
 		return(false);
 	}
-	flock(fd, LOCK_EX);
-	const char* data = content.data();
-	size_t remaining = content.length();
-	while(remaining > 0)
+	bool ok = file_put_contents_locked_fd(fd, content);
+	file_close_locked(fd);
+	if(!ok)
 	{
-		auto bytes_written = write(fd, data, remaining);
-		if(bytes_written < 0)
-		{
-			flock(fd, LOCK_UN);
-			close(fd);
-			printf("(!) Could not fully write %s\n", file_name.c_str());
-			return(false);
-		}
-		data += bytes_written;
-		remaining -= bytes_written;
+		printf("(!) Could not fully write %s\n", file_name.c_str());
+		return(false);
 	}
-	flock(fd, LOCK_UN);
-	close(fd);
+	return(true);
+}
+
+bool file_append_contents(String file_name, String content)
+{
+	s32 fd = file_open_locked(file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+	if(fd == -1)
+	{
+		printf("(!) Could not append %s\n", file_name.c_str());
+		return(false);
+	}
+	lseek(fd, 0, SEEK_END);
+	bool ok = file_write_all(fd, content.data(), content.length());
+	file_close_locked(fd);
+	if(!ok)
+	{
+		printf("(!) Could not fully append %s\n", file_name.c_str());
+		return(false);
+	}
 	return(true);
 }
 
@@ -284,26 +372,34 @@ u64 time()
 
 String time_format_local(String format, u64 timestamp)
 {
-	String ts;
-	String fmt;
-	if(timestamp > 0)
-		ts = String("-d '@")+std::to_string(timestamp)+"'";
-	if(format != "")
-		fmt = String("+'"+format+"'");
-	return(trim(shell_exec("date "+ts+" "+fmt)));
+	return(time_format_shell(format, timestamp, false));
 }
 
 String time_format_utc(String format, u64 timestamp)
 {
-	String ts;
-	String fmt;
-	if(timestamp > 0)
-		ts = String("-d '@")+std::to_string(timestamp)+"'";
 	if(format == "RFC1123")
 		format = "%a, %d %b %Y %T GMT";
-	if(format != "")
-		fmt = String("+'"+format+"'");
-	return(trim(shell_exec("date -u "+ts+" "+fmt)));
+	return(time_format_shell(format, timestamp, true));
+}
+
+String time_format_relative(u64 timestamp, String format_very_recent, u64 medium_recency_seconds, String format_medium_recent, u64 not_recent_seconds, String format_not_recent)
+{
+	u64 now_timestamp = time();
+	u64 delta_seconds = 0;
+	if(now_timestamp > timestamp)
+		delta_seconds = now_timestamp - timestamp;
+
+	format_very_recent = first(format_very_recent, "just now");
+	medium_recency_seconds = (medium_recency_seconds > 0 ? medium_recency_seconds : 90);
+	format_medium_recent = first(format_medium_recent, "%deltaM minutes ago");
+	not_recent_seconds = (not_recent_seconds > 0 ? not_recent_seconds : 90 * 60);
+	format_not_recent = first(format_not_recent, "%deltaH hours ago");
+
+	if(delta_seconds < medium_recency_seconds)
+		return(time_format_expand_delta_tokens(format_very_recent, timestamp, now_timestamp));
+	if(delta_seconds < not_recent_seconds)
+		return(time_format_expand_delta_tokens(format_medium_recent, timestamp, now_timestamp));
+	return(time_format_expand_delta_tokens(format_not_recent, timestamp, now_timestamp));
 }
 
 u64 time_parse(String time_String)
@@ -511,21 +607,29 @@ int task_kill(pid_t pid, int sig)
 pid_t task_pid(String key)
 {
 	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
+	String lock_file_name = status_file_name + ".lock";
+	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
 	String status_file = file_get_contents(status_file_name);
 	pid_t p = 0;
 	if(status_file != "")
 	{
 		p = int_val(status_file);
 		if(task_kill(p, 0) == 0) // process is still running
+		{
+			file_close_locked(lock_fd);
 			return(p);
+		}
 		file_unlink(status_file_name);
 	}
+	file_close_locked(lock_fd);
 	return(p);
 }
 
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 {
 	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
+	String lock_file_name = status_file_name + ".lock";
+	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
 	String status_file = file_get_contents(status_file_name);
 	pid_t p;
 	if(status_file != "")
@@ -534,6 +638,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		if(task_kill(p, 0) == 0) // process is still running
 		{
 			printf("(P) worker process '%s' already running: PID %i\n", key.c_str(), p);
+			file_close_locked(lock_fd);
 			return(p);
 		}
 		//printf("(P) worker process '%s' had crashed: PID %i\n", key.c_str(), p);
@@ -542,27 +647,31 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 	p = fork();
 	if(p == 0)
 	{
+		file_close_locked(lock_fd);
 		my_pid = getpid();
-		file_put_contents(status_file_name, std::to_string(my_pid));
 
 		close(context->resources.client_socket);
 		context->resources.client_socket = 0;
 		//printf("(C) child procress started, PID:%i\n", my_pid);
 		//prctl(PR_SET_PDEATHSIG, SIGHUP);
 		exec_after_spawn();
+		int exit_lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
 		file_unlink(status_file_name);
+		file_close_locked(exit_lock_fd);
 		printf("(P) worker process '%s' terminated: PID %i\n", key.c_str(), my_pid);
 		exit(0);
 	}
 	else
 	{
+		file_put_contents(status_file_name, std::to_string(p));
+		file_close_locked(lock_fd);
 		printf("(P) worker process '%s' spawned: PID %i\n", key.c_str(), p);
 		return(p);
 	}
 }
 
 #include <unistd.h>
-pid_t task_repeat(String key, u64 interval, std::function<void()> exec_after_spawn, u64 timeout)
+pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spawn, u64 timeout)
 {
 	auto repeater_function = [&]() {
 		while (true)
@@ -610,6 +719,9 @@ StringMap make_server_settings()
 	cfg["COMPILER_SYS_PATH"] = ".";
 	cfg["PRECOMPILE_FILES_IN"] = "";
 	cfg["SITE_DIRECTORY"] = "site";
+	cfg["JIT_COMPILE_ON_REQUEST"] = "1";
+	cfg["PROACTIVE_COMPILE_ENABLED"] = "1";
+	cfg["COMPILE_FAILURE_RETRY_SECONDS"] = std::to_string(10);
 	cfg["PROACTIVE_COMPILE_CHECK_INTERVAL"] = std::to_string(60);
 
 	cfg["HTTP_PORT"] = std::to_string(8080);

@@ -1,27 +1,28 @@
+#load "../config/settings.uce"
 #load "user.class.h"
 
-String starter_fs_root(Request& context)
+String app_fs_root(Request& context)
 {
-	String root = context.var["starter"]["fs_root"].to_string();
+	String root = context.var["app"]["fs_root"].to_string();
 	if(root == "")
 		root = cwd_get();
 	return(root);
 }
 
-String starter_script_url(Request& context)
+String app_script_url(Request& context)
 {
-	String url = context.var["starter"]["script_url"].to_string();
+	String url = context.var["app"]["script_url"].to_string();
 	if(url == "")
 		url = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
 	return(url);
 }
 
-String starter_base_url(Request& context)
+String app_base_url(Request& context)
 {
-	String base = context.var["starter"]["base_url"].to_string();
+	String base = context.var["app"]["base_url"].to_string();
 	if(base == "")
 	{
-		base = dirname(starter_script_url(context));
+		base = dirname(app_script_url(context));
 		if(base == "")
 			base = "/";
 		if(base[base.length() - 1] != '/')
@@ -30,15 +31,16 @@ String starter_base_url(Request& context)
 	return(base);
 }
 
-String starter_fs_path(String relative, Request& context)
+String app_fs_path(String relative, Request& context)
 {
-	return(path_join(starter_fs_root(context), relative));
+	return(path_join(app_fs_root(context), relative));
 }
 
-String starter_link(String path, Request& context);
-String starter_link(String path, StringMap params, Request& context);
+String app_link(String path, Request& context);
+String app_link(String path, StringMap params, Request& context);
+void app_init(Request& context);
 
-String starter_first_route_segment(Request& context)
+String app_first_route_segment(Request& context)
 {
 	String query = context.params["QUERY_STRING"];
 	for(auto part : split(query, "&"))
@@ -51,10 +53,10 @@ String starter_first_route_segment(Request& context)
 	return("");
 }
 
-DTree starter_make_route(Request& context)
+DTree app_make_route(Request& context)
 {
 	DTree route;
-	String path = starter_first_route_segment(context);
+	String path = app_first_route_segment(context);
 	path = trim(path);
 	while(path.length() > 0 && path[0] == '/')
 		path = path.substr(1);
@@ -69,10 +71,10 @@ DTree starter_make_route(Request& context)
 	return(route);
 }
 
-DTree starter_resolve_view(Request& context, String base_dir = "views")
+DTree app_resolve_view(Request& context, String base_dir = "views")
 {
 	DTree result;
-	DTree route = context.var["starter"]["route"];
+	DTree route = context.var["app"]["route"];
 	String lpath = first(route["l_path"].to_string(), "index");
 	String base = trim(base_dir);
 	if(base != "" && base[base.length() - 1] == '/')
@@ -110,128 +112,54 @@ DTree starter_resolve_view(Request& context, String base_dir = "views")
 	return(result);
 }
 
-DTree starter_default_config()
+void app_register_css(String path, Request& context)
 {
-	DTree config;
-
-	config["site"]["name"] = "UCE Starter";
-	config["site"]["default_page_title"] = "Home";
-	config["site"]["timezone"] = "UTC";
-
-	config["users"]["enable_signup"].set_bool(true);
-	config["filebase"]["path"] = "/tmp/uce-starter-data";
-
-	config["theme"]["key"] = "portal-dark";
-	config["theme"]["options"]["light"]["label"] = "Starter Light";
-	config["theme"]["options"]["light"]["path"] = "themes/light/";
-	config["theme"]["options"]["light"]["mode"] = "light";
-	config["theme"]["options"]["light"]["description"] = "Original starter light theme kept for backward compatibility.";
-	config["theme"]["options"]["light"]["footer_text"] = "UCE Starter running with the Starter Light theme.";
-	config["theme"]["options"]["light"]["meta_description"] = "Starter Light theme for the UCE starter";
-	config["theme"]["options"]["light"]["theme_color"] = "#3b82f6";
-
-	config["theme"]["options"]["dark"]["label"] = "Starter Dark";
-	config["theme"]["options"]["dark"]["path"] = "themes/dark/";
-	config["theme"]["options"]["dark"]["mode"] = "dark";
-	config["theme"]["options"]["dark"]["description"] = "Original starter dark theme kept for backward compatibility.";
-	config["theme"]["options"]["dark"]["footer_text"] = "UCE Starter running with the Starter Dark theme.";
-	config["theme"]["options"]["dark"]["meta_description"] = "Starter Dark theme for the UCE starter";
-	config["theme"]["options"]["dark"]["theme_color"] = "#0f172a";
-
-	config["theme"]["options"]["portal-light"]["label"] = "AI Portal Light";
-	config["theme"]["options"]["portal-light"]["path"] = "themes/portal-light/";
-	config["theme"]["options"]["portal-light"]["mode"] = "light";
-	config["theme"]["options"]["portal-light"]["description"] = "Dense, corporate portal layout in a light palette.";
-	config["theme"]["options"]["portal-light"]["footer_text"] = "UCE Starter running with the AI Portal Light starter theme.";
-	config["theme"]["options"]["portal-light"]["meta_description"] = "AI Portal Light theme for the UCE starter";
-	config["theme"]["options"]["portal-light"]["theme_color"] = "#0f68ad";
-
-	config["theme"]["options"]["portal-dark"]["label"] = "AI Portal Dark";
-	config["theme"]["options"]["portal-dark"]["path"] = "themes/portal-dark/";
-	config["theme"]["options"]["portal-dark"]["mode"] = "dark";
-	config["theme"]["options"]["portal-dark"]["description"] = "Glassy dark portal shell and the current default starter theme.";
-	config["theme"]["options"]["portal-dark"]["footer_text"] = "UCE Starter running with the AI Portal Dark starter theme.";
-	config["theme"]["options"]["portal-dark"]["meta_description"] = "AI Portal Dark theme for the UCE starter";
-	config["theme"]["options"]["portal-dark"]["theme_color"] = "#0f172a";
-
-	config["theme"]["options"]["localfirst"]["label"] = "Local First";
-	config["theme"]["options"]["localfirst"]["path"] = "themes/localfirst/";
-	config["theme"]["options"]["localfirst"]["mode"] = "dark";
-	config["theme"]["options"]["localfirst"]["description"] = "llm2-derived admin shell with sidebar chrome.";
-	config["theme"]["options"]["localfirst"]["footer_text"] = "UCE Starter running with the Local First starter theme.";
-	config["theme"]["options"]["localfirst"]["meta_description"] = "Local First admin-shell theme for the UCE starter";
-	config["theme"]["options"]["localfirst"]["theme_color"] = "#020913";
-
-	config["theme"]["options"]["retro-gaming"]["label"] = "Retro Gaming";
-	config["theme"]["options"]["retro-gaming"]["path"] = "themes/retro-gaming/";
-	config["theme"]["options"]["retro-gaming"]["mode"] = "dark";
-	config["theme"]["options"]["retro-gaming"]["description"] = "CRT scanlines, pixel font, neon glow.";
-	config["theme"]["options"]["retro-gaming"]["footer_text"] = "INSERT COIN // UCE Starter running the Retro Gaming theme.";
-	config["theme"]["options"]["retro-gaming"]["meta_description"] = "Retro Gaming pixel theme for the UCE starter";
-	config["theme"]["options"]["retro-gaming"]["theme_color"] = "#0a0a1a";
-
-	config["menu"][""]["title"] = "Home";
-	config["menu"][""]["hidden"].set_bool(true);
-	config["menu"]["page1"]["title"] = "Components";
-	config["menu"]["features"]["title"] = "Features";
-	config["menu"]["page2"]["title"] = "Ajaxy";
-	config["menu"]["gauges"]["title"] = "Gauges";
-	config["menu"]["dashboard"]["title"] = "Dashboard";
-	config["menu"]["workspace"]["title"] = "Workspace";
-	config["menu"]["themes"]["title"] = "Themes";
-	config["menu"]["auth/demo"]["title"] = "Auth";
-
-	return(config);
+	context.var["app"]["assets"]["css"][path] = path;
 }
 
-void starter_register_css(String path, Request& context)
+void app_register_js(String path, Request& context)
 {
-	context.var["starter"]["assets"]["css"][path] = path;
+	context.var["app"]["assets"]["js"][path] = path;
 }
 
-void starter_register_js(String path, Request& context)
+String app_asset_url(String path, Request& context)
 {
-	context.var["starter"]["assets"]["js"][path] = path;
-}
-
-String starter_asset_url(String path, Request& context)
-{
-	String url = starter_base_url(context) + path;
-	String fs_path = starter_fs_path(path, context);
+	String url = app_base_url(context) + path;
+	String fs_path = app_fs_path(path, context);
 	if(file_exists(fs_path))
 		url += "?v=" + std::to_string((u64)file_mtime(fs_path));
 	return(url);
 }
 
-void starter_render_registered_css(Request& context)
+void app_render_registered_css(Request& context)
 {
-	context.var["starter"]["assets"]["css"].each([&](DTree item, String key) {
+	context.var["app"]["assets"]["css"].each([&](DTree item, String key) {
 		String path = item.to_string();
 		if(path != "")
 		{
-			<><link rel="stylesheet" href="<?= starter_asset_url(path, context) ?>" /></>
+			<><link rel="stylesheet" href="<?= app_asset_url(path, context) ?>" /></>
 		}
 	});
 }
 
-void starter_render_registered_js(Request& context)
+void app_render_registered_js(Request& context)
 {
-	context.var["starter"]["assets"]["js"].each([&](DTree item, String key) {
+	context.var["app"]["assets"]["js"].each([&](DTree item, String key) {
 		String path = item.to_string();
 		if(path != "")
 		{
-			<><script src="<?= starter_asset_url(path, context) ?>"></script></>
+			<><script src="<?= app_asset_url(path, context) ?>"></script></>
 		}
 	});
 }
 
-String starter_link(String path, Request& context)
+String app_link(String path, Request& context)
 {
 	StringMap params;
-	return(starter_link(path, params, context));
+	return(app_link(path, params, context));
 }
 
-String starter_link(String path, StringMap params, Request& context)
+String app_link(String path, StringMap params, Request& context)
 {
 	String query = "";
 	path = trim(path);
@@ -242,33 +170,33 @@ String starter_link(String path, StringMap params, Request& context)
 		query += "&" + extra;
 	else if(query == "")
 		query = extra;
-	String url = starter_script_url(context);
+	String url = app_script_url(context);
 	if(query != "")
 		url += "?" + query;
 	return(url);
 }
 
-void starter_redirect(String path, Request& context)
+void app_redirect(String path, Request& context)
 {
 	context.set_status(302, "Found");
-	context.header["Location"] = starter_link(path, context);
+	context.header["Location"] = app_link(path, context);
 }
 
-void starter_not_found(String message, Request& context)
+void app_not_found(String message, Request& context)
 {
 	context.set_status(404, "Not Found");
-	context.var["starter"]["error"] = message;
-	context.var["starter"]["page_title"] = "404 Not Found";
+	context.var["app"]["error"] = message;
+	context.var["app"]["page_title"] = "404 Not Found";
 }
 
-String starter_menu_href(String menu_key, DTree menu_item, Request& context)
+String app_menu_href(String menu_key, DTree menu_item, Request& context)
 {
 	if(menu_item["external"].to_string() != "")
 		return("/" + menu_key);
-	return(starter_link(menu_key, context));
+	return(app_link(menu_key, context));
 }
 
-String starter_html_class(Request& context)
+String app_html_class(Request& context)
 {
 	String classes = "no-js";
 	if(context.cfg.get_by_path("theme/mode").to_string() == "dark")
@@ -276,15 +204,15 @@ String starter_html_class(Request& context)
 	return(classes);
 }
 
-String starter_page_main_html(Request& context)
+String app_page_main_html(Request& context)
 {
 	String main_html = context.call["main_html"].to_string();
 	if(main_html == "")
-		main_html = context.var["starter"]["fragments"]["main"].to_string();
+		main_html = context.var["app"]["fragments"]["main"].to_string();
 	return(main_html);
 }
 
-bool starter_bool_value(DTree value, bool fallback = false)
+bool app_bool_value(DTree value, bool fallback = false)
 {
 	String raw = trim(value.to_string());
 	if(raw == "")
@@ -301,22 +229,22 @@ bool starter_bool_value(DTree value, bool fallback = false)
 	);
 }
 
-bool starter_request_embed_mode(Request& context)
+bool app_request_embed_mode(Request& context)
 {
-	return(starter_bool_value(context.var["starter"]["embed_mode"]));
+	return(app_bool_value(context.var["app"]["embed_mode"]));
 }
 
-bool starter_page_embed_mode(Request& context)
+bool app_page_embed_mode(Request& context)
 {
 	String embed_value = context.call["embed_mode"].to_string();
 	if(embed_value != "")
-		return(starter_bool_value(context.call["embed_mode"]));
-	return(starter_request_embed_mode(context));
+		return(app_bool_value(context.call["embed_mode"]));
+	return(app_request_embed_mode(context));
 }
 
-String starter_theme_page_component(Request& context)
+String app_theme_page_component(Request& context)
 {
-	String page_type = first(context.var["starter"]["page_type"].to_string(), "html");
+	String page_type = first(context.var["app"]["page_type"].to_string(), "html");
 	if(page_type == "blank")
 		return("themes/common/page.blank.uce");
 	if(page_type == "json")
@@ -330,17 +258,17 @@ String starter_theme_page_component(Request& context)
 	return(theme_path + "page.html.uce");
 }
 
-void starter_render_page(Request& context)
+void app_render_page(Request& context)
 {
 	if(context.flags.status >= 300 && context.flags.status < 400)
 		return;
 
 	DTree page_props;
-	page_props["main_html"] = context.var["starter"]["fragments"]["main"];
-	if(context.var["starter"]["json"].get_type_name() == "array")
-		page_props["json"] = context.var["starter"]["json"];
+	page_props["main_html"] = context.var["app"]["fragments"]["main"];
+	if(context.var["app"]["json"].get_type_name() == "array")
+		page_props["json"] = context.var["app"]["json"];
 
-	String page_component = starter_theme_page_component(context);
+	String page_component = app_theme_page_component(context);
 	if(page_component != "" && file_exists(page_component))
 	{
 		print(component(page_component, page_props, context));
@@ -349,27 +277,115 @@ void starter_render_page(Request& context)
 
 	context.set_status(500, "Internal Server Error");
 	context.header["Content-Type"] = "text/plain; charset=utf-8";
-	print("UCE Starter is missing the page template component: " + page_component);
+	print("UCE app is missing the page template component: " + page_component);
 }
+
+// Backward-compatible aliases for older starter example units.
+using StarterUser = AppUser;
 
 void starter_boot(Request& context)
 {
-	if(context.var["starter"]["booted"].to_string() == "1")
+	app_init(context);
+}
+
+String starter_link(String path, Request& context)
+{
+	return(app_link(path, context));
+}
+
+String starter_link(String path, StringMap params, Request& context)
+{
+	return(app_link(path, params, context));
+}
+
+void starter_register_css(String path, Request& context)
+{
+	app_register_css(path, context);
+}
+
+void starter_register_js(String path, Request& context)
+{
+	app_register_js(path, context);
+}
+
+String starter_asset_url(String path, Request& context)
+{
+	return(app_asset_url(path, context));
+}
+
+void starter_render_registered_css(Request& context)
+{
+	app_render_registered_css(context);
+}
+
+void starter_render_registered_js(Request& context)
+{
+	app_render_registered_js(context);
+}
+
+bool starter_page_embed_mode(Request& context)
+{
+	return(app_page_embed_mode(context));
+}
+
+String starter_page_main_html(Request& context)
+{
+	return(app_page_main_html(context));
+}
+
+String starter_html_class(Request& context)
+{
+	return(app_html_class(context));
+}
+
+String starter_menu_href(String menu_key, DTree menu_item, Request& context)
+{
+	return(app_menu_href(menu_key, menu_item, context));
+}
+
+void starter_render_page(Request& context)
+{
+	app_render_page(context);
+}
+
+void starter_redirect(String path, Request& context)
+{
+	app_redirect(path, context);
+}
+
+void starter_not_found(String message, Request& context)
+{
+	app_not_found(message, context);
+}
+
+DTree starter_make_route(Request& context)
+{
+	return(app_make_route(context));
+}
+
+DTree starter_resolve_view(Request& context, String base_dir = "views")
+{
+	return(app_resolve_view(context, base_dir));
+}
+
+void app_init(Request& context)
+{
+	if(context.var["app"]["booted"].to_string() == "1")
 		return;
 
-	context.var["starter"]["booted"] = "1";
-	context.var["starter"]["fs_root"] = cwd_get();
-	context.var["starter"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
+	context.var["app"]["booted"] = "1";
+	context.var["app"]["fs_root"] = cwd_get();
+	context.var["app"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
 
-	String base_url = dirname(context.var["starter"]["script_url"].to_string());
+	String base_url = dirname(context.var["app"]["script_url"].to_string());
 	if(base_url == "")
 		base_url = "/";
 	if(base_url[base_url.length() - 1] != '/')
 		base_url.append(1, '/');
-	context.var["starter"]["base_url"] = base_url;
+	context.var["app"]["base_url"] = base_url;
 
-	DTree config = starter_default_config();
-	String requested_theme = first(context.get["theme"], context.cookies["starter_theme"], config["theme"]["key"].to_string());
+	DTree config = get_config();
+	String requested_theme = first(context.get["theme"], context.cookies["app_theme"], config["theme"]["key"].to_string());
 	if(config["theme"]["options"][requested_theme].to_string() == "" && config["theme"]["options"][requested_theme].get_type_name() != "array")
 		requested_theme = config["theme"]["key"].to_string();
 
@@ -379,24 +395,24 @@ void starter_boot(Request& context)
 	config["theme"]["key"] = requested_theme;
 	context.cfg = config;
 	context.var["cfg"].set_reference(&context.cfg);
-	context.var["starter"]["config"].set_reference(&context.cfg);
-	context.var["starter"]["route"] = starter_make_route(context);
-	context.var["starter"]["page_type"] = "html";
-	context.var["starter"]["page_title"] = first(config["menu"][context.var["starter"]["route"]["l_path"].to_string()]["title"].to_string(), config["site"]["default_page_title"].to_string(), "Home");
-	context.var["starter"]["embed_mode"].set_bool(context.get["embed"] != "");
+	context.var["app"]["config"].set_reference(&context.cfg);
+	context.var["app"]["route"] = app_make_route(context);
+	context.var["app"]["page_type"] = "html";
+	context.var["app"]["page_title"] = first(config["menu"][context.var["app"]["route"]["l_path"].to_string()]["title"].to_string(), config["site"]["default_page_title"].to_string(), "Home");
+	context.var["app"]["embed_mode"].set_bool(context.get["embed"] != "");
 
 	if(context.get["theme"] != "" && context.get["theme"] == requested_theme)
 	{
-		set_cookie("starter_theme", requested_theme, time() + (86400 * 180));
-		context.cookies["starter_theme"] = requested_theme;
+		set_cookie("app_theme", requested_theme, time() + (86400 * 180));
+		context.cookies["app_theme"] = requested_theme;
 	}
 
 	session_start();
-	StarterUser(context).is_signed_in();
+	AppUser(context).is_signed_in();
 
-	starter_register_css(context.cfg.get_by_path("theme/path").to_string() + "css/style.css", context);
-	starter_register_css("themes/common/fontawesome/css/all.min.css", context);
-	starter_register_js("js/u-query.js", context);
-	starter_register_js("js/morphdom.js", context);
-	starter_register_js("js/site.js", context);
+	app_register_css(context.cfg.get_by_path("theme/path").to_string() + "css/style.css", context);
+	app_register_css("themes/common/fontawesome/css/all.min.css", context);
+	app_register_js("js/u-query.js", context);
+	app_register_js("js/morphdom.js", context);
+	app_register_js("js/site.js", context);
 }

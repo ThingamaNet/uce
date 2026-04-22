@@ -66,6 +66,7 @@ struct SharedUnit {
 	String so_name;
 	String api_file_name;
 	String meta_file_name;
+	String compile_output_file_name;
 	String setup_file_name;
 	StringList api_declarations;
 	std::map<String, void*> api_functions;
@@ -89,9 +90,11 @@ struct SharedUnit {
 	String compile_error_status = "";
 	String runtime_error_status = "";
 	time_t last_compiled = 0;
+	time_t observed_compiled_time = 0;
 	time_t last_loaded = 0;
 	time_t last_rendered = 0;
 	time_t last_error = 0;
+	String observed_metadata_content = "";
 
 	u64 request_count = 0;
 	u64 invoke_count = 0;
@@ -125,7 +128,6 @@ struct UploadedFile {
 struct ServerState {
 
 	std::map<String, SharedUnit*> units;
-	std::map<String, bool> known_unit_files;
 	StringMap config;
 	u32 request_count = 0;
 
@@ -153,6 +155,9 @@ struct Request {
 	StringMap post;
 	StringMap cookies;
 	StringMap session;
+	String session_file_name = "";
+	String session_serialized = "";
+	int session_lock_fd = -1;
 
 	DTree var;
 	DTree cfg;

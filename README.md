@@ -69,6 +69,8 @@ Useful related runtime patterns:
 Useful helpers for that data model now include:
 
 - `DTree::get_by_path("a/b/c")` for path-style config traversal without creating missing keys
+- `DTree::has("key")` / `key("key")` for non-mutating child lookup, and `get_or_create("key")` when creation is intended
+- `DTree::to_u64()`, `to_s64()`, `to_f64()`, `to_bool()`, and `to_stringmap()` for typed reads from structured values
 - `json_encode(String)` for emitting JavaScript-safe string literals directly
 - `ascii_safe_name(String)` for conservative ASCII identifier normalization
 - `path_join(base, child)` for filesystem-style path assembly

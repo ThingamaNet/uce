@@ -1,3 +1,4 @@
+#include <sys/file.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
@@ -97,6 +98,11 @@ Request::~Request()
 		delete stream;
 	ob_stack.clear();
 	ob = 0;
+	if(session_lock_fd != -1)
+	{
+		flock(session_lock_fd, LOCK_UN);
+		close(session_lock_fd);
+	}
 	for(auto& sockfd : resources.sockets)
 		close(sockfd);
 }

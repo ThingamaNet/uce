@@ -145,6 +145,18 @@ String ws_message()
 	return(context->call["message"].to_string());
 }
 
+bool config_truthy(String raw, bool default_value = true)
+{
+	raw = to_lower(trim(raw));
+	if(raw == "")
+		return(default_value);
+	if(raw == "1" || raw == "true" || raw == "yes" || raw == "on")
+		return(true);
+	if(raw == "0" || raw == "false" || raw == "no" || raw == "off")
+		return(false);
+	return(default_value);
+}
+
 String ws_connection_id()
 {
 	if(!context)
@@ -419,17 +431,22 @@ void run_proactive_compiler()
 {
 	Request background_context;
 	StringList compile_queue;
+	background_context.server = &server_state;
+	if(!config_truthy(server_state.config["PROACTIVE_COMPILE_ENABLED"], true))
+		return;
 	f64 check_interval = float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]);
 	f64 failure_retry_interval = 0;
 	f64 next_scan_at = 0;
 	std::map<String, f64> retry_after;
 	if(check_interval < 1)
 		check_interval = 1;
-	failure_retry_interval = std::max(check_interval, 60.0);
+	failure_retry_interval = std::max(
+		check_interval,
+		(f64)std::max((s64)10, (s64)int_val(server_state.config["COMPILE_FAILURE_RETRY_SECONDS"]))
+	);
 
 	my_pid = getpid();
 	context = &background_context;
-	background_context.server = &server_state;
 
 	close_inherited_server_sockets();
 	signal(SIGSEGV, on_segfault);
@@ -502,6 +519,8 @@ void run_proactive_compiler()
 			{
 				retry_after.erase(file_name);
 			}
+			background_context.session.clear();
+			background_context.session_serialized = "";
 			clear_shared_unit_cache(server_state);
 			usleep(250000);
 			continue;
@@ -518,6 +537,8 @@ bool proactive_compiler_alive()
 
 void ensure_proactive_compiler()
 {
+	if(!config_truthy(server_state.config["PROACTIVE_COMPILE_ENABLED"], true))
+		return;
 	if(float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]) <= 0)
 		return;
 

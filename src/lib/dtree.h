@@ -2,6 +2,11 @@
 
 String json_escape(String s, char quote_char = '"');
 
+// DTree is UCE's general-purpose structured value container.
+// It stores scalar values, nested map/list-like values, and internal references.
+// Numeric and boolean reads are intentionally permissive so request data,
+// JSON-decoded values, and metadata trees can be consumed without repetitive
+// manual parsing at each call site.
 struct DTree {
 
 	char type = 'S';
@@ -18,6 +23,11 @@ struct DTree {
 	bool is_array();
 	bool is_list() const;
 	String to_string();
+	s64 to_s64();
+	u64 to_u64();
+	f64 to_f64();
+	bool to_bool();
+	StringMap to_stringmap();
 	String to_json(char quote_char = '"');
 	String get_type_name();
 	DTree get_by_path(String path, String delim = "/");
@@ -35,7 +45,10 @@ struct DTree {
 	void set(StringMap source);
 	void set_array();
 	void set_reference(DTree* target);
+	bool has(String s) const;
 	DTree* key(String s);
+	const DTree* key(String s) const;
+	DTree* get_or_create(String s);
 	DTree& operator [] (String s);
 	void operator = (String v);
 	void operator = (f64 v);

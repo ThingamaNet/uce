@@ -1,18 +1,18 @@
 #pragma once
 
-class StarterUser
+struct AppUser
 {
-public:
+
 	Request& context;
 
-	explicit StarterUser(Request& request)
+	explicit AppUser(Request& request)
 		: context(request)
 	{
 	}
 
 	static String session_key()
 	{
-		return("starter_user_id");
+		return("app_user_id");
 	}
 
 	static String normalize_email(String email)
@@ -23,12 +23,12 @@ public:
 	static String hash_id(String raw)
 	{
 		raw = normalize_email(raw);
-		return(gen_sha1("uce-starter:" + raw).substr(0, 12));
+		return(gen_sha1("uce-app:" + raw).substr(0, 12));
 	}
 
 	String root_path()
 	{
-		return(first(context.cfg.get_by_path("filebase/path").to_string(), "/tmp/uce-starter-data"));
+		return(first(context.cfg.get_by_path("filebase/path").to_string(), "/tmp/uce-app-data"));
 	}
 
 	String dir(String email)
@@ -44,7 +44,7 @@ public:
 
 	static String password_hash(String password, String salt)
 	{
-		String hash = "uce-starter:" + password + ":" + salt;
+		String hash = "uce-app:" + password + ":" + salt;
 		for(s32 i = 0; i < 2048; i++)
 			hash = gen_sha1(hash + ":" + std::to_string(i));
 		return(hash);
@@ -148,7 +148,7 @@ public:
 
 		session_start();
 		context.session[session_key()] = email;
-		context.var["starter"]["current_user"] = user;
+		context.var["app"]["current_user"] = user;
 		result["result"].set_bool(true);
 		result["profile"] = user;
 		return(result);
@@ -156,7 +156,7 @@ public:
 
 	bool is_signed_in()
 	{
-		if(context.var["starter"]["current_user"]["email"].to_string() != "")
+		if(context.var["app"]["current_user"]["email"].to_string() != "")
 			return(true);
 		String user_id = context.session[session_key()];
 		if(user_id == "")
@@ -167,20 +167,20 @@ public:
 			context.session.erase(session_key());
 			return(false);
 		}
-		context.var["starter"]["current_user"] = user;
+		context.var["app"]["current_user"] = user;
 		return(true);
 	}
 
 	DTree current()
 	{
 		if(is_signed_in())
-			return(context.var["starter"]["current_user"]);
+			return(context.var["app"]["current_user"]);
 		return(DTree());
 	}
 
 	void logout()
 	{
 		context.session.erase(session_key());
-		context.var["starter"]["current_user"].clear();
+		context.var["app"]["current_user"].clear();
 	}
 };
