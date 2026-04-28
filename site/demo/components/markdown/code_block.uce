@@ -1,10 +1,10 @@
 COMPONENT(Request& context)
 {
-	String lang = first(context.call["lang"].to_string(), "plain");
+	String lang = first(context.props["lang"].to_string(), "plain");
 	<>
 		<section>
 			<p><strong>Code block:</strong> <?= lang ?></p>
-			<div><?: context.call["default_html"].to_string() ?></div>
+			<div><?: context.props["default_html"].to_string() ?></div>
 		</section>
 	</>
 }

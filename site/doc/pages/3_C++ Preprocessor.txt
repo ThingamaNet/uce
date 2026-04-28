@@ -88,7 +88,7 @@ Literal output with trusted unescaped markup:
 ```cpp
 RENDER(Request& context)
 {
-    <><div class="panel"><?: component("components/card", context.call, context) ?></div></>
+    <><div class="panel"><?: component("components/card", context.props, context) ?></div></>
 }
 ```
 
@@ -96,7 +96,7 @@ Roughly becomes:
 
 ```cpp
 print(R"(<div class="panel">)");
-print(component("components/card", context.call, context));
+print(component("components/card", context.props, context));
 print(R"(</div>)");
 ```
 

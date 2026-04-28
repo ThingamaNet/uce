@@ -1,6 +1,6 @@
 # Network Tests
 
-This directory contains a dependency-less vanilla Python 3 network test runner and plugin-style test cases.
+This directory contains a dependency-less vanilla Python 3 network test runner and plugin-style test cases. These are AI-generated so they might be garbage.
 
 ## Runner
 

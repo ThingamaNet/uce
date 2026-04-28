@@ -1,8 +1,8 @@
 #pragma once
 
-#define RENDER(X) extern "C" void __uce_render(Request& context)
-#define COMPONENT(X) extern "C" void __uce_component(Request& context)
-#define WS(X) extern "C" void __uce_websocket(Request& context)
+#define RENDER(X) extern "C" void __uce_render(X)
+#define COMPONENT(X) extern "C" void __uce_component(X)
+#define WS(X) extern "C" void __uce_websocket(X)
 #define EXPORT extern "C"
 
 String preprocess_shared_unit(Request* context, SharedUnit* su);

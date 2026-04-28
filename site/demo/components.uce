@@ -3,7 +3,7 @@ RENDER(Request& context)
 {
 	DTree card_props;
 	card_props["title"] = "Component Example";
-	card_props["body"] = "This card body comes from context.call and is rendered through component().";
+	card_props["body"] = "This card body comes from context.props and is rendered through component().";
 
 	DTree named_props;
 	named_props["title"] = "Named Render Example";

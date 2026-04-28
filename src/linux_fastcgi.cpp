@@ -478,23 +478,17 @@ Request websocket_exec_build_event_request(DTree job, String message)
 	if(event_request.params["HTTP_COOKIE"].length() > 0)
 		event_request.cookies = parse_cookies(event_request.params["HTTP_COOKIE"]);
 
-	event_request.var["ws"]["message"] = message;
-	event_request.var["ws"]["connection_id"] = event_request.resources.websocket_connection_id;
-	event_request.var["ws"]["scope"] = event_request.resources.websocket_scope;
-	event_request.var["ws"]["connection_count"] = (f64)event_request.resources.websocket_scope_connection_ids.size();
-	event_request.var["ws"]["opcode"] = (f64)event_request.resources.websocket_opcode;
-	event_request.var["ws"]["is_binary"].set_bool(event_request.resources.websocket_is_binary);
-	event_request.var["ws"]["is_text"].set_bool(event_request.resources.websocket_is_text);
-	event_request.var["ws"]["document_uri"] = first(
+	event_request.params["WS_MESSAGE"] = message;
+	event_request.params["WS_CONNECTION_ID"] = event_request.resources.websocket_connection_id;
+	event_request.params["WS_SCOPE"] = event_request.resources.websocket_scope;
+	event_request.params["WS_CONNECTION_COUNT"] = (f64)event_request.resources.websocket_scope_connection_ids.size();
+	event_request.params["WS_OPCODE"] = (f64)event_request.resources.websocket_opcode;
+	event_request.params["WS_MESSAGE_TYPE"] = (event_request.resources.websocket_is_binary ? "BINARY" : "TEXT");
+	event_request.params["WS_DOCUMENT_URI"] = first(
 		event_request.params["DOCUMENT_URI"],
 		event_request.params["REQUEST_URI"]
 	);
 
-	event_request.call["message"] = message;
-	event_request.call["connection_id"] = event_request.resources.websocket_connection_id;
-	event_request.call["scope"] = event_request.resources.websocket_scope;
-	event_request.call["opcode"] = (f64)event_request.resources.websocket_opcode;
-	event_request.call["document_uri"] = event_request.var["ws"]["document_uri"].to_string();
 	return(event_request);
 }
 
@@ -689,13 +683,6 @@ String normalize_ws_scope(String scope)
 	return(expand_path(scope, cwd_get()));
 }
 
-String ws_message()
-{
-	if(!context)
-		return("");
-	return(context->call["message"].to_string());
-}
-
 bool config_truthy(String raw, bool default_value = true)
 {
 	raw = to_lower(trim(raw));
@@ -883,7 +870,7 @@ int handle_complete(FastCGIRequest& request) {
 				}
 			}
 
-			request.call = DTree();
+			request.props = DTree();
 			compiler_invoke(&request, request.params["SCRIPT_FILENAME"]);
 		}
 		catch(const std::exception& e)

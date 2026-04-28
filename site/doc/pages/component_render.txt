@@ -9,7 +9,7 @@ Renders another `.uce` file as a component and writes the result directly to the
 
 This is the direct-output counterpart to `component()`.
 
-Component props are passed through `context.call`, and `name:COMPONENTFUNC` may be used to select a named handler exported by `COMPONENT:COMPONENTFUNC(Request& context)`.
+Component props are passed through `context.props`, and `name:COMPONENTFUNC` may be used to select a named handler exported by `COMPONENT:COMPONENTFUNC(Request& context)`.
 
 When `name` starts with `:`, the runtime resolves that named handler against the current `.uce` file.
 

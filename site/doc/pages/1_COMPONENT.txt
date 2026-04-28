@@ -25,7 +25,7 @@ This keeps page rendering and component rendering separate:
 
 A file intended only for component reuse can define `COMPONENT()` without defining `RENDER()`.
 
-Inside component handlers, props arrive through `context.call`.
+Inside component handlers, props arrive through `context.props`.
 
 When you call `component(":NAME", props, context)` or `component_render(":NAME", props, context)`, the runtime resolves `:NAME` against the current `.uce` file instead of requiring the file name again.
 
@@ -34,12 +34,12 @@ When you call `component(":NAME", props, context)` or `component_render(":NAME",
 ```cpp
 COMPONENT(Request& context)
 {
-    <><section><?: component(":BODY", context.call, context) ?></section></>
+    <><section><?: component(":BODY", context.props, context) ?></section></>
 }
 
 COMPONENT:BODY(Request& context)
 {
-    <><p><?= context.call["body"] ?></p></>
+    <><p><?= context.props["body"] ?></p></>
 }
 ```
 

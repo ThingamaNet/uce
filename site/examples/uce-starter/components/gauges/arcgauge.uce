@@ -5,11 +5,11 @@ COMPONENT(Request& context)
 	starter_register_js("components/gauges/common.js", context);
 	starter_register_css("themes/common/css/gauges.css", context);
 
-	String gauge_id = first(context.call["id"].to_string(), "arcgauge-" + std::to_string((u64)time()));
-	String title = context.call["title"].to_string();
-	String subtitle = context.call["subtitle"].to_string();
-	String style = context.call["style"].to_string();
-	DTree scale = context.call["scale"];
+	String gauge_id = first(context.props["id"].to_string(), "arcgauge-" + std::to_string((u64)time()));
+	String title = context.props["title"].to_string();
+	String subtitle = context.props["subtitle"].to_string();
+	String style = context.props["style"].to_string();
+	DTree scale = context.props["scale"];
 
 	<>
 		<div class="arcgauge-set" id="<?= gauge_attr_id(gauge_id) ?>" style="<?= style ?>">
@@ -20,7 +20,7 @@ COMPONENT(Request& context)
 				</div>
 			<? } ?>
 			<div class="arcgauge-grid">
-				<? context.call["items"].each([&](DTree item, String item_id_raw) {
+				<? context.props["items"].each([&](DTree item, String item_id_raw) {
 					DTree merged = scale;
 					item.each([&](DTree value, String key) { merged[key] = value; });
 					String item_id = gauge_attr_id(item_id_raw);
@@ -62,7 +62,7 @@ COMPONENT(Request& context)
 				}); ?>
 			</div>
 		</div>
-		<? if(context.call["listen"].to_string() != "") { ?>
+		<? if(context.props["listen"].to_string() != "") { ?>
 			<script>
 			window.ArcgaugeComponents = window.ArcgaugeComponents || {
 				start_listen : function(prop) {
@@ -84,7 +84,7 @@ COMPONENT(Request& context)
 					});
 				}
 			};
-			ArcgaugeComponents.start_listen(<?: json_encode(context.call, '\'') ?>);
+			ArcgaugeComponents.start_listen(<?: json_encode(context.props, '\'') ?>);
 			</script>
 		<? } ?>
 	</>

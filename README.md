@@ -11,7 +11,7 @@ UCE is a PHP-inspired server-side runtime that lets you build web pages and hand
 - `.uce` pages compile to shared objects on demand
 - normal HTTP pages expose `RENDER(Request& context)`
 - WebSocket pages can additionally expose `WS(Request& context)`
-- sub-rendering and components pass structured data through `context.call`
+- sub-rendering and components pass structured data through `context.props`
 - nginx can forward normal `.uce` requests and ordinary `.ws.uce` page loads to the FastCGI socket, while real WebSocket upgrade requests for `.ws.uce` endpoints go to the built-in HTTP/WebSocket listener
 - the nginx-published application tree now lives under `site/`
 - you can include C++ code as much as you want, but only .uce files called via API functions and entry points will be pre-processed
@@ -61,8 +61,10 @@ Useful related runtime patterns:
 
 - `unit_render(String file_name)` or `unit_render(String file_name, Request& context)` to invoke another page
 - `context.cfg` for request-local structured configuration
-- `context.call` for invocation or message-local structured input
+- `context.props` for invocation-local structured input such as component props
 - `context.connection` for broker-owned per-WebSocket-connection state shared across `WS(Request& context)` calls
+- `context.in` for the current request body, including the current WebSocket message payload inside `WS(Request& context)`
+- `context.params["WS_..."]` for direct WebSocket message metadata on the request parameter map
 - `context.params`, `context.get`, `context.post`, `context.cookies`, `context.session`, and `context.header` for request/response state
 - `context.set_status(code[, reason])` to set the HTTP response status
 
@@ -81,7 +83,7 @@ Named component handlers are also supported:
 COMPONENT:BODY(Request& context)
 {
 	<>
-		<p><?= context.call["body"].to_string() ?></p>
+		<p><?= context.props["body"].to_string() ?></p>
 	</>
 }
 ```
@@ -117,7 +119,7 @@ UCE includes a native component layer built on top of ordinary `.uce` files:
 - `component_exists(name)`
 - `component_resolve(name)`
 
-Component props are passed through `context.call`.
+Component props are passed through `context.props`.
 
 Component names resolve:
 
@@ -158,7 +160,9 @@ By default, the WebSocket scope is the current page file, so `ws_send()` queues 
 
 Each live WebSocket connection now owns a broker-side `DTree` exposed to page code as `context.connection`. Mutations to that tree persist for the life of the socket and are visible on later `WS(Request& context)` calls for the same client.
 
-`ws_message()` may contain either text or binary payload data. Use `ws_opcode()` / `ws_is_binary()` to inspect the current inbound message type.
+The current inbound payload is available directly as `context.in`, and the runtime mirrors message metadata into `context.params` using keys such as `WS_CONNECTION_ID`, `WS_SCOPE`, `WS_CONNECTION_COUNT`, `WS_OPCODE`, `WS_MESSAGE_TYPE`, and `WS_DOCUMENT_URI`.
+
+`ws_message()` may still be used when you want the payload through a helper API. Use `ws_opcode()` / `ws_is_binary()` to inspect the current inbound message type.
 
 Set `binary = true` on `ws_send()` or `ws_send_to()` to queue a binary frame instead of a text frame.
 

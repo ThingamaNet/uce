@@ -44,10 +44,10 @@ void marketing_default_features(DTree& features)
 
 COMPONENT:HERO_SECTION(Request& context)
 {
-	String title = first(context.call["title"].to_string(), "Welcome to the Present");
-	String subtitle = first(context.call["subtitle"].to_string(), "Experience no-quite-modern web development with our cutting-edge framework");
-	String cta_text = first(context.call["cta_text"].to_string(), "Get Started");
-	String cta_link = first(context.call["cta_link"].to_string(), "#");
+	String title = first(context.props["title"].to_string(), "Welcome to the Present");
+	String subtitle = first(context.props["subtitle"].to_string(), "Experience no-quite-modern web development with our cutting-edge framework");
+	String cta_text = first(context.props["cta_text"].to_string(), "Get Started");
+	String cta_link = first(context.props["cta_link"].to_string(), "#");
 
 	<>
 		<div class="hero-section">
@@ -194,7 +194,7 @@ COMPONENT:HERO_SECTION(Request& context)
 
 COMPONENT:FEATURES_GRID(Request& context)
 {
-	DTree features = context.call["features"];
+	DTree features = context.props["features"];
 	marketing_default_features(features);
 
 	<>
@@ -288,7 +288,7 @@ COMPONENT:FEATURES_GRID(Request& context)
 
 COMPONENT:STATS_SECTION(Request& context)
 {
-	DTree stats = context.call["stats"];
+	DTree stats = context.props["stats"];
 	if(stats.get_type_name() != "array" || stats["0"]["label"].to_string() == "")
 	{
 		DTree item;
@@ -364,7 +364,7 @@ COMPONENT:STATS_SECTION(Request& context)
 
 COMPONENT:BRANDS_SHOWCASE(Request& context)
 {
-	DTree logos = context.call["logos"];
+	DTree logos = context.props["logos"];
 	if(logos.get_type_name() != "array" || logos["0"]["name"].to_string() == "")
 	{
 		DTree item;
@@ -376,7 +376,7 @@ COMPONENT:BRANDS_SHOWCASE(Request& context)
 			item.clear();
 		}
 	}
-	String title = first(context.call["title"].to_string(), "Trusted by Leading Companies");
+	String title = first(context.props["title"].to_string(), "Trusted by Leading Companies");
 
 	<>
 		<div class="brands-section">
@@ -410,7 +410,7 @@ COMPONENT:BRANDS_SHOWCASE(Request& context)
 
 COMPONENT:TESTIMONIALS(Request& context)
 {
-	DTree testimonials = context.call["testimonials"];
+	DTree testimonials = context.props["testimonials"];
 	if(testimonials.get_type_name() != "array" || testimonials["0"]["name"].to_string() == "")
 	{
 		DTree item;
@@ -473,7 +473,7 @@ COMPONENT:TESTIMONIALS(Request& context)
 
 COMPONENT:PRICING_TABLE(Request& context)
 {
-	DTree plans = context.call["plans"];
+	DTree plans = context.props["plans"];
 	if(plans.get_type_name() != "array" || plans["0"]["name"].to_string() == "")
 	{
 		DTree plan;
@@ -546,12 +546,12 @@ COMPONENT:PRICING_TABLE(Request& context)
 
 COMPONENT:CTA_SECTION(Request& context)
 {
-	String title = first(context.call["title"].to_string(), "Ready to Get Started?");
-	String subtitle = first(context.call["subtitle"].to_string(), "Join thousands of developers building amazing applications with our framework.");
-	String cta_text = first(context.call["cta_text"].to_string(), "Start Building Now");
-	String cta_link = first(context.call["cta_link"].to_string(), "#");
-	String secondary_text = first(context.call["secondary_text"].to_string(), "View Documentation");
-	String secondary_link = first(context.call["secondary_link"].to_string(), "#");
+	String title = first(context.props["title"].to_string(), "Ready to Get Started?");
+	String subtitle = first(context.props["subtitle"].to_string(), "Join thousands of developers building amazing applications with our framework.");
+	String cta_text = first(context.props["cta_text"].to_string(), "Start Building Now");
+	String cta_link = first(context.props["cta_link"].to_string(), "#");
+	String secondary_text = first(context.props["secondary_text"].to_string(), "View Documentation");
+	String secondary_link = first(context.props["secondary_link"].to_string(), "#");
 
 	<>
 		<div class="cta-section">

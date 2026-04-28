@@ -2,11 +2,11 @@
 
 COMPONENT(Request& context)
 {
-	String title = first(context.call["title"].to_string(), "Sign in with OAuth");
-	String subtitle = first(context.call["subtitle"].to_string(), "Choose your preferred authentication method");
-	String callback_url = first(context.call["callback_url"].to_string(), starter_link("auth/callback", context));
+	String title = first(context.props["title"].to_string(), "Sign in with OAuth");
+	String subtitle = first(context.props["subtitle"].to_string(), "Choose your preferred authentication method");
+	String callback_url = first(context.props["callback_url"].to_string(), starter_link("auth/callback", context));
 
-	DTree services = context.call["services"];
+	DTree services = context.props["services"];
 	if(services.get_type_name() != "array" || services["google"]["name"].to_string() == "")
 	{
 		services["google"]["name"] = "Google";
@@ -41,7 +41,7 @@ COMPONENT(Request& context)
 				<label><?= subtitle ?></label>
 			</div>
 			<? services.each([&](DTree service, String service_key) {
-				String client_id = context.call[service_key + "_client_id"].to_string();
+				String client_id = context.props[service_key + "_client_id"].to_string();
 				String handler_name = ascii_safe_name(service_key);
 				String service_name = service["name"].to_string();
 				String scope = service["scope"].to_string();

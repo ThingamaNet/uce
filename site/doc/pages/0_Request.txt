@@ -8,7 +8,7 @@ Request& context;
 >types
 
 :content
-`Request& context` is the request-local state object passed into UCE handlers. It carries incoming request data, response state, runtime metadata, and helper trees such as `context.cfg`, `context.var`, and `context.call`.
+`Request& context` is the request-local state object passed into UCE handlers. It carries incoming request data, response state, runtime metadata, and helper trees such as `context.cfg`, `context.props`, and `context.connection`.
 
 ## Core Fields
 
@@ -20,9 +20,8 @@ Request& context;
 - `StringMap session`: current session data
 - `String session_id`: session cookie ID
 - `String session_name`: session cookie name
-- `DTree var`: user-defined request-local data
 - `DTree cfg`: request-local configuration tree
-- `DTree call`: invocation or message-local structured data
+- `DTree call`: invocation-local structured data for helpers such as component and unit calls
 - `DTree connection`: broker-owned WebSocket connection state that persists across `WS(Request& context)` calls for the same socket
 - `std::vector<UploadedFile> uploaded_files`: files uploaded in the current request
 - `StringMap header`: headers to send back to the browser
@@ -45,7 +44,9 @@ Request& context;
 ## Common Usage Notes
 
 - `context.cfg` is the usual place for structured configuration. Use `context.cfg.get_by_path("path/to/value")` for deep reads.
-- `context.call` carries invocation data for component calls, unit calls, and WebSocket messages.
+- `context.props` carries invocation data for component calls and unit calls.
+- `context.in` carries the current request body, and for `WS(Request& context)` it is the current WebSocket message payload.
+- `context.params["WS_..."]` exposes the current WebSocket message metadata directly on the request parameter map.
 - `context.connection` is only meaningful for WebSocket traffic and persists for the lifetime of the connection.
 
 `unit_render(String file_name, [Request& context])` invokes another UCE file using the current or supplied request context.

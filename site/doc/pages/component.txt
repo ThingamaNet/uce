@@ -9,7 +9,7 @@ Renders another `.uce` file as a component and returns the captured output as a 
 
 `component()` resolves the target file relative to the current page and also tries the `components/` prefix automatically, mirroring the shorthand used by the starter example project.
 
-Component props are passed in `context.call`.
+Component props are passed in `context.props`.
 
 Because `<?= ... ?>` HTML-escapes its value, embed component markup with `<?: component(...) ?>`, `print(component(...))`, or use `component_render(...)` for direct output.
 

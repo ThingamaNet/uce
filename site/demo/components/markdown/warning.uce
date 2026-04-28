@@ -1,15 +1,15 @@
 COMPONENT(Request& context)
 {
 	String title = first(
-		context.call["node"]["attrs"]["title"].to_string(),
-		context.call["argument"].to_string(),
+		context.props["node"]["attrs"]["title"].to_string(),
+		context.props["argument"].to_string(),
 		"Notice"
 	);
 
 	<>
 		<aside>
 			<p><strong><?= title ?></strong></p>
-			<div><?: context.call["children_html"].to_string() ?></div>
+			<div><?: context.props["children_html"].to_string() ?></div>
 		</aside>
 	</>
 }

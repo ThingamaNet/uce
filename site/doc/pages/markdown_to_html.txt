@@ -70,22 +70,22 @@ options["components"]["node.directive"] = "components/markdown/directive";
 
 If both an exact directive hook and a generic `node.directive` hook exist, the exact directive hook wins.
 
-When a markdown hook component is called, its props arrive in `context.call`.
+When a markdown hook component is called, its props arrive in `context.props`.
 
 Useful fields include:
 
-- `context.call["hook"]` for the matched hook key such as `:::warning` or `node.code_block`
-- `context.call["target"]` for the resolved component target name
-- `context.call["default_html"]` for the renderer output without the hook
-- `context.call["children_html"]` for already-rendered child HTML
-- `context.call["node"]` for the full AST node
-- `context.call["type"]` for the node type
-- `context.call["name"]` for the directive name when applicable
-- `context.call["argument"]` for directive remainder after the name
-- `context.call["text"]` for source text used by nodes such as `code_block`
-- `context.call["lang"]` for fenced code language
-- `context.call["href"]`, `context.call["src"]`, and `context.call["title"]`
-- `context.call["options"]` for the full markdown options tree
+- `context.props["hook"]` for the matched hook key such as `:::warning` or `node.code_block`
+- `context.props["target"]` for the resolved component target name
+- `context.props["default_html"]` for the renderer output without the hook
+- `context.props["children_html"]` for already-rendered child HTML
+- `context.props["node"]` for the full AST node
+- `context.props["type"]` for the node type
+- `context.props["name"]` for the directive name when applicable
+- `context.props["argument"]` for directive remainder after the name
+- `context.props["text"]` for source text used by nodes such as `code_block`
+- `context.props["lang"]` for fenced code language
+- `context.props["href"]`, `context.props["src"]`, and `context.props["title"]`
+- `context.props["options"]` for the full markdown options tree
 
 Directive blocks use this form:
 

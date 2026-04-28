@@ -1499,14 +1499,14 @@ void component_render(String name, DTree props, Request& context)
 		return;
 	}
 
-	DTree previous_call = context.call;
-	context.call = props;
+	DTree previous_props = context.props;
+	context.props = props;
 
 	String error_message = "";
 	if(!compiler_invoke_component(&context, resolved_name, render_name, &error_message) && error_message != "")
 		print(component_error_banner(error_message));
 
-	context.call = previous_call;
+	context.props = previous_props;
 }
 
 String component(String name)

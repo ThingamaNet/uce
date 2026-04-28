@@ -4,14 +4,14 @@ COMPONENT:APP_FRAME(Request& context)
 {
 	starter_register_css("themes/common/css/workspace.css", context);
 	starter_register_js("js/u-workspace-shell.js", context);
-	String id = context.call["id"].to_string();
-	String overlay_id = context.call["overlay_id"].to_string();
-	String class_name = context.call["class"].to_string();
+	String id = context.props["id"].to_string();
+	String overlay_id = context.props["overlay_id"].to_string();
+	String class_name = context.props["class"].to_string();
 	<>
 		<div<?: id != "" ? " id=\"" + html_escape(id) + "\"" : "" ?> class="ws-app<?= class_name != "" ? " " + html_escape(class_name) : "" ?>">
-			<?: context.call["sidebar_html"].to_string() ?>
+			<?: context.props["sidebar_html"].to_string() ?>
 			<div<?: overlay_id != "" ? " id=\"" + html_escape(overlay_id) + "\"" : "" ?> class="ws-sidebar-overlay"></div>
-			<main class="ws-main"><?: context.call["main_html"].to_string() ?></main>
+			<main class="ws-main"><?: context.props["main_html"].to_string() ?></main>
 		</div>
 	</>
 }
@@ -19,11 +19,11 @@ COMPONENT:APP_FRAME(Request& context)
 COMPONENT:EMPTY_STATE(Request& context)
 {
 	<>
-		<div class="ws-empty-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<div class="ws-empty-icon"><i class="<?= first(context.call["icon_class"].to_string(), "fas fa-layer-group") ?>"></i></div>
-			<h2><?= context.call["title"].to_string() ?></h2>
-			<p><?= context.call["text"].to_string() ?></p>
-			<?: context.call["action_html"].to_string() ?>
+		<div class="ws-empty-state<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<div class="ws-empty-icon"><i class="<?= first(context.props["icon_class"].to_string(), "fas fa-layer-group") ?>"></i></div>
+			<h2><?= context.props["title"].to_string() ?></h2>
+			<p><?= context.props["text"].to_string() ?></p>
+			<?: context.props["action_html"].to_string() ?>
 		</div>
 	</>
 }
@@ -31,18 +31,18 @@ COMPONENT:EMPTY_STATE(Request& context)
 COMPONENT:LIST_STATE(Request& context)
 {
 	<>
-		<div class="ws-list-state<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>"><? if(context.call["icon_class"].to_string() != "") { ?><i class="<?= context.call["icon_class"].to_string() ?>"></i><? } ?><span><?= context.call["text"].to_string() ?></span></div>
+		<div class="ws-list-state<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>"><? if(context.props["icon_class"].to_string() != "") { ?><i class="<?= context.props["icon_class"].to_string() ?>"></i><? } ?><span><?= context.props["text"].to_string() ?></span></div>
 	</>
 }
 
 COMPONENT:MOBILE_BAR(Request& context)
 {
 	<>
-		<div class="ws-mobile-bar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<button<?: context.call["button_id"].to_string() != "" ? " id=\"" + html_escape(context.call["button_id"].to_string()) + "\"" : "" ?> class="ws-mobile-toggle" title="Toggle sidebar" type="button">
-				<i class="<?= first(context.call["icon_class"].to_string(), "fas fa-bars") ?>"></i>
+		<div class="ws-mobile-bar<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<button<?: context.props["button_id"].to_string() != "" ? " id=\"" + html_escape(context.props["button_id"].to_string()) + "\"" : "" ?> class="ws-mobile-toggle" title="Toggle sidebar" type="button">
+				<i class="<?= first(context.props["icon_class"].to_string(), "fas fa-bars") ?>"></i>
 			</button>
-			<span class="ws-mobile-title"><?= context.call["title"].to_string() ?></span>
+			<span class="ws-mobile-title"><?= context.props["title"].to_string() ?></span>
 		</div>
 	</>
 }
@@ -50,12 +50,12 @@ COMPONENT:MOBILE_BAR(Request& context)
 COMPONENT:PANEL_HEADER(Request& context)
 {
 	<>
-		<div class="ws-panel-header<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
+		<div class="ws-panel-header<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
 			<div class="ws-panel-title-group">
-				<h2><?= context.call["title"].to_string() ?></h2>
-				<? if(context.call["subtitle"].to_string() != "") { ?><p class="ws-subtitle"><?= context.call["subtitle"].to_string() ?></p><? } ?>
+				<h2><?= context.props["title"].to_string() ?></h2>
+				<? if(context.props["subtitle"].to_string() != "") { ?><p class="ws-subtitle"><?= context.props["subtitle"].to_string() ?></p><? } ?>
 			</div>
-			<? if(context.call["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.call["actions_html"].to_string() ?></div><? } ?>
+			<? if(context.props["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.props["actions_html"].to_string() ?></div><? } ?>
 		</div>
 	</>
 }
@@ -63,9 +63,9 @@ COMPONENT:PANEL_HEADER(Request& context)
 COMPONENT:PANEL(Request& context)
 {
 	<>
-		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-panel<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<?: context.call["header_html"].to_string() ?>
-			<?: context.call["body_html"].to_string() ?>
+		<section<?: context.props["id"].to_string() != "" ? " id=\"" + html_escape(context.props["id"].to_string()) + "\"" : "" ?> class="ws-panel<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<?: context.props["header_html"].to_string() ?>
+			<?: context.props["body_html"].to_string() ?>
 		</section>
 	</>
 }
@@ -73,9 +73,9 @@ COMPONENT:PANEL(Request& context)
 COMPONENT:SECTION_HEAD(Request& context)
 {
 	<>
-		<div class="ws-section-head<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<h3><?= context.call["title"].to_string() ?></h3>
-			<? if(context.call["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.call["actions_html"].to_string() ?></div><? } ?>
+		<div class="ws-section-head<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<h3><?= context.props["title"].to_string() ?></h3>
+			<? if(context.props["actions_html"].to_string() != "") { ?><div class="ws-header-actions"><?: context.props["actions_html"].to_string() ?></div><? } ?>
 		</div>
 	</>
 }
@@ -83,9 +83,9 @@ COMPONENT:SECTION_HEAD(Request& context)
 COMPONENT:SECTION(Request& context)
 {
 	<>
-		<section<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-section<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<?: context.call["header_html"].to_string() ?>
-			<?: context.call["body_html"].to_string() ?>
+		<section<?: context.props["id"].to_string() != "" ? " id=\"" + html_escape(context.props["id"].to_string()) + "\"" : "" ?> class="ws-section<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<?: context.props["header_html"].to_string() ?>
+			<?: context.props["body_html"].to_string() ?>
 		</section>
 	</>
 }
@@ -93,9 +93,9 @@ COMPONENT:SECTION(Request& context)
 COMPONENT:SIDEBAR_SHELL(Request& context)
 {
 	<>
-		<aside<?: context.call["id"].to_string() != "" ? " id=\"" + html_escape(context.call["id"].to_string()) + "\"" : "" ?> class="ws-sidebar<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<?: context.call["top_html"].to_string() ?>
-			<?: context.call["body_html"].to_string() ?>
+		<aside<?: context.props["id"].to_string() != "" ? " id=\"" + html_escape(context.props["id"].to_string()) + "\"" : "" ?> class="ws-sidebar<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<?: context.props["top_html"].to_string() ?>
+			<?: context.props["body_html"].to_string() ?>
 		</aside>
 	</>
 }
@@ -103,11 +103,11 @@ COMPONENT:SIDEBAR_SHELL(Request& context)
 COMPONENT:SIDEBAR_TOOLBAR(Request& context)
 {
 	<>
-		<div class="ws-sidebar-top<?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>">
-			<?: context.call["action_html"].to_string() ?>
+		<div class="ws-sidebar-top<?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>">
+			<?: context.props["action_html"].to_string() ?>
 			<div class="ws-search-wrap">
 				<i class="fas fa-search ws-search-icon"></i>
-				<input type="search"<?: context.call["search_input_id"].to_string() != "" ? " id=\"" + html_escape(context.call["search_input_id"].to_string()) + "\"" : "" ?> name="<?= first(context.call["search_input_name"].to_string(), "search") ?>" class="ws-search-input" placeholder="<?= first(context.call["search_placeholder"].to_string(), "Search...") ?>" autocomplete="off">
+				<input type="search"<?: context.props["search_input_id"].to_string() != "" ? " id=\"" + html_escape(context.props["search_input_id"].to_string()) + "\"" : "" ?> name="<?= first(context.props["search_input_name"].to_string(), "search") ?>" class="ws-search-input" placeholder="<?= first(context.props["search_placeholder"].to_string(), "Search...") ?>" autocomplete="off">
 			</div>
 		</div>
 	</>
@@ -115,8 +115,8 @@ COMPONENT:SIDEBAR_TOOLBAR(Request& context)
 
 COMPONENT:STATUS_PILL(Request& context)
 {
-	String variant = to_lower(first(context.call["variant"].to_string(), "neutral"));
+	String variant = to_lower(first(context.props["variant"].to_string(), "neutral"));
 	<>
-		<span class="ws-status-pill ws-status-pill-<?= variant ?><?= context.call["class"].to_string() != "" ? " " + html_escape(context.call["class"].to_string()) : "" ?>"><?= first(context.call["label"].to_string(), context.call["text"].to_string()) ?></span>
+		<span class="ws-status-pill ws-status-pill-<?= variant ?><?= context.props["class"].to_string() != "" ? " " + html_escape(context.props["class"].to_string()) : "" ?>"><?= first(context.props["label"].to_string(), context.props["text"].to_string()) ?></span>
 	</>
 }

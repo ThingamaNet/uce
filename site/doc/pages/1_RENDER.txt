@@ -18,9 +18,9 @@ The default page entrypoint is always the plain `RENDER(Request& context)` handl
 
 Reusable component handlers now live on `COMPONENT(Request& context)` and `COMPONENT:NAME(Request& context)`. The component helpers call those handlers, not `RENDER()`.
 
-The request environment is passed explicitly through `context`, including params, cookies, post data, session state, headers, uploaded files, and the current `context.call` tree.
+The request environment is passed explicitly through `context`, including params, cookies, post data, session state, headers, uploaded files, and the current `context.props` tree.
 
-For a normal direct page request, `context.call` starts empty.
+For a normal direct page request, `context.props` starts empty.
 
 If the page is invoked from another UCE file via `unit_render(file_name, context)`, the callee receives that same `context`.
 

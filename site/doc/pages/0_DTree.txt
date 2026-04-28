@@ -28,9 +28,8 @@ Map-shaped `DTree` values can also represent list-like data when their keys are 
 
 You will encounter `DTree` throughout the runtime, especially in:
 
-- `context.var`
 - `context.cfg`
-- `context.call`
+- `context.props`
 - `context.connection`
 - `json_decode()` results
 - `unit_call()` return values
@@ -107,7 +106,7 @@ For non-map values, `each()` still invokes the callback once:
 - `key` is an empty string
 
 ```cpp
-context.var["items"].each([&](DTree item, String key) {
+context.connection["items"].each([&](DTree item, String key) {
     print(key, ": ", item.to_string(), "\n");
 });
 ```
@@ -119,7 +118,7 @@ String theme = context.cfg.get_by_path("theme/key").to_string();
 
 u64 compiled_mtime = unit_info("test/hello.uce")["compiled_mtime"].to_u64();
 
-bool dark_mode = context.call["dark_mode"].to_bool();
+bool dark_mode = context.props["dark_mode"].to_bool();
 
 if(DTree* user = payload.key("user")) {
     print(user->to_json());

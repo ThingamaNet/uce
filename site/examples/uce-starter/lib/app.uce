@@ -206,7 +206,7 @@ String app_html_class(Request& context)
 
 String app_page_main_html(Request& context)
 {
-	String main_html = context.call["main_html"].to_string();
+	String main_html = context.props["main_html"].to_string();
 	if(main_html == "")
 		main_html = context.var["app"]["fragments"]["main"].to_string();
 	return(main_html);
@@ -236,9 +236,9 @@ bool app_request_embed_mode(Request& context)
 
 bool app_page_embed_mode(Request& context)
 {
-	String embed_value = context.call["embed_mode"].to_string();
+	String embed_value = context.props["embed_mode"].to_string();
 	if(embed_value != "")
-		return(app_bool_value(context.call["embed_mode"]));
+		return(app_bool_value(context.props["embed_mode"]));
 	return(app_request_embed_mode(context));
 }
 

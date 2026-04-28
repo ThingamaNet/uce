@@ -20,7 +20,7 @@ RENDER(Request& context)
 				</div>
 				<pre class="code-block"><code>COMPONENT:HERO_SECTION(Request&amp; context)
 {
-    String title = first(context.call["title"].to_string(), "Welcome");
+    String title = first(context.props["title"].to_string(), "Welcome");
     &lt;&gt;
         &lt;div class="hero-section"&gt;...&lt;/div&gt;
     &lt;/&gt;

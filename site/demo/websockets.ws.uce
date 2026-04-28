@@ -13,9 +13,9 @@ DTree chat_event(Request& context, String type, String body)
 	DTree event;
 	event["type"] = type;
 	event["body"] = body;
-	event["connection_id"] = ws_connection_id();
-	event["scope"] = first(context.params["DOCUMENT_URI"], ws_scope());
-	event["online"] = (f64)ws_connection_count();
+	event["connection_id"] = context.params["WS_CONNECTION_ID"];
+	event["scope"] = first(context.params["WS_DOCUMENT_URI"], context.params["DOCUMENT_URI"]);
+	event["online"] = float_val(first(context.params["WS_CONNECTION_COUNT"], "0"));
 	event["at"] = time_format_utc("%H:%M:%S");
 	event["name"] = context.connection["name"].to_string();
 	event["message_count"] = context.connection["message_count"];
@@ -37,6 +37,7 @@ RENDER(Request& context)
 		<pre>Page scope: <?= ws_url ?>
 Connected right now: <span id="online-count"><?= online ?></span>
 Status: <span id="status">Connecting...</span></pre>
+		<p>This demo uses <code>context.in</code> for the current payload, <code>context.params["WS_..."]</code> for message metadata, and <code>context.connection</code> for per-client state.</p>
 
 		<form id="chat-form" action="?" method="post">
 			<div>
@@ -152,13 +153,13 @@ WS(Request& context)
 	if(ws_is_binary())
 	{
 		ws_send_to(
-			ws_connection_id(),
+			context.params["WS_CONNECTION_ID"],
 			json_encode(chat_event(context, "notice", "Binary messages are not handled by this demo"))
 		);
 		return;
 	}
 
-	DTree payload = json_decode(ws_message());
+	DTree payload = json_decode(context.in);
 	String type = clean_chat_field(payload["type"].to_string(), 24);
 	String name = clean_chat_field(payload["name"].to_string(), 32);
 	String body = clean_chat_field(payload["body"].to_string(), 500);
@@ -190,6 +191,6 @@ WS(Request& context)
 	if(type != "")
 	{
 		context.connection["last_type"] = type;
-		ws_send_to(ws_connection_id(), json_encode(chat_event(context, "notice", "Unknown message type: " + type)));
+		ws_send_to(context.params["WS_CONNECTION_ID"], json_encode(chat_event(context, "notice", "Unknown message type: " + type)));
 	}
 }

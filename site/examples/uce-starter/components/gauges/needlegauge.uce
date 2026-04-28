@@ -5,15 +5,15 @@ COMPONENT(Request& context)
 	starter_register_js("components/gauges/common.js", context);
 	starter_register_css("themes/common/css/gauges.css", context);
 
-	String gauge_id = first(context.call["id"].to_string(), "needlegauge-" + std::to_string((u64)time()));
-	String style = context.call["style"].to_string();
-	String title = context.call["title"].to_string();
-	String subtitle = context.call["subtitle"].to_string();
-	f64 size = float_val(first(context.call["size"].to_string(), "200"));
-	DTree scale = context.call["scale"];
+	String gauge_id = first(context.props["id"].to_string(), "needlegauge-" + std::to_string((u64)time()));
+	String style = context.props["style"].to_string();
+	String title = context.props["title"].to_string();
+	String subtitle = context.props["subtitle"].to_string();
+	f64 size = float_val(first(context.props["size"].to_string(), "200"));
+	DTree scale = context.props["scale"];
 	f64 scale_angle_start = float_val(first(scale["angle_start"].to_string(), std::to_string(-gauge_pi())));
 	f64 scale_angle_end = float_val(first(scale["angle_end"].to_string(), "0"));
-	f64 img_height = float_val(first(context.call["img_height"].to_string(), std::to_string(size * std::max(cos(scale_angle_start), cos(scale_angle_end)))));
+	f64 img_height = float_val(first(context.props["img_height"].to_string(), std::to_string(size * std::max(cos(scale_angle_start), cos(scale_angle_end)))));
 
 	<>
 		<section class="gauge-set needlegauge-set" id="<?= gauge_attr_id(gauge_id) ?>" style="<?= style ?>">
@@ -24,7 +24,7 @@ COMPONENT(Request& context)
 				</div>
 			<? } ?>
 			<div class="needlegauge-grid">
-			<? context.call["items"].each([&](DTree item, String item_id_raw) {
+			<? context.props["items"].each([&](DTree item, String item_id_raw) {
 				DTree merged = scale;
 				item.each([&](DTree value, String key) { merged[key] = value; });
 				String item_id = gauge_attr_id(item_id_raw);
@@ -117,7 +117,7 @@ COMPONENT(Request& context)
 			}); ?>
 			</div>
 		</section>
-		<? if(context.call["listen"].to_string() != "") { ?>
+		<? if(context.props["listen"].to_string() != "") { ?>
 			<script>
 			window.NeedlegaugeComponents = window.NeedlegaugeComponents || {
 				start_listen : function(prop) {
@@ -137,7 +137,7 @@ COMPONENT(Request& context)
 					});
 				}
 			};
-			NeedlegaugeComponents.start_listen(<?: json_encode(context.call, '\'') ?>);
+			NeedlegaugeComponents.start_listen(<?: json_encode(context.props, '\'') ?>);
 			</script>
 		<? } ?>
 	</>

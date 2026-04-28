@@ -157,9 +157,9 @@ struct Request {
 	StringMap session;
 	String session_loaded_hash = "";
 
-	DTree var;
+	//DTree var;
 	DTree cfg;
-	DTree call;
+	DTree props;
 	DTree connection;
 
 	String session_id = "";

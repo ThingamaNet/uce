@@ -27,8 +27,6 @@ RENDER(Request& context)
 			<a class="docs-link" href="../doc/index.uce">API Docs &rarr;</a>
 		</h1>
 		<div class="test-grid">
-			<div class="grid-heading">Coverage</div>
-			<? render_card("../tests/index.uce", "Site Tests", "Grouped coverage pages for broad runtime and API validation"); ?>
 
 			<div class="grid-heading">Basics</div>
 			<? render_card("hello.uce", "Hello World", "Basic output and server time"); ?>

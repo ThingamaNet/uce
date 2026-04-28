@@ -3,8 +3,8 @@ COMPONENT(Request& context)
 {
 	<>
 		<section style="border:1px solid #ccc;padding:1em;margin:1em 0;">
-			<? component_render(":TITLE", context.call, context); ?>
-			<? component_render(":BODY", context.call, context); ?>
+			<? component_render(":TITLE", context.props, context); ?>
+			<? component_render(":BODY", context.props, context); ?>
 		</section>
 	</>
 }
@@ -12,13 +12,13 @@ COMPONENT(Request& context)
 COMPONENT:TITLE(Request& context)
 {
 	<>
-		<h3><?= first(context.call["title"].to_string(), "Component Title") ?></h3>
+		<h3><?= first(context.props["title"].to_string(), "Component Title") ?></h3>
 	</>
 }
 
 COMPONENT:BODY(Request& context)
 {
 	<>
-		<p><?= first(context.call["body"].to_string(), "Component Body") ?></p>
+		<p><?= first(context.props["body"].to_string(), "Component Body") ?></p>
 	</>
 }
