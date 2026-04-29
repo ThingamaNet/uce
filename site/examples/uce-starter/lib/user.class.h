@@ -148,7 +148,7 @@ struct AppUser
 
 		session_start();
 		context.session[session_key()] = email;
-		context.var["app"]["current_user"] = user;
+		context.call["app"]["current_user"] = user;
 		result["result"].set_bool(true);
 		result["profile"] = user;
 		return(result);
@@ -156,7 +156,7 @@ struct AppUser
 
 	bool is_signed_in()
 	{
-		if(context.var["app"]["current_user"]["email"].to_string() != "")
+		if(context.call["app"]["current_user"]["email"].to_string() != "")
 			return(true);
 		String user_id = context.session[session_key()];
 		if(user_id == "")
@@ -167,20 +167,20 @@ struct AppUser
 			context.session.erase(session_key());
 			return(false);
 		}
-		context.var["app"]["current_user"] = user;
+		context.call["app"]["current_user"] = user;
 		return(true);
 	}
 
 	DTree current()
 	{
 		if(is_signed_in())
-			return(context.var["app"]["current_user"]);
+			return(context.call["app"]["current_user"]);
 		return(DTree());
 	}
 
 	void logout()
 	{
 		context.session.erase(session_key());
-		context.var["app"]["current_user"].clear();
+		context.call["app"]["current_user"].clear();
 	}
 };

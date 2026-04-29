@@ -3,7 +3,7 @@
 COMPONENT(Request& context)
 {
 	starter_boot(context);
-	String title = first(context.var["starter"]["page_title"].to_string(), context.cfg.get_by_path("site/default_page_title").to_string());
+	String title = first(context.call["starter"]["page_title"].to_string(), context.cfg.get_by_path("site/default_page_title").to_string());
 	String description = first(context.cfg.get_by_path("theme/meta_description").to_string(), "UCE starter example");
 	String theme_color = first(context.cfg.get_by_path("theme/theme_color").to_string(), "#0f172a");
 	String icon = starter_asset_url(context.cfg.get_by_path("theme/path").to_string() + "icon.png", context);

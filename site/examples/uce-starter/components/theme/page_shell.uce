@@ -4,13 +4,13 @@ COMPONENT(Request& context)
 {
 	starter_boot(context);
 	if(context.props["main_html"].to_string() != "")
-		context.var["starter"]["fragments"]["main"] = context.props["main_html"];
+		context.call["starter"]["fragments"]["main"] = context.props["main_html"];
 	if(context.props["json"].get_type_name() == "array")
-		context.var["starter"]["json"] = context.props["json"];
+		context.call["starter"]["json"] = context.props["json"];
 	if(context.props["page_type"].to_string() != "")
-		context.var["starter"]["page_type"] = context.props["page_type"];
+		context.call["starter"]["page_type"] = context.props["page_type"];
 	if(context.props["embed_mode"].to_string() != "")
-		context.var["starter"]["embed_mode"] = context.props["embed_mode"];
+		context.call["starter"]["embed_mode"] = context.props["embed_mode"];
 	starter_render_page(context);
 }
 

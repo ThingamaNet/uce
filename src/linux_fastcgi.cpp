@@ -702,6 +702,13 @@ String ws_connection_id()
 	return(context->resources.websocket_connection_id);
 }
 
+String ws_message()
+{
+	if(!context)
+		return("");
+	return(context->in);
+}
+
 String ws_scope()
 {
 	return(current_ws_scope());

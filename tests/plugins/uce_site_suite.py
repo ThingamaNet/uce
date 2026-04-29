@@ -10,6 +10,7 @@ def register(registry):
 	pages = [
 		("site tests index", "/tests/index.uce", "Coverage Index", ["http", "suite", "uce", "public"]),
 		("site tests core", "/tests/core.uce", "Core APIs", ["http", "suite", "uce", "public"]),
+		("site tests preprocessor", "/tests/preprocessor.uce", "top-level )\" marker", ["http", "suite", "uce", "public"]),
 		("site tests http", "/tests/http.uce", "HTTP And Session", ["http", "suite", "uce", "public"]),
 		("site tests components", "/tests/components.uce", "Components", ["http", "suite", "uce", "public"]),
 		("site tests markdown", "/tests/markdown.uce", "Markdown", ["http", "suite", "uce", "public"]),

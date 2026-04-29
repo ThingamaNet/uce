@@ -3,7 +3,7 @@
 
 String app_fs_root(Request& context)
 {
-	String root = context.var["app"]["fs_root"].to_string();
+	String root = context.call["app"]["fs_root"].to_string();
 	if(root == "")
 		root = cwd_get();
 	return(root);
@@ -11,7 +11,7 @@ String app_fs_root(Request& context)
 
 String app_script_url(Request& context)
 {
-	String url = context.var["app"]["script_url"].to_string();
+	String url = context.call["app"]["script_url"].to_string();
 	if(url == "")
 		url = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
 	return(url);
@@ -19,7 +19,7 @@ String app_script_url(Request& context)
 
 String app_base_url(Request& context)
 {
-	String base = context.var["app"]["base_url"].to_string();
+	String base = context.call["app"]["base_url"].to_string();
 	if(base == "")
 	{
 		base = dirname(app_script_url(context));
@@ -74,7 +74,7 @@ DTree app_make_route(Request& context)
 DTree app_resolve_view(Request& context, String base_dir = "views")
 {
 	DTree result;
-	DTree route = context.var["app"]["route"];
+	DTree route = context.call["app"]["route"];
 	String lpath = first(route["l_path"].to_string(), "index");
 	String base = trim(base_dir);
 	if(base != "" && base[base.length() - 1] == '/')
@@ -114,12 +114,12 @@ DTree app_resolve_view(Request& context, String base_dir = "views")
 
 void app_register_css(String path, Request& context)
 {
-	context.var["app"]["assets"]["css"][path] = path;
+	context.call["app"]["assets"]["css"][path] = path;
 }
 
 void app_register_js(String path, Request& context)
 {
-	context.var["app"]["assets"]["js"][path] = path;
+	context.call["app"]["assets"]["js"][path] = path;
 }
 
 String app_asset_url(String path, Request& context)
@@ -133,7 +133,7 @@ String app_asset_url(String path, Request& context)
 
 void app_render_registered_css(Request& context)
 {
-	context.var["app"]["assets"]["css"].each([&](DTree item, String key) {
+	context.call["app"]["assets"]["css"].each([&](DTree item, String key) {
 		String path = item.to_string();
 		if(path != "")
 		{
@@ -144,7 +144,7 @@ void app_render_registered_css(Request& context)
 
 void app_render_registered_js(Request& context)
 {
-	context.var["app"]["assets"]["js"].each([&](DTree item, String key) {
+	context.call["app"]["assets"]["js"].each([&](DTree item, String key) {
 		String path = item.to_string();
 		if(path != "")
 		{
@@ -185,8 +185,8 @@ void app_redirect(String path, Request& context)
 void app_not_found(String message, Request& context)
 {
 	context.set_status(404, "Not Found");
-	context.var["app"]["error"] = message;
-	context.var["app"]["page_title"] = "404 Not Found";
+	context.call["app"]["error"] = message;
+	context.call["app"]["page_title"] = "404 Not Found";
 }
 
 String app_menu_href(String menu_key, DTree menu_item, Request& context)
@@ -208,7 +208,7 @@ String app_page_main_html(Request& context)
 {
 	String main_html = context.props["main_html"].to_string();
 	if(main_html == "")
-		main_html = context.var["app"]["fragments"]["main"].to_string();
+		main_html = context.call["app"]["fragments"]["main"].to_string();
 	return(main_html);
 }
 
@@ -231,7 +231,7 @@ bool app_bool_value(DTree value, bool fallback = false)
 
 bool app_request_embed_mode(Request& context)
 {
-	return(app_bool_value(context.var["app"]["embed_mode"]));
+	return(app_bool_value(context.call["app"]["embed_mode"]));
 }
 
 bool app_page_embed_mode(Request& context)
@@ -244,7 +244,7 @@ bool app_page_embed_mode(Request& context)
 
 String app_theme_page_component(Request& context)
 {
-	String page_type = first(context.var["app"]["page_type"].to_string(), "html");
+	String page_type = first(context.call["app"]["page_type"].to_string(), "html");
 	if(page_type == "blank")
 		return("themes/common/page.blank.uce");
 	if(page_type == "json")
@@ -264,9 +264,9 @@ void app_render_page(Request& context)
 		return;
 
 	DTree page_props;
-	page_props["main_html"] = context.var["app"]["fragments"]["main"];
-	if(context.var["app"]["json"].get_type_name() == "array")
-		page_props["json"] = context.var["app"]["json"];
+	page_props["main_html"] = context.call["app"]["fragments"]["main"];
+	if(context.call["app"]["json"].get_type_name() == "array")
+		page_props["json"] = context.call["app"]["json"];
 
 	String page_component = app_theme_page_component(context);
 	if(page_component != "" && file_exists(page_component))
@@ -370,19 +370,19 @@ DTree starter_resolve_view(Request& context, String base_dir = "views")
 
 void app_init(Request& context)
 {
-	if(context.var["app"]["booted"].to_string() == "1")
+	if(context.call["app"]["booted"].to_string() == "1")
 		return;
 
-	context.var["app"]["booted"] = "1";
-	context.var["app"]["fs_root"] = cwd_get();
-	context.var["app"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
+	context.call["app"]["booted"] = "1";
+	context.call["app"]["fs_root"] = cwd_get();
+	context.call["app"]["script_url"] = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
 
-	String base_url = dirname(context.var["app"]["script_url"].to_string());
+	String base_url = dirname(context.call["app"]["script_url"].to_string());
 	if(base_url == "")
 		base_url = "/";
 	if(base_url[base_url.length() - 1] != '/')
 		base_url.append(1, '/');
-	context.var["app"]["base_url"] = base_url;
+	context.call["app"]["base_url"] = base_url;
 
 	DTree config = get_config();
 	String requested_theme = first(context.get["theme"], context.cookies["app_theme"], config["theme"]["key"].to_string());
@@ -394,12 +394,12 @@ void app_init(Request& context)
 	});
 	config["theme"]["key"] = requested_theme;
 	context.cfg = config;
-	context.var["cfg"].set_reference(&context.cfg);
-	context.var["app"]["config"].set_reference(&context.cfg);
-	context.var["app"]["route"] = app_make_route(context);
-	context.var["app"]["page_type"] = "html";
-	context.var["app"]["page_title"] = first(config["menu"][context.var["app"]["route"]["l_path"].to_string()]["title"].to_string(), config["site"]["default_page_title"].to_string(), "Home");
-	context.var["app"]["embed_mode"].set_bool(context.get["embed"] != "");
+	context.call["cfg"].set_reference(&context.cfg);
+	context.call["app"]["config"].set_reference(&context.cfg);
+	context.call["app"]["route"] = app_make_route(context);
+	context.call["app"]["page_type"] = "html";
+	context.call["app"]["page_title"] = first(config["menu"][context.call["app"]["route"]["l_path"].to_string()]["title"].to_string(), config["site"]["default_page_title"].to_string(), "Home");
+	context.call["app"]["embed_mode"].set_bool(context.get["embed"] != "");
 
 	if(context.get["theme"] != "" && context.get["theme"] == requested_theme)
 	{

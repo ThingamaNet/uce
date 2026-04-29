@@ -20,6 +20,50 @@ bool compiler_code_state_is_neutral(const CompilerCodeState& state)
 	return(!state.inside_quote && !state.inside_line_comment && !state.inside_block_comment);
 }
 
+String compiler_cpp_raw_string_delimiter(const String& content)
+{
+	StringList candidates = {
+		"",
+		"UCE",
+		"UCE_LITERAL",
+		"uce_literal_0",
+		"uce_literal_1"
+	};
+
+	u64 hash = 1469598103934665603ULL;
+	for(unsigned char c : content)
+	{
+		hash ^= c;
+		hash *= 1099511628211ULL;
+	}
+
+	for(u32 i = 0; i < 64; i += 1)
+	{
+		String suffix = to_hex<u64>(hash ^ ((u64)i * 0x9E3779B97F4A7C15ULL), 12);
+		candidates.push_back("UCE" + suffix);
+	}
+
+	for(auto& delimiter : candidates)
+	{
+		String terminator = ")" + delimiter + "\"";
+		if(content.find(terminator) == String::npos)
+			return(delimiter);
+	}
+
+	return("");
+}
+
+String compiler_cpp_string_literal(const String& content)
+{
+	String delimiter = compiler_cpp_raw_string_delimiter(content);
+	if(delimiter != "" || content.find(")\"") == String::npos)
+		return("R\"" + delimiter + "(" + content + ")" + delimiter + "\"");
+
+	// This fallback is only reachable for deliberately adversarial content that
+	// contains every generated raw-string delimiter candidate.
+	return(json_escape(content));
+}
+
 void compiler_code_state_consume(CompilerCodeState& state, String& buffer, const String& content, u32& i)
 {
 	char c = content[i];
@@ -172,16 +216,15 @@ void compiler_append_text_literal_output(String& parsed_content, String& literal
 {
 	if(literal_buffer == "")
 		return;
-	parsed_content.append("print(R\"(" + literal_buffer + ")\");");
+	parsed_content.append("print(" + compiler_cpp_string_literal(literal_buffer) + ");");
 	literal_buffer.clear();
 }
 
 String compiler_process_text_literal(Request* context, SharedUnit* su, String content)
 {
 	String parsed_content;
-	String html_output_start = "print(R\"(";
-	String html_output_end = ")\");";
 	String code_buffer = "";
+	String literal_buffer = "";
 	CompilerCodeState code_state;
 	bool inside_code = false;
 	bool is_field = false;
@@ -200,6 +243,7 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 				inside_code = true;
 				code_buffer = "";
 				code_state = CompilerCodeState();
+				compiler_append_text_literal_output(parsed_content, literal_buffer);
 				if(c2 == '=')
 				{
 					is_field = true;
@@ -221,7 +265,7 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 				continue;
 			}
 
-			parsed_content.append(1, c);
+			literal_buffer.append(1, c);
 			continue;
 		}
 
@@ -234,27 +278,23 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 				if(escape_field)
 				{
 					parsed_content.append(
-						html_output_end +
 						"print(html_escape( " +
 						code_buffer +
-						" )); " +
-						html_output_start
+						" )); "
 					);
 				}
 				else
 				{
 					parsed_content.append(
-						html_output_end +
 						"print( " +
 						code_buffer +
-						" ); " +
-						html_output_start
+						" ); "
 					);
 				}
 			}
 			else
 			{
-				parsed_content.append(html_output_end + code_buffer + html_output_start);
+				parsed_content.append(code_buffer);
 			}
 			continue;
 		}
@@ -269,7 +309,10 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 		compiler_code_state_consume(code_state, code_buffer, content, i);
 	}
 
-	return(html_output_start + parsed_content + html_output_end);
+	if(literal_buffer != "")
+		compiler_append_text_literal_output(parsed_content, literal_buffer);
+
+	return(parsed_content);
 }
 
 String compiler_rewrite_named_render_syntax(String content)

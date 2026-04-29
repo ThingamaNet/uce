@@ -9,7 +9,7 @@ RENDER(Request& context)
 		starter_redirect("account/login", context);
 		return;
 	}
-	context.var["starter"]["page_title"] = "Profile";
+	context.call["starter"]["page_title"] = "Profile";
 	DTree user = users.current();
 	String roles = "";
 	user["roles"].each([&](DTree role, String key) {

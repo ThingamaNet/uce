@@ -3,6 +3,9 @@ String component(String name, [DTree props], [Request& context])
 
 :see
 >ob
+>component_render
+>1_COMPONENT
+>1_RENDER
 
 :content
 Renders another `.uce` file as a component and returns the captured output as a `String`.
@@ -21,13 +24,17 @@ The default handler is `COMPONENT(Request& context)`.
 
 When `name` starts with a colon, such as `:BODY`, the target resolves against the current `.uce` file so component files can call their own named handlers without repeating the file name.
 
+When a component unit defines `ONCE(Request& context)`, the runtime calls that hook once per request, per resolved component file, before the first `COMPONENT()` or `COMPONENT:NAME()` handler from that file runs.
+
 ## Resolution Order
 
 - exact file name
 - exact file name with `.uce`
 - the same two forms under `components/`
 
-## Example
+## Common Patterns
+
+Default component handler:
 
 ```cpp
 DTree props;
@@ -35,6 +42,66 @@ props["title"] = "Status";
 
 <><?: component("workspace/panel", props, context) ?></>
 ```
+
+Named component handler:
+
+```cpp
+DTree props;
+props["title"] = "System";
+props["body"] = "Healthy";
+
+print(component("components/card:BODY", props, context));
+```
+
+Self-targeted named handler from inside the same file:
+
+```cpp
+COMPONENT(Request& context)
+{
+	<>
+		<section class="card">
+			<?: component(":BODY", context.props, context) ?>
+		</section>
+	</>
+}
+
+COMPONENT:BODY(Request& context)
+{
+	<>
+		<p><?= context.props["body"] ?></p>
+	</>
+}
+```
+
+Preparing props in C++ before rendering:
+
+```cpp
+DTree props;
+props["items"][0] = "alpha";
+props["items"][1] = "beta";
+props["items"][2] = "gamma";
+
+String html = component("components/list", props, context);
+print(html);
+```
+
+Embedding returned component markup inside a literal block:
+
+```cpp
+<>
+	<div class="panel">
+		<?: component("components/card", props, context) ?>
+	</div>
+</>
+```
+
+Because `<?= ... ?>` escapes HTML, use `<?: ... ?>` when inserting the returned markup from `component()`.
+
+## Lifecycle Notes
+
+- `INIT(Request& context)` runs once when the worker loads that unit into memory.
+- `ONCE(Request& context)` runs once per request before the first component or render entrypoint from that file.
+- `component()` then calls either `COMPONENT(Request& context)` or the selected `COMPONENT:NAME(Request& context)` handler.
 
 ## Related Concepts
 

@@ -8,6 +8,9 @@ return value : 0 if signal was sent, -1 otherwise
 
 :see
 >task
+task
+task_pid
+task_repeat
 
 :content
 Wraps the standard POSIX `kill()` function.

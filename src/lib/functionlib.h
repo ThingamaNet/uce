@@ -14,6 +14,11 @@ bool str_starts_with(String haystack, String needle);
 bool str_ends_with(String haystack, String needle);
 bool contains(String haystack, String needle);
 String replace(String s, String search, String replace_with);
+bool regex_match(String pattern, String subject, String flags = "");
+DTree regex_search(String pattern, String subject, String flags = "");
+DTree regex_search_all(String pattern, String subject, String flags = "");
+String regex_replace(String pattern, String replacement, String subject, String flags = "");
+StringList regex_split(String pattern, String subject, String flags = "");
 
 String trim(String raw);
 StringList split_space(String str);

@@ -6,9 +6,11 @@ file_name : UCE file to load
 return value : loaded shared unit, or `null` if the unit could not be loaded
 
 :see
+>runtime
 unit_render
 unit_call
 load
+unit_info
 
 :content
 Loads a UCE compilation unit and returns its in-memory `SharedUnit` record.

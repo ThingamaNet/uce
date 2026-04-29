@@ -2,8 +2,10 @@
 std::vector<String> units_list()
 
 :see
+>runtime
 unit_info
 unit_compile
+unit_load
 
 :content
 Returns the normalized paths of all known `.uce` units.

@@ -1,8 +1,13 @@
 Types
 
+0_Request
 array_merge
-DTree
+0_DTree
 get_by_path
 set_status
 String
+StringList
 StringMap
+to_bool
+to_f64
+to_u64

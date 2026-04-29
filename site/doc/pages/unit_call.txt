@@ -9,6 +9,11 @@ return value : DTree* returned from function
 
 :see
 >ob
+unit_load
+unit_render
+unit_info
+1_RENDER
+1_COMPONENT
 
 :content
 Calls an exported function inside another UCE file.
@@ -16,6 +21,19 @@ Calls an exported function inside another UCE file.
 Use `unit_call()` when you need structured data exchange between units rather than rendered HTML output.
 
 The callee must expose an `EXPORT` function whose name matches `function_name`. Arguments are passed through `call_param`, and the return value is a `DTree*` owned by the callee.
+
+`unit_call()` also understands the request-bound UCE entrypoint names:
+
+- `RENDER`
+- `RENDER:NAME`
+- `COMPONENT`
+- `COMPONENT:NAME`
+- `ONCE`
+- `INIT`
+
+When `function_name` matches one of those macro-style entrypoints, `unit_call()` does not look for a plain `EXPORT DTree* ...` function. Instead, it translates the name to the generated C++ symbol, uses the current `Request` context, and passes `call_param` into `context.props`, matching the normal component invocation model.
+
+For `RENDER...` and `COMPONENT...`, the unit's `ONCE(Request& context)` hook is still honored automatically before the selected handler runs.
 
 Example:
 
@@ -29,6 +47,25 @@ EXPORT DTree* test_func(DTree* call_param)
 
 // use that function in another file
 unit_call("call_file_funcs.uce", "test_func");
+```
+
+Calling a named component handler through `unit_call()`:
+
+```cpp
+DTree props;
+props["title"] = "Diagnostics";
+props["body"] = "Ready";
+
+unit_call("components/card.uce", "COMPONENT:BODY", &props);
+```
+
+Calling a page render handler through `unit_call()`:
+
+```cpp
+DTree props;
+props["section"] = "summary";
+
+unit_call("reports/summary.uce", "RENDER", &props);
 ```
 
 Related:

@@ -3,8 +3,8 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Workspace";
-	String section = first(context.var["starter"]["route"]["param"].to_string(), "overview");
+	context.call["starter"]["page_title"] = "Workspace";
+	String section = first(context.call["starter"]["route"]["param"].to_string(), "overview");
 	if(section != "overview" && section != "projects" && section != "activity")
 		section = "overview";
 

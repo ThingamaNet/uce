@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Features";
+	context.call["starter"]["page_title"] = "Features";
 	starter_register_css("views/marketing.css", context);
 	<>
 		<h1>Features</h1>

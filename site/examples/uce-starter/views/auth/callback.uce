@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "OAuth Callback";
+	context.call["starter"]["page_title"] = "OAuth Callback";
 	String code = context.get["code"];
 	String state = context.get["state"];
 	String error = context.get["error"];

@@ -7,9 +7,10 @@ delim : optional path separator
 return value : the resolved child node, or an empty `DTree` when the path cannot be followed
 
 :see
-DTree
-0_context
+0_DTree
+0_Request
 >types
+json_decode
 
 :content
 Traverses a nested `DTree` without creating missing keys.

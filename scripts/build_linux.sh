@@ -14,7 +14,7 @@ mkdir work > /dev/null 2>&1
 COMPILER="clang++"
 FLAGS="-g -rdynamic -w -Wall -$OPT_FLAG -std=c++20 -fpermissive -ffast-math"
 
-LIBS="-ldl -lm -lpthread `mysql_config --cflags --libs`"
+LIBS="-ldl -lm -lpthread -lpcre2-8 `mysql_config --cflags --libs`"
 SRCFLAGS="-D EXEC_NAME=\"$GF\" -D PLATFORM_NAME=\"linux\""
 
 echo "Compliling executable..."

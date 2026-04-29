@@ -1,104 +1,25 @@
-struct DocPage {
-	String title;
-	String content;
-	StringList sig_lines;
-	StringList param_lines;
-	StringList see_lines;
-};
+#include "lib/doc_page.h"
 
-String doc_default_title(String page)
+void render_doc_page_link(String page, String label = "", String badge = "")
 {
-	String page_title = page;
-	if(page_title.length() > 1 && page_title[1] == '_')
-		nibble(page_title, "_");
-	return(page_title);
-}
+	page = trim(page);
+	if(page == "")
+		return;
+	if(label == "")
+		label = doc_index_label(page);
+	if(badge == "")
+		badge = doc_page_kind_badge(doc_page_kind(page));
 
-String doc_markdown_inline(String text)
-{
-	text = trim(text);
-	if(text == "")
-		return("");
-	String html = markdown_to_html(text);
-	if(html.length() >= 7 && html.substr(0, 3) == "<p>" && html.substr(html.length() - 4) == "</p>")
-		return(html.substr(3, html.length() - 7));
-	return(html);
-}
-
-String doc_legacy_heading(String section)
-{
-	if(section == "desc")
-		return("");
-	if(section == "related")
-		return("## PHP & JS Equivalents");
-	return("## " + section);
-}
-
-DocPage load_doc_page(String page)
-{
-	DocPage result;
-	StringList lines = split(file_get_contents("pages/" + page + ".txt"), "\n");
-	String current_section = "";
-	bool content_mode = false;
-	StringList content_lines;
-
-	for(auto line : lines)
+	?><a href="index.uce?p=<?= uri_encode(page) ?>"><?= label ?><?
+	if(badge != "")
 	{
-		if(!content_mode && line != "" && line.substr(0, 1) == ":")
-		{
-			String section = trim(line.substr(1));
-			if(section == "title" || section == "sig" || section == "params" || section == "see")
-			{
-				current_section = section;
-				continue;
-			}
-			if(section == "content")
-			{
-				content_mode = true;
-				current_section = "content";
-				continue;
-			}
-
-			current_section = "legacy";
-			String heading = doc_legacy_heading(section);
-			if(heading != "")
-			{
-				if(content_lines.size() > 0 && content_lines.back() != "")
-					content_lines.push_back("");
-				content_lines.push_back(heading);
-				content_lines.push_back("");
-			}
-			continue;
-		}
-
-		if(current_section == "title")
-		{
-			if(result.title != "")
-				result.title += "\n";
-			result.title += line;
-		}
-		else if(current_section == "sig")
-		{
-			result.sig_lines.push_back(line);
-		}
-		else if(current_section == "params")
-		{
-			result.param_lines.push_back(line);
-		}
-		else if(current_section == "see")
-		{
-			if(trim(line) != "")
-				result.see_lines.push_back(trim(line));
-		}
-		else
-		{
-			content_lines.push_back(line);
-		}
+		?><span class="badge"><?= badge ?></span><?
 	}
-
-	result.content = join(content_lines, "\n");
-	result.title = trim(result.title);
-	return(result);
+	else
+	{
+		?><span class="dim">()</span><?
+	}
+	?></a><?
 }
 
 void render_doc_params(StringList param_lines)
@@ -130,13 +51,19 @@ void render_see_section(String name)
 	s32 idx = 0;
 	for(auto line : lines)
 	{
+		line = trim(line);
+		if(line == "")
+		{
+			idx += 1;
+			continue;
+		}
 		if(idx == 0)
 		{
 			<><div class="category"><h3><?= line ?></h3><ul></>
 		}
-		else if(line != "")
+		else
 		{
-			<><li><a href="index.uce?p=<?= uri_encode(line) ?>"><?= line ?><span class="dim">()</span></a></li></>
+			?><li><? render_doc_page_link(line); ?></li><?
 		}
 		idx += 1;
 	}
@@ -154,11 +81,19 @@ void render_doc_see_links(StringList see_lines)
 	{
 		if(sl[0] == '>')
 		{
-			render_see_section(sl.substr(1));
+			String target = trim(sl.substr(1));
+			if(doc_has_area(target))
+			{
+				render_see_section(target);
+			}
+			else if(doc_has_page(target))
+			{
+				?><div><? render_doc_page_link(target); ?></div><?
+			}
 		}
 		else
 		{
-			?><div><a href="index.uce?p=<?= trim(sl) ?>"><?= trim(sl) ?><span class="dim">()</span></a></div><?
+			?><div><? render_doc_page_link(trim(sl)); ?></div><?
 		}
 	} 
 	?>
@@ -216,36 +151,9 @@ RENDER(Request& context)
 			for(auto file_name : ls("pages/"))
 			{
 				String ft = nibble(file_name, ".");
-				if(ft.substr(0, 2) == "0_")
-				{
-					String fn = ft;
-					String pre = nibble(fn, "_");
-					?>
-					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">struct</span></a></div>
-					<?
-				}
-				else if(ft.substr(0, 2) == "1_")
-				{
-					String fn = ft;
-					String pre = nibble(fn, "_");
-					?>
-					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">directive</span></a></div>
-					<?
-				}
-				else if(ft.substr(0, 2) == "3_")
-				{
-					String fn = ft;
-					String pre = nibble(fn, "_");
-					?>
-					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= fn ?><span class="badge">info</span></a></div>
-					<?
-				}
-				else
-				{
-					?>
-					<div class="func-item"><a href="?p=<?= uri_encode(ft) ?>"><?= ft ?><span class="dim">()</span></a></div>
-					<?
-				}
+				String label = doc_index_label(ft);
+				String badge = doc_page_kind_badge(doc_page_kind(ft));
+				?><div class="func-item"><? render_doc_page_link(ft, label, badge); ?></div><?
 			}
 			?></div>
 			</main>

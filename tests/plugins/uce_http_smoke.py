@@ -3,6 +3,7 @@ def register(registry):
 		("doc index", "/doc/index.uce", "<html>"),
 		("doc singlepage", "/doc/singlepage.uce", "<html>"),
 		("doc component page", "/doc/index.uce?p=component", "component()"),
+		("doc regex page", "/doc/index.uce?p=regex_search", "regex_search"),
 		("doc relative time page", "/doc/index.uce?p=time_format_relative", "time_format_relative"),
 	]
 

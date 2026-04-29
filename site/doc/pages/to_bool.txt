@@ -1,0 +1,18 @@
+:sig
+bool DTree::to_bool()
+
+:see
+>types
+0_DTree
+json_decode
+to_f64
+to_u64
+
+:content
+Reads a `DTree` value as a boolean.
+
+String values such as `true`, `yes`, `on`, and `1` read as true. Values such as `false`, `no`, `off`, `0`, and `null` read as false.
+
+Numeric values read as true when non-zero. Empty strings read as false.
+
+Use this when consuming request data, JSON-decoded values, config trees, or component props where the original input may be string-shaped.

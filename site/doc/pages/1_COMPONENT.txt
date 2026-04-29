@@ -8,12 +8,18 @@ COMPONENT(Request& context)
 >component
 >component_render
 >1_RENDER
+>1_INIT
+>1_ONCE
 >1_WS
 
 :content
 Defines the default component entrypoint for the current `.uce` file.
 
 `component()` and `component_render()` call `COMPONENT(Request& context)` by default. Named component entrypoints use `COMPONENT:NAME(Request& context)`.
+
+If the same file defines `ONCE(Request& context)`, that hook runs once per request before the first `COMPONENT()` or `COMPONENT:NAME()` call for that unit.
+
+If the file defines `INIT(Request& context)`, that hook runs once when the worker loads the compiled unit into memory.
 
 ## Why It Exists
 

@@ -1,0 +1,39 @@
+:sig
+DTree regex_search_all(String pattern, String subject)
+DTree regex_search_all(String pattern, String subject, String flags)
+
+:params
+pattern : PCRE2 regular expression pattern
+subject : string to search
+flags : optional regex flags
+return value : a DTree containing all non-overlapping matches
+
+:see
+>regex
+regex_match
+regex_search
+regex_replace
+regex_split
+0_DTree
+
+:content
+Finds every non-overlapping match of `pattern` in `subject`.
+
+Example:
+
+```uce
+DTree tags = regex_search_all("#(?<tag>[A-Za-z0-9_]+)", "Ship #uce and #docs");
+
+tags["matches"].each([](DTree match, String key) {
+	print(match["named"]["tag"].to_string(), "\n");
+});
+```
+
+Return shape:
+
+- `matched` is `true` when at least one match exists.
+- `count` is the number of matches.
+- `matches` is a list of entries with the same shape returned by `regex_search()`.
+- `pattern` and `flags` mirror the call inputs.
+
+Zero-length matches are handled safely; the scanner advances after each zero-length match to avoid infinite loops.

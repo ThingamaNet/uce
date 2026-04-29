@@ -1,0 +1,25 @@
+:sig
+StringList
+
+:see
+>types
+String
+split
+split_space
+split_utf8
+join
+regex_split
+
+:content
+Sequential container of `String` values.
+
+`StringList` is an alias for `std::vector<String>`.
+
+It is returned by split-style helpers such as `split()`, `split_space()`, `split_utf8()`, and `regex_split()`.
+
+Use `join()` when you want to turn a `StringList` back into a single `String`.
+
+Related:
+
+- PHP: indexed arrays of strings
+- JavaScript / Node.js: arrays of strings

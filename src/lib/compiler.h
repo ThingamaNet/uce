@@ -2,6 +2,8 @@
 
 #define RENDER(X) extern "C" void __uce_render(X)
 #define COMPONENT(X) extern "C" void __uce_component(X)
+#define ONCE(X) extern "C" void __uce_once(X)
+#define INIT(X) extern "C" void __uce_init(X)
 #define WS(X) extern "C" void __uce_websocket(X)
 #define EXPORT extern "C"
 

@@ -8,7 +8,7 @@ UCE source preprocessing
 load
 unit_render
 unit_call
-0_context
+0_Request
 1_COMPONENT
 
 :content
@@ -25,7 +25,7 @@ The template rewriting implementation lives in `src/lib/compiler-parser.cpp`, wi
 - Inside a literal block, `<?= expression ?>` emits `print(html_escape(expression));`.
 - Inside a literal block, `<?: expression ?>` emits `print(expression);` without HTML escaping.
 - `#load "other.uce"` injects another UCE unit at compile time.
-- `RENDER(Request& context)`, `COMPONENT(Request& context)`, and `WS(Request& context)` are normal C++ macros from `src/lib/compiler.h`.
+- `RENDER(Request& context)`, `COMPONENT(Request& context)`, `ONCE(Request& context)`, `INIT(Request& context)`, and `WS(Request& context)` are normal C++ macros from `src/lib/compiler.h`.
 - `COMPONENT:NAME(Request& context)` is rewritten by the custom pass into an exported named component handler.
 - `EXPORT` is also a normal C++ macro, but the custom pass additionally records exported declarations for metadata.
 
@@ -34,7 +34,7 @@ The template rewriting implementation lives in `src/lib/compiler-parser.cpp`, wi
 - The generated file starts by including `COMPILER_SYS_PATH/src/lib/uce_lib.h`.
 - It then inlines the configured setup template from `SETUP_TEMPLATE` (by default `scripts/setup.h.template`), which defines the internal hook `__uce_set_current_request(Request*)`.
 - It inserts `#line 1` before page code so compiler diagnostics point back to the original `.uce` file.
-- Each literal region is rewritten into one or more `print(R"( ... )");` calls.
+- Each literal region is rewritten into one or more `print(R"...( ... )...");` calls using a safe raw-string delimiter selected for that literal content.
 - `<>` and `?>` both switch from code mode into literal output.
 - `</>` and `<?` both switch from literal output back into code mode.
 - `<? ... ?>` temporarily breaks out of literal printing, emits the enclosed C++ unchanged, then resumes literal output.
@@ -46,6 +46,8 @@ The template rewriting implementation lives in `src/lib/compiler-parser.cpp`, wi
 - Lines beginning with `COMPONENT:NAME(...)` are rewritten into exported `__uce_component_NAME(...)` functions for the component helpers.
 - The final generated source is written to `BIN_DIRECTORY + src_path + "/" + source_file + ".cpp"`.
 - `scripts/compile` then compiles that generated `.cpp` into `source_file + ".so"` with `clang++ -shared -std=c++20 ...`.
+- When a worker loads the compiled unit into memory, the runtime checks for `INIT(Request& context)` and calls it once for that worker-side load.
+- On each request, the first time a given unit is entered through `RENDER()` or any `COMPONENT...` handler, the runtime checks for `ONCE(Request& context)` and calls it before the render/component handler.
 
 ## Generated Files
 
@@ -113,15 +115,32 @@ RENDER(Request& context)
 
 The loaded file is resolved relative to the current source file unless the path is already absolute.
 
+One-time worker initialization plus request-local setup:
+
+```cpp
+INIT(Request& context)
+{
+	// load worker-local data, warm caches, or initialize globals for this unit
+}
+
+ONCE(Request& context)
+{
+	// prepare request-local state before the first render/component call
+	context.call["page_title"] = "Demo";
+}
+```
+
 ## Rules
 
 - Literal mode can start on either `<>` or `?>`.
 - Literal mode can end on either `</>` or `<?`.
-- Literal delimiters are interchangeable; the parser now treats them as one shared code-vs-literal state machine rather than as separate nested block types.
+- Literal delimiters are interchangeable; the parser treats them as one shared code-vs-literal state machine rather than as separate nested block types.
 - `#load` is recognized only when the current line starts with `#load ` at column 1.
 - `EXPORT` harvesting only triggers when the current line starts with `EXPORT` at column 1 and is followed by whitespace.
 - Relative `#load` paths are expanded against the including unit's source directory.
 - `unit_render()` and `unit_call()` are runtime APIs. `#load` is a compile-time composition feature.
+- `INIT()` runs when the shared object is loaded into a worker during a request-triggered load, so it still receives a valid `Request& context`.
+- `ONCE()` is tracked per request and per resolved unit file. A file entered multiple times in one request only runs `ONCE()` once.
 
 ## Limitations
 
@@ -129,7 +148,7 @@ The loaded file is resolved relative to the current source file unless the path 
 - Outside literal blocks it tracks C++ quotes and comments while deciding whether `<>` or `?>` should open literal mode.
 - It does not understand comments, raw string literals, templates, or general C++ token structure.
 - Inside literal blocks it tracks quotes and comments while scanning `<? ... ?>`, `<?= ... ?>`, and `<?: ... ?>` islands so quoted `?>` text does not close those islands early.
-- Because literal output is emitted as a C++ raw string literal `R"( ... )"`, literal content must not contain the exact terminator sequence `)"` or the generated C++ will break.
+- Literal output is emitted through C++ string literals generated by the preprocessor. The preprocessor chooses a raw-string delimiter that does not occur in the literal content, so literal text may safely contain the ordinary raw-string terminator sequence `)"`.
 - `#load` depends on the target unit's generated `.cpp` existing and being compilable. If the target cannot be preprocessed or compiled correctly, the including file will fail to compile as well.
 
 ## Debugging

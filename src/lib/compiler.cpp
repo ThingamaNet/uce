@@ -13,6 +13,8 @@ const char* UCE_SETUP_SYMBOL = "__uce_set_current_request";
 const char* UCE_RENDER_SYMBOL = "__uce_render";
 const char* UCE_COMPONENT_SYMBOL = "__uce_component";
 const char* UCE_WEBSOCKET_SYMBOL = "__uce_websocket";
+const char* UCE_ONCE_SYMBOL = "__uce_once";
+const char* UCE_INIT_SYMBOL = "__uce_init";
 const u64 UCE_UNIT_ABI_VERSION = 1;
 
 struct SharedUnitFilesystemState
@@ -48,6 +50,10 @@ struct SharedUnitCompileCheck
 	bool needs_compile = false;
 };
 
+void compiler_unload_failed_shared_unit(SharedUnit* su);
+bool compiler_run_unit_init(Request* context, SharedUnit* su, String* error_out = 0);
+bool compiler_run_unit_once_if_needed(Request* context, SharedUnit* su, String* error_out = 0);
+
 bool compiler_config_truthy(String raw, bool default_value)
 {
 	raw = to_lower(trim(raw));
@@ -65,19 +71,6 @@ bool compiler_jit_compile_on_request_enabled(Request* context)
 	if(!context || !context->server)
 		return(true);
 	return(compiler_config_truthy(context->server->config["JIT_COMPILE_ON_REQUEST"], true));
-}
-
-u64 compiler_failure_retry_seconds(Request* context)
-{
-	if(!context || !context->server)
-		return(10);
-	auto raw = trim(context->server->config["COMPILE_FAILURE_RETRY_SECONDS"]);
-	if(raw == "")
-		return(10);
-	auto value = int_val(raw);
-	if(value < 0)
-		return(0);
-	return((u64)value);
 }
 
 bool compiler_is_u64_string(String value)
@@ -167,16 +160,16 @@ bool compiler_failure_retry_deferred(Request* context, SharedUnit* su, const Sha
 {
 	if(!context || !su)
 		return(false);
-	auto retry_seconds = compiler_failure_retry_seconds(context);
-	if(retry_seconds == 0)
-		return(false);
 	if(!state.compile_output_exists || state.compile_output_time == 0)
 		return(false);
 	if(state.source_time == 0)
 		return(false);
-	if(state.source_time > state.compile_output_time)
-		return(false);
-	return(time() < (u64)state.compile_output_time + retry_seconds);
+	auto required_failure_inputs_time = std::max({
+		state.source_time,
+		state.setup_template_time,
+		state.compiler_abi_time
+	});
+	return(state.compile_output_time >= required_failure_inputs_time);
 }
 
 String compiler_failure_output_for_state(SharedUnit* su, const SharedUnitFilesystemState& state)
@@ -653,6 +646,8 @@ void load_shared_unit(Request* context, SharedUnit* su)
 	su->on_render = 0;
 	su->on_component = 0;
 	su->on_websocket = 0;
+	su->on_once = 0;
+	su->on_init = 0;
 	su->on_setup = 0;
 	su->so_handle = 0;
 	su->compiler_messages = "";
@@ -695,17 +690,31 @@ void load_shared_unit(Request* context, SharedUnit* su)
 		dlerror();
 		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, UCE_WEBSOCKET_SYMBOL);
 		dlerror();
+		su->on_once = (request_ref_handler)dlsym(su->so_handle, UCE_ONCE_SYMBOL);
+		dlerror();
+		su->on_init = (request_ref_handler)dlsym(su->so_handle, UCE_INIT_SYMBOL);
+		dlerror();
 		su->api_declarations = split(file_get_contents(su->api_file_name), "\n");
+		String init_error = "";
+		if(!compiler_run_unit_init(context, su, &init_error))
+		{
+			if(init_error != "")
+				su->compiler_messages = init_error;
+			compiler_unload_failed_shared_unit(su);
+		}
 		//else
 		//	printf("(i) loaded unit %s\n", su->file_name.c_str());
 	}
 	else
 	{
+		const char* dl_error = dlerror();
 		su->compiler_messages = "could not open " + su->so_name;
+		if(dl_error && String(dl_error) != "")
+			su->compiler_messages += ": " + String(dl_error);
 		su->compile_status = "load_error";
 		su->compile_error_status = su->compiler_messages;
 		su->last_error = time();
-		printf("Error loading unit %s, could not open %s\n", su->file_name.c_str(), su->so_name.c_str());
+		printf("Error loading unit %s, %s\n", su->file_name.c_str(), su->compiler_messages.c_str());
 	}
 }
 
@@ -1176,6 +1185,183 @@ struct UnitInvocationScope
 	}
 };
 
+enum class UnitCallMacroKind
+{
+	none,
+	render,
+	component,
+	once,
+	init
+};
+
+struct UnitCallMacroTarget
+{
+	UnitCallMacroKind kind = UnitCallMacroKind::none;
+	String handler_name;
+};
+
+struct RequestPropsScope
+{
+	Request* context = 0;
+	DTree previous_props;
+
+	RequestPropsScope(Request* context, const DTree& props)
+	{
+		this->context = context;
+		if(this->context)
+		{
+			previous_props = this->context->props;
+			this->context->props = props;
+		}
+	}
+
+	~RequestPropsScope()
+	{
+		if(context)
+			context->props = previous_props;
+	}
+};
+
+void compiler_unload_failed_shared_unit(SharedUnit* su)
+{
+	if(!su)
+		return;
+	if(su->so_handle)
+		dlclose(su->so_handle);
+	su->so_handle = 0;
+	su->api_functions.clear();
+	su->on_setup = 0;
+	su->on_render = 0;
+	su->on_component = 0;
+	su->on_websocket = 0;
+	su->on_once = 0;
+	su->on_init = 0;
+}
+
+bool compiler_run_unit_init(Request* context, SharedUnit* su, String* error_out)
+{
+	if(!su || !su->on_init)
+		return(true);
+	if(!context)
+	{
+		if(error_out)
+			*error_out = "internal error: INIT() requires a Request context";
+		return(false);
+	}
+	if(!su->on_setup)
+	{
+		if(error_out)
+			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + su->file_name;
+		return(false);
+	}
+
+	UnitInvocationScope invoke_scope(context, su);
+	su->on_setup(context);
+	try
+	{
+		su->on_init(*context);
+		return(true);
+	}
+	catch(...)
+	{
+		su->runtime_error_status = "uncaught exception during INIT";
+		su->compile_status = "load_error";
+		su->compile_error_status = su->runtime_error_status;
+		su->last_error = time();
+		if(error_out)
+			*error_out = su->runtime_error_status;
+		return(false);
+	}
+}
+
+bool compiler_run_unit_once_if_needed(Request* context, SharedUnit* su, String* error_out)
+{
+	if(!su || !su->on_once)
+		return(true);
+	if(!context)
+	{
+		if(error_out)
+			*error_out = "internal error: ONCE() requires a Request context";
+		return(false);
+	}
+	if(!su->on_setup)
+	{
+		if(error_out)
+			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + su->file_name;
+		return(false);
+	}
+
+	if(context->once_units.find(su->file_name) != context->once_units.end())
+		return(true);
+
+	context->once_units.insert(su->file_name);
+	UnitInvocationScope invoke_scope(context, su);
+	su->on_setup(context);
+	try
+	{
+		su->on_once(*context);
+		return(true);
+	}
+	catch(...)
+	{
+		context->once_units.erase(su->file_name);
+		su->runtime_error_status = "uncaught exception during ONCE";
+		su->last_error = time();
+		if(error_out)
+			*error_out = su->runtime_error_status;
+		throw;
+	}
+}
+
+String unit_call_macro_trim(String function_name)
+{
+	function_name = trim(function_name);
+	if(function_name.length() >= 2 && function_name.substr(function_name.length() - 2) == "()")
+		function_name = trim(function_name.substr(0, function_name.length() - 2));
+	return(function_name);
+}
+
+UnitCallMacroTarget unit_call_macro_target(String function_name)
+{
+	UnitCallMacroTarget target;
+	function_name = unit_call_macro_trim(function_name);
+
+	if(function_name == "RENDER")
+	{
+		target.kind = UnitCallMacroKind::render;
+		return(target);
+	}
+	if(function_name.rfind("RENDER:", 0) == 0)
+	{
+		target.kind = UnitCallMacroKind::render;
+		target.handler_name = trim(function_name.substr(7));
+		return(target);
+	}
+	if(function_name == "COMPONENT")
+	{
+		target.kind = UnitCallMacroKind::component;
+		return(target);
+	}
+	if(function_name.rfind("COMPONENT:", 0) == 0)
+	{
+		target.kind = UnitCallMacroKind::component;
+		target.handler_name = trim(function_name.substr(10));
+		return(target);
+	}
+	if(function_name == "ONCE")
+	{
+		target.kind = UnitCallMacroKind::once;
+		return(target);
+	}
+	if(function_name == "INIT")
+	{
+		target.kind = UnitCallMacroKind::init;
+		return(target);
+	}
+
+	return(target);
+}
+
 }
 
 String component_normalize_path(String name)
@@ -1262,6 +1448,70 @@ String component_handler_symbol(String render_name)
 	return(String(UCE_COMPONENT_SYMBOL) + "_" + safe_name(render_name));
 }
 
+String compiler_missing_request_handler_message(UnitCallMacroKind kind, String handler_name)
+{
+	handler_name = trim(handler_name);
+	if(kind == UnitCallMacroKind::render)
+	{
+		if(handler_name == "" || handler_name == "render")
+			return("no RENDER() entry point");
+		return("no RENDER:" + handler_name + "() entry point");
+	}
+	if(kind == UnitCallMacroKind::component)
+	{
+		if(handler_name == "")
+			return("no COMPONENT() entry point");
+		return("no COMPONENT:" + handler_name + "() entry point");
+	}
+	if(kind == UnitCallMacroKind::once)
+		return("no ONCE() entry point");
+	if(kind == UnitCallMacroKind::init)
+		return("no INIT() entry point");
+	return("request handler not found");
+}
+
+bool compiler_prepare_request_handler(Request* context, SharedUnit* su, String* error_out = 0, bool run_once = false)
+{
+	if(!su->on_setup)
+	{
+		if(error_out)
+			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + su->file_name;
+		return(false);
+	}
+	if(run_once && !compiler_run_unit_once_if_needed(context, su, error_out))
+		return(false);
+	return(true);
+}
+
+void compiler_execute_request_handler(
+	Request* context,
+	SharedUnit* su,
+	request_ref_handler handler,
+	bool count_request,
+	String runtime_error_status
+)
+{
+	UnitInvocationScope invoke_scope(context, su);
+	su->on_setup(context);
+	f64 render_start = time_precise();
+	compiler_begin_render_result(su, count_request);
+	try
+	{
+		handler(*context);
+		compiler_record_render_result(su, time_precise() - render_start, true);
+	}
+	catch(...)
+	{
+		compiler_record_render_result(
+			su,
+			time_precise() - render_start,
+			false,
+			runtime_error_status
+		);
+		throw;
+	}
+}
+
 request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 {
 	String symbol = page_render_handler_symbol(render_name);
@@ -1300,46 +1550,24 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 	if(!su)
 		return(false);
 
-	if(!su->on_setup)
-	{
-		if(error_out)
-			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + file_name;
+	if(!compiler_prepare_request_handler(context, su, error_out, true))
 		return(false);
-	}
 
 	auto handler = get_page_render_handler(su, render_name);
 	if(!handler)
 	{
 		if(error_out)
-		{
-			if(trim(render_name) == "" || trim(render_name) == "render")
-				*error_out = "no RENDER() entry point";
-			else
-				*error_out = "no RENDER:" + render_name + "() entry point";
-		}
+			*error_out = compiler_missing_request_handler_message(UnitCallMacroKind::render, render_name);
 		return(false);
 	}
 
-	UnitInvocationScope invoke_scope(context, su);
-	su->on_setup(context);
-	f64 render_start = time_precise();
-	bool count_request = compiler_is_request_entry_unit(context, su);
-	compiler_begin_render_result(su, count_request);
-	try
-	{
-		handler(*context);
-		compiler_record_render_result(su, time_precise() - render_start, true);
-	}
-	catch(...)
-	{
-		compiler_record_render_result(
-			su,
-			time_precise() - render_start,
-			false,
-			"uncaught exception during render"
-		);
-		throw;
-	}
+	compiler_execute_request_handler(
+		context,
+		su,
+		handler,
+		compiler_is_request_entry_unit(context, su),
+		"uncaught exception during render"
+	);
 	return(true);
 }
 
@@ -1349,45 +1577,24 @@ bool compiler_invoke_component(Request* context, String file_name, String render
 	if(!su)
 		return(false);
 
-	if(!su->on_setup)
-	{
-		if(error_out)
-			*error_out = "internal error: " + String(UCE_SETUP_SYMBOL) + "() not defined in " + file_name;
+	if(!compiler_prepare_request_handler(context, su, error_out, true))
 		return(false);
-	}
 
 	auto handler = get_component_handler(su, render_name);
 	if(!handler)
 	{
 		if(error_out)
-		{
-			if(trim(render_name) == "")
-				*error_out = "no COMPONENT() entry point";
-			else
-				*error_out = "no COMPONENT:" + render_name + "() entry point";
-		}
+			*error_out = compiler_missing_request_handler_message(UnitCallMacroKind::component, render_name);
 		return(false);
 	}
 
-	UnitInvocationScope invoke_scope(context, su);
-	su->on_setup(context);
-	f64 render_start = time_precise();
-	compiler_begin_render_result(su, false);
-	try
-	{
-		handler(*context);
-		compiler_record_render_result(su, time_precise() - render_start, true);
-	}
-	catch(...)
-	{
-		compiler_record_render_result(
-			su,
-			time_precise() - render_start,
-			false,
-			"uncaught exception during component render"
-		);
-		throw;
-	}
+	compiler_execute_request_handler(
+		context,
+		su,
+		handler,
+		false,
+		"uncaught exception during component render"
+	);
 	return(true);
 }
 
@@ -1421,26 +1628,13 @@ void compiler_invoke_websocket(Request* context, String file_name)
 		return;
 	}
 
-	UnitInvocationScope invoke_scope(context, su);
-	su->on_setup(context);
-	f64 render_start = time_precise();
-	bool count_request = compiler_is_request_entry_unit(context, su);
-	compiler_begin_render_result(su, count_request);
-	try
-	{
-		su->on_websocket(*context);
-		compiler_record_render_result(su, time_precise() - render_start, true);
-	}
-	catch(...)
-	{
-		compiler_record_render_result(
-			su,
-			time_precise() - render_start,
-			false,
-			"uncaught exception during websocket handler"
-		);
-		throw;
-	}
+	compiler_execute_request_handler(
+		context,
+		su,
+		su->on_websocket,
+		compiler_is_request_entry_unit(context, su),
+		"uncaught exception during websocket handler"
+	);
 }
 
 void unit_render(String file_name)
@@ -1499,14 +1693,11 @@ void component_render(String name, DTree props, Request& context)
 		return;
 	}
 
-	DTree previous_props = context.props;
-	context.props = props;
+	RequestPropsScope props_scope(&context, props);
 
 	String error_message = "";
 	if(!compiler_invoke_component(&context, resolved_name, render_name, &error_message) && error_message != "")
 		print(component_error_banner(error_message));
-
-	context.props = previous_props;
 }
 
 String component(String name)
@@ -1558,16 +1749,52 @@ DTree* unit_call(String file_name, String function_name, DTree* call_param)
 		}
 		else
 		{
-			auto f = (dtree_call_handler)dlsym(su->so_handle, function_name.c_str());
-			if(!f)
+			auto macro_target = unit_call_macro_target(function_name);
+			if(macro_target.kind != UnitCallMacroKind::none)
 			{
-				print("Error: unit_call() function '", function_name, "' not found");
+				RequestPropsScope props_scope(context, (call_param ? *call_param : DTree()));
+				String error_message = "";
+
+				if(macro_target.kind == UnitCallMacroKind::render)
+				{
+					if(!compiler_invoke_render(context, su->file_name, macro_target.handler_name, &error_message) && error_message != "")
+						print("Error: unit_call() ", error_message);
+				}
+				else if(macro_target.kind == UnitCallMacroKind::component)
+				{
+					if(!compiler_invoke_component(context, su->file_name, macro_target.handler_name, &error_message) && error_message != "")
+						print("Error: unit_call() ", error_message);
+				}
+				else
+				{
+					UnitInvocationScope invoke_scope(context, su);
+					su->on_setup(context);
+					request_ref_handler handler = 0;
+
+					if(macro_target.kind == UnitCallMacroKind::once)
+						handler = su->on_once;
+					else if(macro_target.kind == UnitCallMacroKind::init)
+						handler = su->on_init;
+
+					if(!handler)
+						print("Error: unit_call() ", compiler_missing_request_handler_message(macro_target.kind, macro_target.handler_name));
+					else
+						handler(*context);
+				}
 			}
 			else
 			{
-				UnitInvocationScope invoke_scope(context, su);
-				su->on_setup(context);
-				result = f(call_param);
+				auto f = (dtree_call_handler)dlsym(su->so_handle, function_name.c_str());
+				if(!f)
+				{
+					print("Error: unit_call() function '", function_name, "' not found");
+				}
+				else
+				{
+					UnitInvocationScope invoke_scope(context, su);
+					su->on_setup(context);
+					result = f(call_param);
+				}
 			}
 		}
 	}

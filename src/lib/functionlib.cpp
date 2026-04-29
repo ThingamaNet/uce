@@ -1,5 +1,9 @@
 #include "functionlib.h"
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+#include <stdexcept>
+
 String var_dump(StringMap map, String prefix, String postfix)
 {
 	String result = "";
@@ -148,6 +152,347 @@ String replace(String s, String search, String replace_with)
 	}
 	if(last_spos < s.length())
 		result.append(s.substr(last_spos));
+	return(result);
+}
+
+namespace {
+
+String regex_flags_label(String flags)
+{
+	return(flags == "" ? "default" : flags);
+}
+
+void regex_throw(String function_name, String message)
+{
+	throw std::runtime_error(function_name + "(): " + message);
+}
+
+String regex_pcre2_error(int error_code)
+{
+	PCRE2_UCHAR buffer[256];
+	pcre2_get_error_message(error_code, buffer, sizeof(buffer));
+	return(String(reinterpret_cast<char*>(buffer)));
+}
+
+uint32_t regex_compile_options(String flags, String function_name)
+{
+	uint32_t options = PCRE2_UTF | PCRE2_UCP;
+	for(char flag : flags)
+	{
+		switch(flag)
+		{
+			case('i'):
+				options |= PCRE2_CASELESS;
+				break;
+			case('m'):
+				options |= PCRE2_MULTILINE;
+				break;
+			case('s'):
+				options |= PCRE2_DOTALL;
+				break;
+			case('x'):
+				options |= PCRE2_EXTENDED;
+				break;
+			case('u'):
+				options |= PCRE2_UTF | PCRE2_UCP;
+				break;
+			case('a'):
+				options &= ~PCRE2_UTF;
+				options &= ~PCRE2_UCP;
+				break;
+			default:
+				regex_throw(function_name, "unknown regex flag '" + String(1, flag) + "'");
+		}
+	}
+	return(options);
+}
+
+struct RegexCode {
+	pcre2_code* code = 0;
+
+	RegexCode(String pattern, String flags, String function_name)
+	{
+		int error_code = 0;
+		PCRE2_SIZE error_offset = 0;
+		code = pcre2_compile(
+			reinterpret_cast<PCRE2_SPTR>(pattern.c_str()),
+			pattern.length(),
+			regex_compile_options(flags, function_name),
+			&error_code,
+			&error_offset,
+			0
+		);
+		if(!code)
+			regex_throw(function_name, "could not compile pattern at offset " + std::to_string((u64)error_offset) + ": " + regex_pcre2_error(error_code));
+
+		pcre2_jit_compile(code, PCRE2_JIT_COMPLETE);
+	}
+
+	~RegexCode()
+	{
+		if(code)
+			pcre2_code_free(code);
+	}
+};
+
+struct RegexMatchData {
+	pcre2_match_data* data = 0;
+
+	RegexMatchData(pcre2_code* code)
+	{
+		data = pcre2_match_data_create_from_pattern(code, 0);
+		if(!data)
+			regex_throw("regex", "could not allocate match data");
+	}
+
+	~RegexMatchData()
+	{
+		if(data)
+			pcre2_match_data_free(data);
+	}
+};
+
+String regex_subject_slice(String subject, PCRE2_SIZE start, PCRE2_SIZE end)
+{
+	if(start == PCRE2_UNSET || end == PCRE2_UNSET || end < start || start > subject.length())
+		return("");
+	if(end > subject.length())
+		end = subject.length();
+	return(subject.substr(start, end - start));
+}
+
+size_t regex_next_utf8_offset(String subject, size_t offset)
+{
+	if(offset >= subject.length())
+		return(subject.length() + 1);
+
+	unsigned char c = (unsigned char)subject[offset];
+	size_t step = 1;
+	if((c & 0x80) == 0)
+		step = 1;
+	else if((c & 0xE0) == 0xC0)
+		step = 2;
+	else if((c & 0xF0) == 0xE0)
+		step = 3;
+	else if((c & 0xF8) == 0xF0)
+		step = 4;
+
+	if(offset + step > subject.length())
+		step = 1;
+	return(offset + step);
+}
+
+void regex_add_named_captures(DTree& result, pcre2_code* code, String subject, PCRE2_SIZE* ovector, int rc)
+{
+	uint32_t name_count = 0;
+	uint32_t entry_size = 0;
+	PCRE2_SPTR name_table = 0;
+
+	pcre2_pattern_info(code, PCRE2_INFO_NAMECOUNT, &name_count);
+	if(name_count == 0)
+		return;
+
+	pcre2_pattern_info(code, PCRE2_INFO_NAMEENTRYSIZE, &entry_size);
+	pcre2_pattern_info(code, PCRE2_INFO_NAMETABLE, &name_table);
+
+	for(uint32_t i = 0; i < name_count; i += 1)
+	{
+		PCRE2_SPTR entry = name_table + (i * entry_size);
+		uint32_t group_index = (entry[0] << 8) | entry[1];
+		String name(reinterpret_cast<const char*>(entry + 2));
+		if(group_index >= (uint32_t)rc)
+			continue;
+
+		PCRE2_SIZE start = ovector[group_index * 2];
+		PCRE2_SIZE end = ovector[group_index * 2 + 1];
+		if(start == PCRE2_UNSET || end == PCRE2_UNSET)
+			continue;
+
+		result["named"][name] = regex_subject_slice(subject, start, end);
+		result["named_offsets"][name]["index"] = (f64)group_index;
+		result["named_offsets"][name]["start"] = (f64)start;
+		result["named_offsets"][name]["end"] = (f64)end;
+	}
+}
+
+DTree regex_build_match_tree(String pattern, String flags, String subject, pcre2_code* code, pcre2_match_data* match_data, int rc)
+{
+	DTree result;
+	result["matched"].set_bool(rc >= 0);
+	result["pattern"] = pattern;
+	result["flags"] = regex_flags_label(flags);
+
+	if(rc < 0)
+		return(result);
+
+	PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(match_data);
+	result["start"] = (f64)ovector[0];
+	result["end"] = (f64)ovector[1];
+	result["match"] = regex_subject_slice(subject, ovector[0], ovector[1]);
+
+	for(int i = 0; i < rc; i += 1)
+	{
+		DTree capture;
+		PCRE2_SIZE start = ovector[i * 2];
+		PCRE2_SIZE end = ovector[i * 2 + 1];
+		capture["index"] = (f64)i;
+		capture["matched"].set_bool(start != PCRE2_UNSET && end != PCRE2_UNSET);
+		if(start != PCRE2_UNSET && end != PCRE2_UNSET)
+		{
+			capture["start"] = (f64)start;
+			capture["end"] = (f64)end;
+			capture["text"] = regex_subject_slice(subject, start, end);
+		}
+		result["captures"].push(capture);
+	}
+
+	regex_add_named_captures(result, code, subject, ovector, rc);
+	return(result);
+}
+
+int regex_match_at(RegexCode& regex, RegexMatchData& match_data, String subject, size_t offset, uint32_t options, String function_name)
+{
+	int rc = pcre2_match(
+		regex.code,
+		reinterpret_cast<PCRE2_SPTR>(subject.c_str()),
+		subject.length(),
+		offset,
+		options,
+		match_data.data,
+		0
+	);
+
+	if(rc == PCRE2_ERROR_NOMATCH)
+		return(rc);
+	if(rc < 0)
+		regex_throw(function_name, "match failed: " + regex_pcre2_error(rc));
+	return(rc);
+}
+
+}
+
+bool regex_match(String pattern, String subject, String flags)
+{
+	RegexCode regex(pattern, flags, "regex_match");
+	RegexMatchData match_data(regex.code);
+	int rc = regex_match_at(regex, match_data, subject, 0, PCRE2_ANCHORED | PCRE2_ENDANCHORED, "regex_match");
+	return(rc >= 0);
+}
+
+DTree regex_search(String pattern, String subject, String flags)
+{
+	RegexCode regex(pattern, flags, "regex_search");
+	RegexMatchData match_data(regex.code);
+	int rc = regex_match_at(regex, match_data, subject, 0, 0, "regex_search");
+	return(regex_build_match_tree(pattern, flags, subject, regex.code, match_data.data, rc));
+}
+
+DTree regex_search_all(String pattern, String subject, String flags)
+{
+	RegexCode regex(pattern, flags, "regex_search_all");
+	RegexMatchData match_data(regex.code);
+	DTree result;
+	result["matched"].set_bool(false);
+	result["pattern"] = pattern;
+	result["flags"] = regex_flags_label(flags);
+
+	size_t offset = 0;
+	while(offset <= subject.length())
+	{
+		int rc = regex_match_at(regex, match_data, subject, offset, 0, "regex_search_all");
+		if(rc == PCRE2_ERROR_NOMATCH)
+			break;
+
+		DTree match = regex_build_match_tree(pattern, flags, subject, regex.code, match_data.data, rc);
+		result["matches"].push(match);
+		result["matched"].set_bool(true);
+
+		PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(match_data.data);
+		size_t start = ovector[0];
+		size_t end = ovector[1];
+		if(end > offset)
+			offset = end;
+		else
+			offset = regex_next_utf8_offset(subject, offset);
+	}
+
+	result["count"] = (f64)result["matches"].deref()._map.size();
+	return(result);
+}
+
+String regex_replace(String pattern, String replacement, String subject, String flags)
+{
+	RegexCode regex(pattern, flags, "regex_replace");
+	PCRE2_SIZE output_length = 0;
+	uint32_t options = PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH;
+
+	int rc = pcre2_substitute(
+		regex.code,
+		reinterpret_cast<PCRE2_SPTR>(subject.c_str()),
+		subject.length(),
+		0,
+		options,
+		0,
+		0,
+		reinterpret_cast<PCRE2_SPTR>(replacement.c_str()),
+		replacement.length(),
+		0,
+		&output_length
+	);
+
+	if(rc != PCRE2_ERROR_NOMEMORY && rc < 0)
+		regex_throw("regex_replace", "substitution failed: " + regex_pcre2_error(rc));
+
+	String output;
+	output.resize(output_length);
+	rc = pcre2_substitute(
+		regex.code,
+		reinterpret_cast<PCRE2_SPTR>(subject.c_str()),
+		subject.length(),
+		0,
+		PCRE2_SUBSTITUTE_GLOBAL,
+		0,
+		0,
+		reinterpret_cast<PCRE2_SPTR>(replacement.c_str()),
+		replacement.length(),
+		reinterpret_cast<PCRE2_UCHAR*>(&output[0]),
+		&output_length
+	);
+
+	if(rc < 0)
+		regex_throw("regex_replace", "substitution failed: " + regex_pcre2_error(rc));
+
+	output.resize(output_length);
+	return(output);
+}
+
+StringList regex_split(String pattern, String subject, String flags)
+{
+	RegexCode regex(pattern, flags, "regex_split");
+	RegexMatchData match_data(regex.code);
+	StringList result;
+
+	size_t offset = 0;
+	size_t last_end = 0;
+	while(offset <= subject.length())
+	{
+		int rc = regex_match_at(regex, match_data, subject, offset, 0, "regex_split");
+		if(rc == PCRE2_ERROR_NOMATCH)
+			break;
+
+		PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(match_data.data);
+		size_t start = ovector[0];
+		size_t end = ovector[1];
+		result.push_back(subject.substr(last_end, start - last_end));
+		last_end = end;
+
+		if(end > offset)
+			offset = end;
+		else
+			offset = regex_next_utf8_offset(subject, offset);
+	}
+
+	result.push_back(subject.substr(last_end));
 	return(result);
 }
 

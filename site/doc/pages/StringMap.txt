@@ -3,6 +3,10 @@ StringMap
 
 :see
 >types
+0_Request
+parse_query
+encode_query
+array_merge
 
 :content
 Associative container mapping `String` keys to `String` values.

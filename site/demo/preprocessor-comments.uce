@@ -11,6 +11,7 @@ RENDER(Request& context)
 		</h1>
 
 		<p>This page exists to prove the template parser ignores quotes and template markers that appear inside C++ comments.</p>
+		<p>It also renders a literal raw-string terminator sequence safely: <code>)"</code>.</p>
 
 		<?
 		// Regression: this comment's apostrophe must not swallow the later ?> marker.

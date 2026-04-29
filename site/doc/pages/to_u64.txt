@@ -1,0 +1,17 @@
+:sig
+u64 DTree::to_u64()
+
+:see
+>types
+0_DTree
+json_decode
+int_val
+to_bool
+to_f64
+
+:content
+Reads a `DTree` value as an unsigned integer.
+
+String values are parsed numerically. Boolean values become `1` or `0`. Negative values clamp to `0`.
+
+Use this for counts, identifiers, limits, timestamps, and other non-negative numeric values stored inside a `DTree`.

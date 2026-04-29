@@ -6,8 +6,10 @@ path : optional UCE unit path. If empty, recompiles the current executing unit.
 return value : `true` when the unit was compiled and loaded successfully
 
 :see
+>runtime
 unit_info
 units_list
+unit_load
 
 :content
 Triggers a manual recompile of a UCE compilation unit.

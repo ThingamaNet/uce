@@ -38,6 +38,7 @@ RENDER(Request& context)
 			<? render_card("dtree.uce", "DTree", "Dynamic hierarchical data tree"); ?>
 			<? render_card("json.uce", "JSON", "Parse and encode JSON data"); ?>
 			<? render_card("preprocessor-comments.uce", "Preprocessor Comments", "Regression coverage for comment parsing in templates"); ?>
+			<? render_card("regex.uce", "Regular Expressions", "PCRE2 matching, captures, replacement, and splitting"); ?>
 			<? render_card("string.uce", "String", "String operations"); ?>
 			<? render_card("str_replace.uce", "String Replace", "Search and replace in strings"); ?>
 			<? render_card("utf8.uce", "UTF-8", "Unicode string handling"); ?>
@@ -61,6 +62,7 @@ RENDER(Request& context)
 			<div class="grid-heading">Advanced</div>
 			<? render_card("call_file.uce", "unit_call()", "Dynamic file inclusion"); ?>
 			<? render_card("components.uce", "Components", "Reusable component system"); ?>
+			<? render_card("once-init.uce", "ONCE / INIT", "Unit lifecycle hooks for worker load and request entry"); ?>
 			<? render_card("markdown.uce", "Markdown", "Markdown parsing with components"); ?>
 			<? render_card("script.uce", "Script", "UCE script integration"); ?>
 			<? render_card("websockets.ws.uce", "WebSockets", "Real-time WebSocket chat"); ?>

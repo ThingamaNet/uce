@@ -7,7 +7,7 @@ code : optional HTTP redirect status, defaults to `302`
 
 :see
 set_status
-0_context
+0_Request
 
 :content
 Sets the `Location` response header and updates the current HTTP status code.

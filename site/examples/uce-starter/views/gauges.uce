@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Gauges";
+	context.call["starter"]["page_title"] = "Gauges";
 	starter_register_css("themes/common/css/gauges.css", context);
 	f64 pi = 3.14159265358979323846;
 
@@ -69,7 +69,7 @@ RENDER(Request& context)
 	props.clear();
 	props["id"] = "needle_demo";
 	props["title"] = "Needle Gauge";
-	props["subtitle"] = "The original analog gauge now uses the same elevated panels, typography, and theme-token palette as the arc gauges.";
+	props["subtitle"] = "The original analog gauge uses the same elevated panels, typography, and theme-token palette as the arc gauges.";
 	props["style"] = "flex:1 1 24rem";
 	props["listen"].set_bool(true);
 	props["label"] = "CPU";

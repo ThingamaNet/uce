@@ -9,6 +9,9 @@ return value : merged result
 
 :see
 >types
+0_DTree
+StringMap
+json_decode
 
 :content
 Merges two maps or trees using PHP-like merge behavior.

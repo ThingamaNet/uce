@@ -1,0 +1,17 @@
+:sig
+f64 DTree::to_f64()
+
+:see
+>types
+0_DTree
+json_decode
+float_val
+to_bool
+to_u64
+
+:content
+Reads a `DTree` value as a floating-point number.
+
+String values are parsed using the same permissive conversion rules used by the runtime's scalar helpers. Boolean values become `1.0` or `0.0`.
+
+Use this for numeric config values, JSON-decoded fields, component props, and request data that should be treated as a number.

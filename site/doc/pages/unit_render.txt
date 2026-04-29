@@ -8,6 +8,10 @@ context : optional request context to pass into the target page
 
 :see
 >ob
+unit_call
+unit_load
+1_RENDER
+component
 
 :content
 Calls another UCE file and executes its `RENDER(Request& context)` function.

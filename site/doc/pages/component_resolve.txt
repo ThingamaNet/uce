@@ -3,6 +3,10 @@ String component_resolve(String name)
 
 :see
 >ob
+component
+component_exists
+component_render
+1_COMPONENT
 
 :content
 Resolves a component name to the concrete `.uce` file path that will be loaded.

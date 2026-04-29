@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Register";
+	context.call["starter"]["page_title"] = "Register";
 	StarterUser users(context);
 	DTree result;
 	if(context.params["REQUEST_METHOD"] == "POST")

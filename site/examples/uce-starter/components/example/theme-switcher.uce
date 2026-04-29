@@ -5,7 +5,7 @@ COMPONENT(Request& context)
 	starter_boot(context);
 	String current_theme = context.cfg.get_by_path("theme/key").to_string();
 	String current_label = first(context.cfg.get_by_path("theme/label").to_string(), current_theme);
-	String route_path = context.var["starter"]["route"]["l_path"].to_string();
+	String route_path = context.call["starter"]["route"]["l_path"].to_string();
 
 	<>
 		<div id="theme-switcher" style="position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 9999; font-family: inherit;">

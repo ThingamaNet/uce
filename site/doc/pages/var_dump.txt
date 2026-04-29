@@ -7,6 +7,13 @@ String var_dump(DTree t, String prefix = "", String postfix = "\n")
 t : object to be dumped into a string
 return value : string containing a human-friendly representation of 't'
 
+:see
+>types
+0_DTree
+StringMap
+json_encode
+print
+
 :content
 Returns a string representation of `t` intended for debugging.
 

@@ -6,7 +6,7 @@ s : string containing JSON data
 return value : a DTree object containing the deserialized JSON data
 
 :see
-DTree
+0_DTree
 json_encode
 to_bool
 to_f64

@@ -5,7 +5,7 @@ COMPONENT(Request& context)
 	starter_boot(context);
 	bool embed_mode = starter_page_embed_mode(context);
 	String main_html = starter_page_main_html(context);
-	String current_path = context.var["starter"]["route"]["l_path"].to_string();
+	String current_path = context.call["starter"]["route"]["l_path"].to_string();
 
 	DTree global_props;
 	global_props["cookie_consent"].set_bool(false);

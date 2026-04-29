@@ -13,7 +13,7 @@ UCE is a PHP-inspired server-side runtime that lets you build web pages and hand
 - WebSocket pages can additionally expose `WS(Request& context)`
 - sub-rendering and components pass structured data through `context.props`
 - nginx can forward normal `.uce` requests and ordinary `.ws.uce` page loads to the FastCGI socket, while real WebSocket upgrade requests for `.ws.uce` endpoints go to the built-in HTTP/WebSocket listener
-- the nginx-published application tree now lives under `site/`
+- the nginx-published application tree lives under `site/`
 - you can include C++ code as much as you want, but only .uce files called via API functions and entry points will be pre-processed
 - the preprocessor has two jobs:
        - allow for inline HTML within C++ and the use of templating tags inside of that HTML
@@ -42,6 +42,7 @@ The current build expects:
 
 - `clang++`
 - `mysql_config`
+- PCRE2 development headers and library (`libpcre2-dev` on Debian / Ubuntu)
 - standard Linux development headers for `dl`, `pthread`, sockets, and backtrace support
 
 The binary is written to:
@@ -52,7 +53,7 @@ bin/uce_fastcgi.linux.bin
 
 ## Runtime Model
 
-UCE pages now use explicit request handlers instead of implicit globals:
+UCE pages use explicit request handlers instead of implicit globals:
 
 - `RENDER(Request& context)` for normal HTTP rendering
 - `WS(Request& context)` for inbound WebSocket messages
@@ -68,7 +69,7 @@ Useful related runtime patterns:
 - `context.params`, `context.get`, `context.post`, `context.cookies`, `context.session`, and `context.header` for request/response state
 - `context.set_status(code[, reason])` to set the HTTP response status
 
-Useful helpers for that data model now include:
+Useful helpers for that data model include:
 
 - `DTree::get_by_path("a/b/c")` for path-style config traversal without creating missing keys
 - `DTree::has("key")` / `key("key")` for non-mutating child lookup, and `get_or_create("key")` when creation is intended
@@ -90,9 +91,14 @@ COMPONENT:BODY(Request& context)
 
 Those are intended for sub-rendering through helpers such as `component("components/card:BODY", props, context)` rather than direct page entry.
 
+Additional lifecycle hooks are also available on ordinary `.uce` units:
+
+- `INIT(Request& context)` runs once when a worker loads that unit's shared object into memory
+- `ONCE(Request& context)` runs once per request before the first `RENDER()` or `COMPONENT...` entrypoint from that file
+
 ## Template Output
 
-UCE now treats template parsing as one shared code-vs-literal state machine.
+UCE treats template parsing as one shared code-vs-literal state machine.
 
 - `<>` and `?>` both enter literal output mode
 - `</>` and `<?` both return to code mode
@@ -106,9 +112,9 @@ Inside literal output, UCE supports three inline forms:
 
 Use `<?= ... ?>` by default for user-visible text. Use `<?: ... ?>` only for trusted markup or content that has already been escaped.
 
-The parser now treats C++ `//` and `/* ... */` comments as comments in both normal code and `<? ... ?>` islands, so quotes or delimiter markers inside comments do not confuse template parsing.
+The parser treats C++ `//` and `/* ... */` comments as comments in both normal code and `<? ... ?>` islands, so quotes or delimiter markers inside comments do not confuse template parsing.
 
-The preprocessing implementation is now split between `src/lib/compiler.cpp` and `src/lib/compiler-parser.cpp`. `compiler.cpp` owns unit compilation and cache orchestration, while `compiler-parser.cpp` owns source rewriting and template parsing.
+The preprocessing implementation is split between `src/lib/compiler.cpp` and `src/lib/compiler-parser.cpp`. `compiler.cpp` owns unit compilation and cache orchestration, while `compiler-parser.cpp` owns source rewriting and template parsing.
 
 ## Components
 
@@ -141,6 +147,8 @@ Components expose `COMPONENT(Request& context)` as their default entrypoint and 
 
 The component helpers call only `COMPONENT...` handlers. A file meant purely for component use can define `COMPONENT()` without defining `RENDER()`, which keeps direct page entry and component entry cleanly separated. Inside a component file, `component(":NAME", props, context)` and `component_render(":NAME", props, context)` target another named component handler in that same file.
 
+If the component file also defines `ONCE(Request& context)`, that hook runs once per request before the file's first component/render entrypoint. If it defines `INIT(Request& context)`, that hook runs once when the worker loads the unit.
+
 ## WebSockets
 
 The runtime keeps the socket lifecycle in-process and exposes a low-boilerplate API to page code:
@@ -158,7 +166,7 @@ The runtime keeps the socket lifecycle in-process and exposes a low-boilerplate 
 
 By default, the WebSocket scope is the current page file, so `ws_send()` queues a message for clients connected to that same `.ws.uce` endpoint.
 
-Each live WebSocket connection now owns a broker-side `DTree` exposed to page code as `context.connection`. Mutations to that tree persist for the life of the socket and are visible on later `WS(Request& context)` calls for the same client.
+Each live WebSocket connection owns a broker-side `DTree` exposed to page code as `context.connection`. Mutations to that tree persist for the life of the socket and are visible on later `WS(Request& context)` calls for the same client.
 
 The current inbound payload is available directly as `context.in`, and the runtime mirrors message metadata into `context.params` using keys such as `WS_CONNECTION_ID`, `WS_SCOPE`, `WS_CONNECTION_COUNT`, `WS_OPCODE`, `WS_MESSAGE_TYPE`, and `WS_DOCUMENT_URI`.
 
@@ -166,11 +174,11 @@ The current inbound payload is available directly as `context.in`, and the runti
 
 Set `binary = true` on `ws_send()` or `ws_send_to()` to queue a binary frame instead of a text frame.
 
-The runtime now accepts fragmented messages, validates reserved bits and UTF-8 for text payloads, and delivers both text and binary message frames into `WS(Request& context)`.
+The runtime accepts fragmented messages, validates reserved bits and UTF-8 for text payloads, and delivers both text and binary message frames into `WS(Request& context)`.
 
 ## Error Reporting
 
-Unhandled exceptions and recovered fatal request signals now return a `500 Internal Server Error` response with a plain-text trace instead of simply dropping the upstream connection and leaving nginx to show a generic `502`.
+Unhandled exceptions and recovered fatal request signals return a `500 Internal Server Error` response with a plain-text trace instead of simply dropping the upstream connection and leaving nginx to show a generic `502`.
 
 The demo page `site/test/error-reporting.uce` can be used to exercise:
 
@@ -232,7 +240,7 @@ On a Debian or Ubuntu host, start with the packages needed to build and run UCE 
 
 ```bash
 apt update
-apt install -y nginx clang mariadb-client libmariadb-dev build-essential
+apt install -y nginx clang mariadb-client libmariadb-dev libpcre2-dev build-essential
 ```
 
 The exact package names may vary by distro. The important requirements are:
@@ -240,6 +248,7 @@ The exact package names may vary by distro. The important requirements are:
 - `nginx`
 - `clang++`
 - `mysql_config`
+- PCRE2 development headers and library (`libpcre2-dev` on Debian / Ubuntu)
 - normal Linux development headers for threads, sockets, `dl`, and backtrace support
 
 ### 2. Put the repo on the server
@@ -484,7 +493,7 @@ Common failure modes:
 - WebSocket upgrade fails
   Check that nginx is routing `.ws.uce` to `proxy_pass`, not `fastcgi_pass`, and that `HTTP_PORT` is reachable on localhost.
 - Requests compile but immediately crash
-  Check `journalctl -u uce.service`. Generated units now carry an ABI metadata sidecar and should be recompiled automatically after runtime ABI changes, but clearing stale artifacts under `BIN_DIRECTORY` is still a useful last-resort recovery step if the cache has been damaged manually.
+  Check `journalctl -u uce.service`. Generated units carry an ABI metadata sidecar and should be recompiled automatically after runtime ABI changes, but clearing stale artifacts under `BIN_DIRECTORY` is still a useful last-resort recovery step if the cache has been damaged manually.
 - nginx serves raw source or internal files
   Tighten the server root and add explicit deny rules for non-public directories.
 

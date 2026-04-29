@@ -5,6 +5,12 @@ String html_escape(String s)
 s : string to be escaped
 return value : an HTML-safe escaped version of 's'
 
+:see
+>string
+json_encode
+print
+component
+
 :content
 Returns a version of the input string where special HTML characters are replaced by entities:
 

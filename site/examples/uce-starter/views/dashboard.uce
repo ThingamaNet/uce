@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Dashboard";
+	context.call["starter"]["page_title"] = "Dashboard";
 	starter_register_css("views/dashboard.css", context);
 
 	DTree props;

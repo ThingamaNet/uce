@@ -7,6 +7,7 @@
 #include <functional>
 #include <sstream>
 #include <atomic>
+#include <set>
 
 typedef unsigned char u8;
 typedef signed char s8;
@@ -84,6 +85,8 @@ struct SharedUnit {
 	request_ref_handler on_render = 0;
 	request_ref_handler on_component = 0;
 	request_ref_handler on_websocket = 0;
+	request_ref_handler on_once = 0;
+	request_ref_handler on_init = 0;
 
 	String compiler_messages;
 	String compile_status = "unknown";
@@ -156,8 +159,9 @@ struct Request {
 	StringMap cookies;
 	StringMap session;
 	String session_loaded_hash = "";
+	std::set<String> once_units;
 
-	//DTree var;
+	DTree call;
 	DTree cfg;
 	DTree props;
 	DTree connection;

@@ -6,9 +6,11 @@ path : optional UCE unit path. If empty, uses the current executing unit.
 return value : metadata tree for the resolved unit, or an empty tree if the unit cannot be resolved
 
 :see
+>runtime
 units_list
 unit_compile
-0_context
+0_Request
+unit_load
 
 :content
 Returns runtime metadata for a UCE compilation unit.

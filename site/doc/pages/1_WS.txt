@@ -6,6 +6,10 @@ WS(Request& context)
 
 :see
 >websocket
+>1_COMPONENT
+>1_INIT
+>1_ONCE
+>1_RENDER
 
 :content
 Defines the WebSocket message handler for the current `.ws.uce` page.

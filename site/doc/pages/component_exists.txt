@@ -3,6 +3,10 @@ bool component_exists(String name)
 
 :see
 >ob
+component
+component_render
+component_resolve
+1_COMPONENT
 
 :content
 Checks whether a component file can be resolved from the current page context.

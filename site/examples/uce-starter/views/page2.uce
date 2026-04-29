@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Ajaxy";
+	context.call["starter"]["page_title"] = "Ajaxy";
 	<>
 		<h1>Ajax Demo</h1>
 		<div id="page2-section1">

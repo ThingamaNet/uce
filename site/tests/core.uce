@@ -25,6 +25,19 @@ RENDER(Request& context)
 
 	check("trim()", trim("  padded value  ") == "padded value", trim("  padded value  "));
 	check("replace()", replace("alpha-beta-beta", "beta", "done") == "alpha-done-done", replace("alpha-beta-beta", "beta", "done"));
+	check("regex_match()", regex_match("[A-Z][a-z]+", "Alice") && !regex_match("[A-Z][a-z]+", "Alice!"), "full-string validation");
+
+	DTree regex_email = regex_search("(?<user>[A-Za-z0-9._%+-]+)@(?<host>[A-Za-z0-9.-]+)", "Contact ops@example.test");
+	check("regex_search()", regex_email["matched"].to_bool() && regex_email["named"]["user"].to_string() == "ops" && regex_email["named"]["host"].to_string() == "example.test", json_encode(regex_email));
+
+	DTree regex_tags = regex_search_all("#(?<tag>[A-Za-z0-9_]+)", "#uce #docs");
+	check("regex_search_all()", regex_tags["count"].to_s64() == 2 && regex_tags["matches"]["1"]["named"]["tag"].to_string() == "docs", json_encode(regex_tags));
+
+	check("regex_replace()", regex_replace("#([A-Za-z0-9_]+)", "<tag>$1</tag>", "#uce") == "<tag>uce</tag>", regex_replace("#([A-Za-z0-9_]+)", "<tag>$1</tag>", "#uce"));
+
+	auto regex_parts = regex_split("\\s*,\\s*", "uce, components, markdown");
+	check("regex_split()", regex_parts.size() == 3 && regex_parts[1] == "components", join(regex_parts, " | "));
+
 	check("substr() + strpos()", strpos("component suite", "suite") == 10 && substr("component suite", 10) == "suite", "strpos=10 substr='" + substr("component suite", 10) + "'");
 	check("str_starts_with()", str_starts_with("websocket-suite", "websocket"), "websocket-suite starts with websocket");
 	check("str_ends_with()", str_ends_with("component.uce", ".uce"), "component.uce ends with .uce");

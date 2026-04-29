@@ -3,7 +3,7 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_title"] = "Themes";
+	context.call["starter"]["page_title"] = "Themes";
 	starter_register_css("views/themes.css", context);
 	String current_theme = context.cfg.get_by_path("theme/key").to_string();
 

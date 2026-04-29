@@ -3,19 +3,19 @@
 RENDER(Request& context)
 {
 	starter_boot(context);
-	context.var["starter"]["page_type"] = "json";
+	context.call["starter"]["page_type"] = "json";
 
 	DTree body = json_decode(context.in);
 	if(context.params["REQUEST_METHOD"] == "POST" && body["oauth_service"].to_string() != "" && body["oauth_state"].to_string() != "")
 	{
 		context.session["oauth_service"] = body["oauth_service"].to_string();
 		context.session["oauth_state"] = body["oauth_state"].to_string();
-		context.var["starter"]["json"]["status"] = "success";
+		context.call["starter"]["json"]["status"] = "success";
 	}
 	else
 	{
 		context.set_status(400, "Bad Request");
-		context.var["starter"]["json"]["status"] = "error";
-		context.var["starter"]["json"]["message"] = "Invalid input";
+		context.call["starter"]["json"]["status"] = "error";
+		context.call["starter"]["json"]["message"] = "Invalid input";
 	}
 }

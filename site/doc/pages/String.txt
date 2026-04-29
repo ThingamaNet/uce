@@ -3,6 +3,10 @@ String
 
 :see
 >types
+>string
+split_utf8
+substr
+html_escape
 
 :content
 Primary string type used throughout UCE.

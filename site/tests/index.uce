@@ -1,0 +1,19 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	site_tests_page_start("Coverage Index", "Public and local-only UCE regression coverage pages.");
+	?><div class="tests-grid"><?
+		site_tests_card("core.uce", "Core APIs", "Pure helper coverage for strings, regex, UTF-8, DTree, and JSON.", "public");
+		site_tests_card("preprocessor.uce", "Preprocessor", "Literal-output parser regression coverage.", "public");
+		site_tests_card("http.uce", "HTTP And Session", "Request, response, cookie, and session helpers.", "public");
+		site_tests_card("components.uce", "Components", "component(), props, and component rendering.", "public");
+		site_tests_card("markdown.uce", "Markdown", "Markdown parsing, rendering, and component hooks.", "public");
+		site_tests_card("units.uce", "Units", "unit_call(), lifecycle hooks, and unit metadata.", "public");
+		site_tests_card("websockets.ws.uce", "WebSockets", "Browser-driven WebSocket helper checks.", "public websocket");
+		site_tests_card("io.uce", "Filesystem", "Filesystem helpers that are restricted outside trusted networks.", "internal");
+		site_tests_card("services.uce", "Sockets And Services", "Network/service helpers that are restricted outside trusted networks.", "internal");
+		site_tests_card("tasks.uce", "Tasks", "Background task helper coverage.", "internal");
+	?></div><?
+	site_tests_page_end();
+}

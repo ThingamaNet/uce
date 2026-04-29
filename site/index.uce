@@ -1,0 +1,4 @@
+RENDER(Request& context)
+{
+    context.header["Location"] = "/info/";
+}

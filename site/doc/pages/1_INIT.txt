@@ -1,0 +1,50 @@
+:title
+INIT
+
+:sig
+INIT(Request& context)
+
+:see
+>1_COMPONENT
+>1_ONCE
+>1_RENDER
+>1_WS
+>3_C++ Preprocessor
+>unit_call
+
+:content
+Defines a worker-load hook for the current `.uce` unit.
+
+When a worker loads the unit's compiled shared object into memory, the runtime checks whether the unit exposes `INIT(Request& context)`. If it does, the hook runs once for that load before the unit begins serving later requests from that in-memory copy.
+
+Because UCE usually loads units on demand during a request, `INIT()` still receives a valid `Request& context`. Use it for worker-local initialization, not for request-local state that should reset each request.
+
+## Typical Uses
+
+- warm caches or parse static lookup data into globals
+- initialize worker-local helper state for expensive component trees
+- perform one-time registration work for that unit's in-memory copy
+
+## Example
+
+```cpp
+std::map<String, String> cached_labels;
+
+INIT(Request& context)
+{
+	if(cached_labels.empty())
+		cached_labels["ready"] = "Ready";
+}
+
+COMPONENT(Request& context)
+{
+	<>
+		<p><?= cached_labels["ready"] ?></p>
+	</>
+}
+```
+
+## Related Concepts
+
+- PHP: opcode-cache preload or one-time bootstrap work per worker process
+- JavaScript / Node.js: module-load initialization or lazy singleton setup

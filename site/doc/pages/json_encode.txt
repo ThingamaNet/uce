@@ -7,6 +7,13 @@ s : string to encode as a JSON string literal
 t : DTree object to be serialized
 return value : string containing the JSON result
 
+:see
+>types
+json_decode
+0_DTree
+String
+html_escape
+
 :content
 Serializes either a `String` or a `DTree` into JSON notation.
 

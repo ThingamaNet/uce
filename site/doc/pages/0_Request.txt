@@ -6,6 +6,11 @@ Request& context;
 
 :see
 >types
+set_status
+component
+unit_render
+ws_message
+session_start
 
 :content
 `Request& context` is the request-local state object passed into UCE handlers. It carries incoming request data, response state, runtime metadata, and helper trees such as `context.cfg`, `context.props`, and `context.connection`.
