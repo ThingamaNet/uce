@@ -136,90 +136,6 @@ void restore_request_fault_handlers()
 
 namespace {
 
-const char* websocket_ipc_base64_alphabet =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-String websocket_ipc_base64_encode(String raw)
-{
-	String result;
-	size_t i = 0;
-	while(i < raw.length())
-	{
-		unsigned char input[3] = {0, 0, 0};
-		size_t chunk = 0;
-		for(; chunk < 3 && i < raw.length(); ++chunk, ++i)
-			input[chunk] = (unsigned char)raw[i];
-
-		result += websocket_ipc_base64_alphabet[input[0] >> 2];
-		result += websocket_ipc_base64_alphabet[((input[0] & 0x03) << 4) | (input[1] >> 4)];
-		result += (chunk > 1 ? websocket_ipc_base64_alphabet[((input[1] & 0x0F) << 2) | (input[2] >> 6)] : '=');
-		result += (chunk > 2 ? websocket_ipc_base64_alphabet[input[2] & 0x3F] : '=');
-	}
-	return(result);
-}
-
-int websocket_ipc_base64_value(char c)
-{
-	if(c >= 'A' && c <= 'Z')
-		return(c - 'A');
-	if(c >= 'a' && c <= 'z')
-		return(c - 'a' + 26);
-	if(c >= '0' && c <= '9')
-		return(c - '0' + 52);
-	if(c == '+')
-		return(62);
-	if(c == '/')
-		return(63);
-	return(-1);
-}
-
-String websocket_ipc_base64_decode(String raw, bool& ok)
-{
-	ok = false;
-	String filtered = "";
-	for(auto c : raw)
-	{
-		if(!isspace((unsigned char)c))
-			filtered.append(1, c);
-	}
-	if(filtered == "")
-	{
-		ok = true;
-		return("");
-	}
-	if(filtered.length() % 4 != 0)
-		return("");
-
-	String result;
-	for(size_t i = 0; i < filtered.length(); i += 4)
-	{
-		int values[4] = {0, 0, 0, 0};
-		int padding = 0;
-		for(int j = 0; j < 4; ++j)
-		{
-			char c = filtered[i + j];
-			if(c == '=')
-			{
-				values[j] = 0;
-				padding += 1;
-				continue;
-			}
-			values[j] = websocket_ipc_base64_value(c);
-			if(values[j] < 0)
-				return("");
-		}
-
-		result.append(1, (char)((values[0] << 2) | (values[1] >> 4)));
-		if(padding < 2)
-			result.append(1, (char)(((values[1] & 0x0F) << 4) | (values[2] >> 2)));
-		if(padding < 1)
-			result.append(1, (char)(((values[2] & 0x03) << 6) | values[3]));
-	}
-
-	ok = true;
-	return(result);
-}
-
 bool websocket_ipc_set_nonblocking(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
@@ -323,7 +239,7 @@ DTree websocket_exec_make_message_command(String action, String message, bool bi
 	DTree command;
 	command["action"] = action;
 	command["binary"].set_bool(binary);
-	command["message_b64"] = websocket_ipc_base64_encode(message);
+	command["message_b64"] = base64_encode(message);
 	return(command);
 }
 
@@ -343,7 +259,7 @@ void websocket_exec_apply_command(DTree command)
 	if(action == "broadcast")
 	{
 		bool ok = false;
-		String payload = websocket_ipc_base64_decode(command["message_b64"].to_string(), ok);
+		String payload = base64_decode(command["message_b64"].to_string(), ok);
 		if(!ok)
 			return;
 		server.websocket_broadcast(command["scope"].to_string(), payload, command["binary"].to_bool());
@@ -352,7 +268,7 @@ void websocket_exec_apply_command(DTree command)
 	if(action == "send_to")
 	{
 		bool ok = false;
-		String payload = websocket_ipc_base64_decode(command["message_b64"].to_string(), ok);
+		String payload = base64_decode(command["message_b64"].to_string(), ok);
 		if(!ok)
 			return;
 		server.websocket_send_to(command["connection_id"].to_string(), payload, command["binary"].to_bool());
@@ -543,7 +459,7 @@ void websocket_exec_process_job_line(int fd, String line)
 		return;
 
 	bool decoded = false;
-	String message = websocket_ipc_base64_decode(job["message_b64"].to_string(), decoded);
+	String message = base64_decode(job["message_b64"].to_string(), decoded);
 	if(!decoded)
 	{
 		printf("(!) invalid websocket IPC payload for %s\n", job["connection_id"].to_string().c_str());
@@ -703,18 +619,6 @@ String normalize_ws_scope(String scope)
 	if(scope[0] == '/')
 		return(scope);
 	return(expand_path(scope, cwd_get()));
-}
-
-bool config_truthy(String raw, bool default_value = true)
-{
-	raw = to_lower(trim(raw));
-	if(raw == "")
-		return(default_value);
-	if(raw == "1" || raw == "true" || raw == "yes" || raw == "on")
-		return(true);
-	if(raw == "0" || raw == "false" || raw == "no" || raw == "off")
-		return(false);
-	return(default_value);
 }
 
 String ws_connection_id()
@@ -1063,7 +967,7 @@ int handle_websocket_message(FastCGIRequest& request, const String& message, u8 
 	job["opcode"] = (f64)opcode;
 	job["is_binary"].set_bool(request.resources.websocket_is_binary);
 	job["is_text"].set_bool(request.resources.websocket_is_text);
-	job["message_b64"] = websocket_ipc_base64_encode(message);
+	job["message_b64"] = base64_encode(message);
 	if(request.resources.websocket_connection_state)
 		job["connection_state"] = *request.resources.websocket_connection_state;
 
@@ -1169,22 +1073,6 @@ StringMap custom_server_config_decode(String content)
 	return(result);
 }
 
-u64 custom_server_config_u64(String key, u64 fallback)
-{
-	String raw = trim(server_state.config[key]);
-	if(raw == "")
-		return(fallback);
-	return(int_val(raw));
-}
-
-bool custom_server_config_truthy(String key, bool fallback)
-{
-	String raw = to_lower(trim(server_state.config[key]));
-	if(raw == "")
-		return(fallback);
-	return(raw == "1" || raw == "true" || raw == "yes" || raw == "on");
-}
-
 bool custom_server_is_numeric_port(String value)
 {
 	value = trim(value);
@@ -1227,11 +1115,11 @@ int custom_server_bind_http(FastCGIServer& dispatcher, String bind)
 	if(custom_server_is_numeric_port(bind))
 	{
 		u64 port = int_val(bind);
-		u64 min_port = custom_server_config_u64("CUSTOM_SERVER_MIN_PORT", 1024);
-		u64 max_port = custom_server_config_u64("CUSTOM_SERVER_MAX_PORT", 65535);
+		u64 min_port = config_map_u64(server_state.config, "CUSTOM_SERVER_MIN_PORT", 1024);
+		u64 max_port = config_map_u64(server_state.config, "CUSTOM_SERVER_MAX_PORT", 65535);
 		if(port < min_port || port > max_port)
 			throw std::runtime_error("server_start_http(): TCP port is outside configured custom server range");
-		String bind_address = custom_server_config_truthy("CUSTOM_SERVER_ALLOW_PUBLIC_BIND", false) ? "0.0.0.0" : "127.0.0.1";
+		String bind_address = config_map_bool(server_state.config, "CUSTOM_SERVER_ALLOW_PUBLIC_BIND", false) ? "0.0.0.0" : "127.0.0.1";
 		return(dispatcher.listen_http((unsigned)port, bind_address));
 	}
 	String socket_prefix = first(server_state.config["CUSTOM_SERVER_UNIX_SOCKET_PREFIX"], "/tmp/uce/custom-servers/");
@@ -1270,7 +1158,7 @@ int custom_server_http_complete(FastCGIRequest& request)
 	request.params["UCE_SERVE_HTTP_BIND"] = cfg["bind"];
 	request.params["UCE_SERVE_HTTP_FUNCTION"] = cfg["function"];
 	request.params["SCRIPT_FILENAME"] = cfg["file"];
-	u64 timeout = custom_server_config_u64("CUSTOM_SERVER_HANDLER_TIMEOUT_SECONDS", 30);
+	u64 timeout = config_map_u64(server_state.config, "CUSTOM_SERVER_HANDLER_TIMEOUT_SECONDS", 30);
 	if(timeout > 0)
 		alarm(timeout);
 	int status = handle_complete(request);
@@ -1341,7 +1229,7 @@ pid_t server_start_http(String key, String socket_fn_or_port, String call_uce_fi
 		previous_config = custom_server_config_decode(file_get_contents(config_file));
 	String new_config = custom_server_config_encode(key, "http", socket_fn_or_port, call_uce_filename, call_function);
 	String task_key = custom_server_task_key(key);
-	u64 max_servers = custom_server_config_u64("CUSTOM_SERVER_MAX_SERVERS", 16);
+	u64 max_servers = config_map_u64(server_state.config, "CUSTOM_SERVER_MAX_SERVERS", 16);
 	if(!file_exists(config_file) && max_servers > 0 && custom_server_registry_count() >= max_servers)
 		throw std::runtime_error("server_start_http(): custom server quota exceeded");
 	pid_t existing_pid = task_pid(task_key);
@@ -1392,7 +1280,8 @@ void run_proactive_compiler()
 	Request background_context;
 	StringList compile_queue;
 	background_context.server = &server_state;
-	if(!config_truthy(server_state.config["PROACTIVE_COMPILE_ENABLED"], true))
+	set_active_request(background_context);
+	if(!config_map_bool(server_state.config, "PROACTIVE_COMPILE_ENABLED", true))
 		return;
 	f64 check_interval = float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]);
 	f64 failure_retry_interval = 0;
@@ -1406,7 +1295,6 @@ void run_proactive_compiler()
 	);
 
 	my_pid = getpid();
-	context = &background_context;
 
 	close_inherited_server_sockets();
 	signal(SIGSEGV, on_segfault);
@@ -1497,7 +1385,7 @@ bool proactive_compiler_alive()
 
 void ensure_proactive_compiler()
 {
-	if(!config_truthy(server_state.config["PROACTIVE_COMPILE_ENABLED"], true))
+	if(!config_map_bool(server_state.config, "PROACTIVE_COMPILE_ENABLED", true))
 		return;
 	if(float_val(server_state.config["PROACTIVE_COMPILE_CHECK_INTERVAL"]) <= 0)
 		return;

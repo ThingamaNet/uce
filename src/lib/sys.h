@@ -34,6 +34,13 @@ time_t file_mtime(String file_name);
 void file_unlink(String file_name);
 String expand_path(String path, String relative_to_path = "");
 StringList ls(String dir);
+u64 config_map_u64(StringMap& cfg, String key, u64 fallback);
+f64 config_map_f64(StringMap& cfg, String key, f64 fallback);
+bool config_bool_value(String raw, bool fallback = true);
+bool config_map_bool(StringMap& cfg, String key, bool fallback = true);
+u64 config_u64(String key, u64 fallback);
+f64 config_f64(String key, f64 fallback);
+bool config_bool(String key, bool fallback = true);
 
 f64 time_precise();
 u64 time();

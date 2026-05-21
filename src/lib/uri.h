@@ -3,6 +3,8 @@
 
 
 String var_dump(URI uri, String prefix = "", String postfix = "\n");
+String base64_encode(String raw);
+String base64_decode(String raw, bool& ok);
 String uri_decode(String q);
 String uri_encode(String q);
 StringMap parse_query(String q);

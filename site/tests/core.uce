@@ -43,6 +43,17 @@ RENDER(Request& context)
 	check("str_ends_with()", str_ends_with("component.uce", ".uce"), "component.uce ends with .uce");
 	check("to_lower() / to_upper()", to_lower("MiXeD") == "mixed" && to_upper("MiXeD") == "MIXED", to_lower("MiXeD") + " / " + to_upper("MiXeD"));
 
+	String binary_payload = "core";
+	binary_payload.push_back((char)0x00);
+	binary_payload.push_back((char)0xff);
+	binary_payload += "payload";
+	bool base64_ok = false;
+	String encoded_base64 = base64_encode(binary_payload);
+	String decoded_base64 = base64_decode(encoded_base64, base64_ok);
+	bool invalid_base64_ok = true;
+	base64_decode("AA=A", invalid_base64_ok);
+	check("base64_encode() / base64_decode() binary-safe", base64_ok && decoded_base64 == binary_payload && decoded_base64.size() == binary_payload.size() && !invalid_base64_ok, encoded_base64 + " bytes=" + std::to_string((u64)decoded_base64.size()));
+
 	String utf8_sample = "A\xC3\xA9";
 	auto utf8_parts = split_utf8(utf8_sample);
 	check("split_utf8()", utf8_parts.size() == 2, "count=" + std::to_string(utf8_parts.size()));

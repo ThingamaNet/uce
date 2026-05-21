@@ -56,23 +56,11 @@ void compiler_unload_failed_shared_unit(SharedUnit* su);
 bool compiler_run_unit_init(Request* context, SharedUnit* su, String* error_out = 0);
 bool compiler_run_unit_once_if_needed(Request* context, SharedUnit* su, String* error_out = 0);
 
-bool compiler_config_truthy(String raw, bool default_value)
-{
-	raw = to_lower(trim(raw));
-	if(raw == "")
-		return(default_value);
-	if(raw == "1" || raw == "true" || raw == "yes" || raw == "on")
-		return(true);
-	if(raw == "0" || raw == "false" || raw == "no" || raw == "off")
-		return(false);
-	return(default_value);
-}
-
 bool compiler_jit_compile_on_request_enabled(Request* context)
 {
 	if(!context || !context->server)
 		return(true);
-	return(compiler_config_truthy(context->server->config["JIT_COMPILE_ON_REQUEST"], true));
+	return(config_bool("JIT_COMPILE_ON_REQUEST", true));
 }
 
 bool compiler_is_u64_string(String value)

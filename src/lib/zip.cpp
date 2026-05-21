@@ -14,19 +14,9 @@ String zip_error(String api, String detail)
 	return(api + "(): " + detail);
 }
 
-u64 archive_config_u64(String key, u64 fallback)
-{
-	if(!context || !context->server)
-		return(fallback);
-	String raw = trim(context->server->config[key]);
-	if(raw == "")
-		return(fallback);
-	return(int_val(raw));
-}
-
 void archive_check_size(String api, String label, u64 size, String config_key, u64 fallback)
 {
-	u64 limit = archive_config_u64(config_key, fallback);
+	u64 limit = config_u64(config_key, fallback);
 	if(limit > 0 && size > limit)
 		throw std::runtime_error(zip_error(api, label + " exceeds configured limit"));
 }
@@ -336,7 +326,7 @@ String gz_uncompress(String compressed)
 	if(!out)
 		throw std::runtime_error("gz_uncompress(): decompression failed");
 
-	u64 output_limit = archive_config_u64("ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
+	u64 output_limit = config_u64("ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 	if(output_limit > 0 && out_len > output_limit)
 	{
 		mz_free(out);

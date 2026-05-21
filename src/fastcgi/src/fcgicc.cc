@@ -73,38 +73,18 @@ struct TransportLimits {
 	}
 };
 
-u64 transport_config_u64(String key, u64 fallback)
-{
-	if(!context || !context->server)
-		return(fallback);
-	String raw = trim(context->server->config[key]);
-	if(raw == "")
-		return(fallback);
-	return(int_val(raw));
-}
-
-f64 transport_config_f64(String key, f64 fallback)
-{
-	if(!context || !context->server)
-		return(fallback);
-	String raw = trim(context->server->config[key]);
-	if(raw == "")
-		return(fallback);
-	return(float_val(raw));
-}
-
 TransportLimits transport_limits()
 {
 	TransportLimits limits;
-	limits.max_client_connections = transport_config_u64("TRANSPORT_MAX_CLIENT_CONNECTIONS", limits.max_client_connections);
-	limits.max_http_header_bytes = transport_config_u64("TRANSPORT_MAX_HTTP_HEADER_BYTES", limits.max_http_header_bytes);
-	limits.max_http_body_bytes = transport_config_u64("TRANSPORT_MAX_HTTP_BODY_BYTES", limits.max_http_body_bytes);
-	limits.max_websocket_frame_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_FRAME_BYTES", limits.max_websocket_frame_bytes);
-	limits.max_websocket_message_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_MESSAGE_BYTES", limits.max_websocket_message_bytes);
-	limits.max_websocket_output_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_OUTPUT_BYTES", limits.max_websocket_output_bytes);
-	limits.max_response_bytes = transport_config_u64("TRANSPORT_MAX_RESPONSE_BYTES", limits.max_response_bytes);
-	limits.http_request_timeout_seconds = transport_config_f64("TRANSPORT_HTTP_REQUEST_TIMEOUT_SECONDS", limits.http_request_timeout_seconds);
-	limits.connection_idle_timeout_seconds = transport_config_f64("TRANSPORT_CONNECTION_IDLE_TIMEOUT_SECONDS", limits.connection_idle_timeout_seconds);
+	limits.max_client_connections = config_u64("TRANSPORT_MAX_CLIENT_CONNECTIONS", limits.max_client_connections);
+	limits.max_http_header_bytes = config_u64("TRANSPORT_MAX_HTTP_HEADER_BYTES", limits.max_http_header_bytes);
+	limits.max_http_body_bytes = config_u64("TRANSPORT_MAX_HTTP_BODY_BYTES", limits.max_http_body_bytes);
+	limits.max_websocket_frame_bytes = config_u64("TRANSPORT_MAX_WEBSOCKET_FRAME_BYTES", limits.max_websocket_frame_bytes);
+	limits.max_websocket_message_bytes = config_u64("TRANSPORT_MAX_WEBSOCKET_MESSAGE_BYTES", limits.max_websocket_message_bytes);
+	limits.max_websocket_output_bytes = config_u64("TRANSPORT_MAX_WEBSOCKET_OUTPUT_BYTES", limits.max_websocket_output_bytes);
+	limits.max_response_bytes = config_u64("TRANSPORT_MAX_RESPONSE_BYTES", limits.max_response_bytes);
+	limits.http_request_timeout_seconds = config_f64("TRANSPORT_HTTP_REQUEST_TIMEOUT_SECONDS", limits.http_request_timeout_seconds);
+	limits.connection_idle_timeout_seconds = config_f64("TRANSPORT_CONNECTION_IDLE_TIMEOUT_SECONDS", limits.connection_idle_timeout_seconds);
 	return(limits);
 }
 

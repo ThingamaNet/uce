@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-static String base64_encode(String raw)
+String base64_encode(String raw)
 {
 	static const char* chars =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -31,7 +31,9 @@ static String base64_encode(String raw)
 	return(result);
 }
 
-static int base64_decode_value(char c)
+namespace {
+
+int base64_decode_value(char c)
 {
 	if(c >= 'A' && c <= 'Z')
 		return(c - 'A');
@@ -46,17 +48,24 @@ static int base64_decode_value(char c)
 	return(-1);
 }
 
-static String base64_decode(String raw, bool& ok)
+}
+
+String base64_decode(String raw, bool& ok)
 {
 	ok = false;
 	String cleaned;
 	for(char c : raw)
 	{
-		if(!isspace(c))
+		if(!isspace((unsigned char)c))
 			cleaned.append(1, c);
 	}
 
-	if(cleaned.length() == 0 || (cleaned.length() % 4) != 0)
+	if(cleaned.length() == 0)
+	{
+		ok = true;
+		return("");
+	}
+	if((cleaned.length() % 4) != 0)
 		return("");
 
 	String result;

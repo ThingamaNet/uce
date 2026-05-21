@@ -868,6 +868,60 @@ StringList ls(String dir)
 	return(split(trim(shell_exec("ls -1 "+shell_escape(dir))), "\n"));
 }
 
+u64 config_map_u64(StringMap& cfg, String key, u64 fallback)
+{
+	String raw = trim(cfg[key]);
+	if(raw == "")
+		return(fallback);
+	return(int_val(raw));
+}
+
+f64 config_map_f64(StringMap& cfg, String key, f64 fallback)
+{
+	String raw = trim(cfg[key]);
+	if(raw == "")
+		return(fallback);
+	return(float_val(raw));
+}
+
+bool config_bool_value(String raw, bool fallback)
+{
+	raw = trim(to_lower(raw));
+	if(raw == "")
+		return(fallback);
+	if(raw == "1" || raw == "true" || raw == "yes" || raw == "on")
+		return(true);
+	if(raw == "0" || raw == "false" || raw == "no" || raw == "off")
+		return(false);
+	return(fallback);
+}
+
+bool config_map_bool(StringMap& cfg, String key, bool fallback)
+{
+	return(config_bool_value(cfg[key], fallback));
+}
+
+u64 config_u64(String key, u64 fallback)
+{
+	if(!context || !context->server)
+		return(fallback);
+	return(config_map_u64(context->server->config, key, fallback));
+}
+
+f64 config_f64(String key, f64 fallback)
+{
+	if(!context || !context->server)
+		return(fallback);
+	return(config_map_f64(context->server->config, key, fallback));
+}
+
+bool config_bool(String key, bool fallback)
+{
+	if(!context || !context->server)
+		return(fallback);
+	return(config_map_bool(context->server->config, key, fallback));
+}
+
 StringMap make_server_settings()
 {
 	StringMap cfg;
