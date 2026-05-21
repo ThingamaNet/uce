@@ -1329,10 +1329,10 @@ pid_t server_start_http(String key, String socket_fn_or_port, String call_uce_fi
 	if(call_uce_filename[0] != '/')
 		call_uce_filename = expand_path(call_uce_filename, cwd_get());
 	String allowed_root = first(server_state.config["CUSTOM_SERVER_UCE_ROOT"], path_join(server_state.config["COMPILER_SYS_PATH"], server_state.config["SITE_DIRECTORY"]));
-	if(allowed_root[allowed_root.length() - 1] != '/')
-		allowed_root += "/";
-	if(!str_starts_with(call_uce_filename, allowed_root))
+	String real_call_uce_filename = path_real(call_uce_filename);
+	if(real_call_uce_filename == "" || !path_is_within(real_call_uce_filename, allowed_root))
 		throw std::runtime_error("server_start_http(): call_uce_filename is outside configured custom server UCE root");
+	call_uce_filename = real_call_uce_filename;
 
 	String config_file = custom_server_config_file(key);
 	StringMap previous_config;

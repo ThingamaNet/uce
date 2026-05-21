@@ -36,6 +36,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <cctype>
 
 #include <errno.h> // E*
 #include <fcntl.h>
@@ -121,6 +122,86 @@ make_http_text_response(String status_line, String body, String extra_headers = 
 		"Connection: close\r\n\r\n" +
 		body
 	);
+}
+
+static bool
+header_token_safe(String name)
+{
+	if(name == "")
+		return(false);
+	for(char c : name)
+	{
+		if(!(std::isalnum((unsigned char)c) || c == '-' || c == '_'))
+			return(false);
+	}
+	return(true);
+}
+
+static String
+header_value_sanitize(String value)
+{
+	for(char& c : value)
+	{
+		if(c == '\r' || c == '\n')
+			c = ' ';
+	}
+	return(value);
+}
+
+static String
+render_header_map(StringMap headers)
+{
+	String result;
+	for(auto& item : headers)
+	{
+		if(!header_token_safe(item.first))
+			continue;
+		result += item.first + ": " + header_value_sanitize(item.second) + "\r\n";
+	}
+	return(result);
+}
+
+static String
+render_set_cookie_headers(StringList headers)
+{
+	String result;
+	for(String header : headers)
+	{
+		if(header.find('\r') != String::npos || header.find('\n') != String::npos)
+			continue;
+		if(!str_starts_with(to_lower(header), "set-cookie: "))
+			continue;
+		result += header + "\r\n";
+	}
+	return(result);
+}
+
+static String
+safe_status_line(String status_line)
+{
+	if(status_line.find('\r') != String::npos || status_line.find('\n') != String::npos)
+		return("Status: 500 Internal Server Error");
+	return(status_line);
+}
+
+static String
+http_script_root()
+{
+	if(context && context->server)
+		return(first(
+			context->server->config["HTTP_DOCUMENT_ROOT"],
+			context->server->config["COMPILER_SYS_PATH"],
+			cwd_get()
+		));
+	return(cwd_get());
+}
+
+static String
+strip_leading_slashes(String s)
+{
+	while(s.length() > 0 && s[0] == '/')
+		s.erase(0, 1);
+	return(s);
 }
 
 static bool
@@ -784,15 +865,20 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 	if(!parse_http_message(request, data))
 		return;
 
-	if(request.params["HTTP_SCRIPT_FILENAME"] != "")
-		request.params["SCRIPT_FILENAME"] = request.params["HTTP_SCRIPT_FILENAME"];
-	else if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
+	if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
 	{
-		String document_root = first(request.params["DOCUMENT_ROOT"], cwd_get());
-		if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
-			document_root.resize(document_root.length()-1);
-		request.params["DOCUMENT_ROOT"] = document_root;
-		request.params["SCRIPT_FILENAME"] = document_root + request.params["DOCUMENT_URI"];
+		String document_root = http_script_root();
+		String document_uri = strip_leading_slashes(request.params["DOCUMENT_URI"]);
+		String candidate = path_join(document_root, document_uri);
+		String real_root = path_real(document_root);
+		String real_candidate = path_real(candidate);
+		if(real_root == "" || real_candidate == "" || !path_is_within(real_candidate, real_root))
+		{
+			reject_http_connection(*client_sockets[request.resources.client_socket], "HTTP/1.1 404 Not Found", "script not found\n");
+			return;
+		}
+		request.params["DOCUMENT_ROOT"] = real_root;
+		request.params["SCRIPT_FILENAME"] = real_candidate;
 	}
 
 	if(to_lower(request.params["HTTP_UPGRADE"]) == "websocket")
@@ -1253,9 +1339,9 @@ void
 FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* connection)
 {
 	request.out =
-		request.response_code+"\r\n"+
-		var_dump(request.header, "", "\r\n") +
-		var_dump(request.set_cookies, "", "\r\n") +
+		safe_status_line(request.response_code)+"\r\n"+
+		render_header_map(request.header) +
+		render_set_cookie_headers(request.set_cookies) +
 		"\r\n";
 
 	for(auto obs : request.ob_stack)
@@ -1268,7 +1354,7 @@ FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* conne
 		request.set_status(500, "Response Too Large");
 		request.header.clear();
 		request.header["Content-Type"] = "text/plain; charset=utf-8";
-		request.out = request.response_code + "\r\n" + var_dump(request.header, "", "\r\n") + "\r\nresponse exceeded configured output limit\n";
+		request.out = safe_status_line(request.response_code) + "\r\n" + render_header_map(request.header) + "\r\nresponse exceeded configured output limit\n";
 	}
 	request.ob_stack.clear();
 	request.flags.output_closed = true;

@@ -1,0 +1,6 @@
+RENDER(Request& context)
+{
+	context.header["X-UCE-Security-Test"] = "safe\r\nX-UCE-Injected: nope";
+	redirect("/tests/index.uce\r\nX-UCE-Redirect-Injected: nope", 299);
+	print("security header sanitizer test");
+}

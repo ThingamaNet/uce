@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/file.h>
 #include "sys.h"
 #include "hash.h"
@@ -180,6 +181,27 @@ String path_join(String base, String child)
 	if(base[base.length() - 1] == '/')
 		return(base + child);
 	return(base + "/" + child);
+}
+
+String path_real(String path)
+{
+	char resolved[PATH_MAX];
+	if(realpath(path.c_str(), resolved))
+		return(String(resolved));
+	return("");
+}
+
+bool path_is_within(String path, String root)
+{
+	String real_path = path_real(path);
+	String real_root = path_real(root);
+	if(real_path == "" || real_root == "")
+		return(false);
+	if(real_path == real_root)
+		return(true);
+	if(real_root[real_root.length() - 1] != '/')
+		real_root += "/";
+	return(str_starts_with(real_path, real_root));
 }
 
 bool mkdir(String path)
@@ -877,6 +899,7 @@ StringMap make_server_settings()
 	cfg["TRANSPORT_MAX_RESPONSE_BYTES"] = std::to_string(8 * 1024 * 1024);
 	cfg["TRANSPORT_HTTP_REQUEST_TIMEOUT_SECONDS"] = "15";
 	cfg["TRANSPORT_CONNECTION_IDLE_TIMEOUT_SECONDS"] = "120";
+	cfg["HTTP_DOCUMENT_ROOT"] = "";
 	cfg["CUSTOM_SERVER_MAX_SERVERS"] = "16";
 	cfg["CUSTOM_SERVER_MIN_PORT"] = "1024";
 	cfg["CUSTOM_SERVER_MAX_PORT"] = "65535";

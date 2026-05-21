@@ -1,5 +1,8 @@
 #include "uri.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 static String base64_encode(String raw)
 {
 	static const char* chars =
@@ -256,9 +259,33 @@ String encode_query(StringMap map)
 	return(result);
 }
 
+namespace {
+
+String http_header_value_clean(String value)
+{
+	for(char& c : value)
+	{
+		if(c == '\r' || c == '\n')
+			c = ' ';
+	}
+	return(value);
+}
+
+String cookie_attribute_value_clean(String value)
+{
+	for(char& c : value)
+	{
+		if(c == '\r' || c == '\n' || c == ';')
+			c = ' ';
+	}
+	return(trim(value));
+}
+
+}
+
 void redirect(String url, s32 code)
 {
-	context->header["Location"] = url;
+	context->header["Location"] = http_header_value_clean(url);
 	context->set_status(code);
 }
 
@@ -499,9 +526,18 @@ void set_cookie(
 	bool secure, bool http_only)
 {
 	String cookie = "Set-Cookie: ";
-	cookie.append(uri_encode(name) + "=" + uri_encode(value));
+	cookie.append(uri_encode(cookie_attribute_value_clean(name)) + "=" + uri_encode(value));
 	if(expires > 0)
 		cookie.append(String("; Expires=") + time_format_utc("RFC1123", expires));
+	if(path != "")
+		cookie.append("; Path=" + cookie_attribute_value_clean(path));
+	if(domain != "")
+		cookie.append("; Domain=" + cookie_attribute_value_clean(domain));
+	if(secure)
+		cookie.append("; Secure");
+	if(http_only)
+		cookie.append("; HttpOnly");
+	cookie.append("; SameSite=Lax");
 	context->set_cookies.push_back(cookie);
 	context->cookies[name] = value;
 }
@@ -520,7 +556,30 @@ StringMap parse_cookies(String cookie_String)
 
 String session_id_create()
 {
-	return(to_hex(rand())+to_hex(rand())+to_hex(rand())+to_hex(rand()));
+	unsigned char bytes[32];
+	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+	if(fd == -1)
+		throw std::runtime_error("session_id_create(): could not open /dev/urandom");
+	size_t offset = 0;
+	while(offset < sizeof(bytes))
+	{
+		ssize_t count = read(fd, bytes + offset, sizeof(bytes) - offset);
+		if(count <= 0)
+		{
+			close(fd);
+			throw std::runtime_error("session_id_create(): could not read random bytes");
+		}
+		offset += (size_t)count;
+	}
+	close(fd);
+	String result;
+	static const char* hex = "0123456789abcdef";
+	for(unsigned char b : bytes)
+	{
+		result.push_back(hex[b >> 4]);
+		result.push_back(hex[b & 0x0f]);
+	}
+	return(result);
 }
 
 bool is_valid_session_id(String session_id)
@@ -602,7 +661,7 @@ String session_start(String session_name)
 	context->session_name = "";
 
 	String session_id = context->cookies[session_name];
-	if(!is_valid_session_id(session_id))
+	if(!is_valid_session_id(session_id) || !file_exists(session_file_path(session_id)))
 		session_id = "";
 
 	if(session_id.length() == 0)

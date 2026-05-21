@@ -9,6 +9,8 @@ String shell_escape(String raw);
 String basename(String fn);
 String dirname(String fn);
 String path_join(String base, String child);
+String path_real(String path);
+bool path_is_within(String path, String root);
 bool mkdir(String path);
 bool file_exists(String path);
 int file_open_locked(String file_name, int open_flags, int lock_type = LOCK_SH, int create_mode = 0644, f64 wait_timeout_seconds = 3.0, String purpose = "");

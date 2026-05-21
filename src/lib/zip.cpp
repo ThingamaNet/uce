@@ -122,6 +122,21 @@ String zip_read(String zip_file_name, String entry_name)
 	if(!mz_zip_reader_init_file(&archive, zip_file_name.c_str(), 0))
 		throw std::runtime_error(zip_error("zip_read", "could not open " + zip_file_name));
 
+	int file_index = mz_zip_reader_locate_file(&archive, entry_name.c_str(), NULL, 0);
+	if(file_index < 0)
+	{
+		mz_zip_reader_end(&archive);
+		throw std::runtime_error(zip_error("zip_read", "entry not found or not readable: " + entry_name));
+	}
+	mz_zip_archive_file_stat stat;
+	std::memset(&stat, 0, sizeof(stat));
+	if(!mz_zip_reader_file_stat(&archive, (mz_uint)file_index, &stat))
+	{
+		mz_zip_reader_end(&archive);
+		throw std::runtime_error(zip_error("zip_read", "entry not found or not readable: " + entry_name));
+	}
+	archive_check_size("zip_read", "uncompressed entry", stat.m_uncomp_size, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
+
 	size_t size = 0;
 	void* data = mz_zip_reader_extract_file_to_heap(&archive, entry_name.c_str(), &size, 0);
 	if(!data)
@@ -129,7 +144,6 @@ String zip_read(String zip_file_name, String entry_name)
 		mz_zip_reader_end(&archive);
 		throw std::runtime_error(zip_error("zip_read", "entry not found or not readable: " + entry_name));
 	}
-	archive_check_size("zip_read", "uncompressed entry", size, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 	String result((char*)data, size);
 	mz_free(data);
 	mz_zip_reader_end(&archive);
@@ -305,9 +319,12 @@ String gz_compress(String src)
 
 String gz_uncompress(String compressed)
 {
+	archive_check_size("gz_uncompress", "input", compressed.size(), "ARCHIVE_MAX_INPUT_BYTES", 64 * 1024 * 1024);
 	size_t deflate_offset = gz_deflate_offset(compressed);
 	size_t footer_offset = compressed.size() - 8;
 	size_t deflate_size = footer_offset - deflate_offset;
+	u32 expected_size = gz_read_u32_le(compressed, footer_offset + 4);
+	archive_check_size("gz_uncompress", "declared output", expected_size, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 	size_t out_len = 0;
 	void* out = tinfl_decompress_mem_to_heap(compressed.data() + deflate_offset, deflate_size, &out_len, 0);
 	if(!out)
@@ -318,7 +335,6 @@ String gz_uncompress(String compressed)
 	mz_free(out);
 
 	u32 expected_crc = gz_read_u32_le(compressed, footer_offset);
-	u32 expected_size = gz_read_u32_le(compressed, footer_offset + 4);
 	u32 actual_crc = (u32)mz_crc32(MZ_CRC32_INIT, (const unsigned char*)result.data(), result.size());
 	if(actual_crc != expected_crc)
 		throw std::runtime_error("gz_uncompress(): crc check failed");
