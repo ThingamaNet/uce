@@ -26,6 +26,7 @@ static DTree websocket_exec_inflight_job;
 static String websocket_exec_write_buffer = "";
 
 void close_inherited_server_sockets();
+u64 request_seed_from_time(f64 time_value);
 
 Request* set_active_request(Request& request)
 {
@@ -315,6 +316,25 @@ void websocket_exec_append_command(DTree command)
 	context->resources.websocket_dispatch_commands.push(command);
 }
 
+DTree websocket_exec_make_message_command(String action, String message, bool binary)
+{
+	DTree command;
+	command["action"] = action;
+	command["binary"].set_bool(binary);
+	command["message_b64"] = websocket_ipc_base64_encode(message);
+	return(command);
+}
+
+DTree websocket_exec_make_close_command(String connection_id, u16 status_code = 1000, String reason = "")
+{
+	DTree command;
+	command["action"] = "close";
+	command["connection_id"] = connection_id;
+	command["status_code"] = (f64)status_code;
+	command["reason"] = reason;
+	return(command);
+}
+
 void websocket_exec_apply_command(DTree command)
 {
 	String action = command["action"].to_string();
@@ -470,7 +490,7 @@ Request websocket_exec_build_event_request(DTree job, String message)
 	event_request.stats.time_init = time_precise();
 	event_request.stats.time_start = event_request.stats.time_init;
 	event_request.random_index = 0;
-	event_request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&event_request.stats.time_start));
+	event_request.random_seed = request_seed_from_time(event_request.stats.time_start);
 	event_request.response_code = "WEBSOCKET";
 	event_request.header["Content-Type"] = server_state.config["CONTENT_TYPE"];
 	event_request.in = message;
@@ -747,28 +767,23 @@ u64 ws_connection_count(String scope)
 
 bool ws_send(String message, bool binary, String scope)
 {
+	String normalized_scope = normalize_ws_scope(scope);
 	if(context && context->resources.websocket_dispatch_capture)
 	{
-		DTree command;
-		command["action"] = "broadcast";
-		command["scope"] = normalize_ws_scope(scope);
-		command["binary"].set_bool(binary);
-		command["message_b64"] = websocket_ipc_base64_encode(message);
+		DTree command = websocket_exec_make_message_command("broadcast", message, binary);
+		command["scope"] = normalized_scope;
 		websocket_exec_append_command(command);
 		return(true);
 	}
-	return(server.websocket_broadcast(normalize_ws_scope(scope), message, binary) > 0);
+	return(server.websocket_broadcast(normalized_scope, message, binary) > 0);
 }
 
 bool ws_send_to(String connection_id, String message, bool binary)
 {
 	if(context && context->resources.websocket_dispatch_capture)
 	{
-		DTree command;
-		command["action"] = "send_to";
+		DTree command = websocket_exec_make_message_command("send_to", message, binary);
 		command["connection_id"] = connection_id;
-		command["binary"].set_bool(binary);
-		command["message_b64"] = websocket_ipc_base64_encode(message);
 		websocket_exec_append_command(command);
 		return(true);
 	}
@@ -783,15 +798,154 @@ bool ws_close(String connection_id)
 		return(false);
 	if(context && context->resources.websocket_dispatch_capture)
 	{
-		DTree command;
-		command["action"] = "close";
-		command["connection_id"] = connection_id;
-		command["status_code"] = (f64)1000;
-		command["reason"] = "";
-		websocket_exec_append_command(command);
+		websocket_exec_append_command(websocket_exec_make_close_command(connection_id));
 		return(true);
 	}
 	return(server.websocket_close(connection_id));
+}
+
+bool cli_path_is_safe(String command)
+{
+	for(auto& segment : split(command, "/"))
+	{
+		if(segment == "..")
+			return(false);
+	}
+	return(true);
+}
+
+String cli_resolve_unit_path(Request& request, String command, String& document_root)
+{
+	document_root = first(request.params["DOCUMENT_ROOT"], cwd_get());
+	if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
+		document_root.resize(document_root.length()-1);
+
+	String script_filename = document_root + command;
+	if(file_exists(script_filename))
+		return(script_filename);
+
+	String site_filename = document_root + "/site" + command;
+	if(file_exists(site_filename))
+	{
+		document_root = document_root + "/site";
+		return(site_filename);
+	}
+
+	return("");
+}
+
+u64 request_seed_from_time(f64 time_value)
+{
+	u64 bits = 0;
+	static_assert(sizeof(bits) == sizeof(time_value));
+	memcpy(&bits, &time_value, sizeof(bits));
+	return(gen_noise64(bits));
+}
+
+void prepare_request_body_maps(Request& request)
+{
+	request.get = parse_query(request.params["QUERY_STRING"]);
+	if(request.params["HTTP_COOKIE"].length() > 0)
+		request.cookies = parse_cookies(request.params["HTTP_COOKIE"]);
+
+	String ct_info = request.params["CONTENT_TYPE"];
+	String ct_type = nibble(ct_info, ";");
+	if(request.params["REQUEST_METHOD"] == "POST")
+	{
+		if(ct_type == "multipart/form-data")
+		{
+			nibble("boundary=", ct_info);
+			request.post = parse_multipart(request.in, String("--")+ct_info, request.uploaded_files);
+		}
+		else
+		{
+			request.post = parse_query(request.in);
+		}
+	}
+}
+
+int handle_cli_complete(FastCGIRequest& request)
+{
+	Request* previous_context = set_active_request(request);
+	server_state.request_count += 1;
+	request.server = &server_state;
+	request.resources.is_cli = true;
+	request.params["UCE_CLI"] = "1";
+	request.stats.time_start = time_precise();
+	request.header["Content-Type"] = "text/plain; charset=utf-8";
+	request.random_index = 0;
+	request.random_seed = request_seed_from_time(request.stats.time_start);
+	request.ob_start();
+	prepare_request_body_maps(request);
+
+	String method = trim(request.params["REQUEST_METHOD"]);
+	String command = trim(first(request.params["DOCUMENT_URI"], request.params["REQUEST_URI"]));
+
+	try
+	{
+		if(method != "GET" && method != "POST")
+		{
+			request.set_status(405, "Method Not Allowed");
+			request.header["Allow"] = "GET, POST";
+			print("UCE CLI socket accepts GET and POST commands only\n");
+		}
+		else if(command == "/" || command == "/help")
+		{
+			print("UCE CLI command socket\n\nAvailable test hooks:\n  GET /ping\n  GET /status\n");
+		}
+		else if(command == "/ping" || command == "/test")
+		{
+			print("uce-cli: ok\n");
+		}
+		else if(command == "/status")
+		{
+			print("pid=", std::to_string(getpid()), "\nclients=", std::to_string(server.client_sockets.size()), "\n");
+		}
+		else if(command.length() >= 4 && command.substr(command.length() - 4) == ".uce")
+		{
+			if(!cli_path_is_safe(command))
+			{
+				request.set_status(400, "Bad Request");
+				print("invalid UCE CLI unit path\n");
+			}
+			else
+			{
+				String document_root;
+				String script_filename = cli_resolve_unit_path(request, command, document_root);
+				if(script_filename == "")
+				{
+					request.set_status(404, "Not Found");
+					print("UCE CLI unit not found: ", command, "\n");
+				}
+				else
+				{
+					request.params["DOCUMENT_ROOT"] = document_root;
+					request.params["SCRIPT_FILENAME"] = script_filename;
+					request.props = DTree();
+					compiler_invoke_cli(&request, script_filename);
+				}
+			}
+		}
+		else
+		{
+			request.set_status(404, "Not Found");
+			print("unknown UCE CLI command: ", command, "\n");
+		}
+	}
+	catch(const std::exception& e)
+	{
+		render_request_failure(request, "uncaught exception during CLI request", e.what(), capture_backtrace_string(32, 1), 500);
+	}
+	catch(...)
+	{
+		render_request_failure(request, "unknown uncaught exception during CLI request", "", capture_backtrace_string(32, 1), 500);
+	}
+
+	for(auto &f : request.uploaded_files)
+		file_unlink(f.tmp_name);
+	cleanup_mysql_connections();
+	restore_active_request(previous_context);
+	return(request.flags.status);
 }
 
 int handle_request(FastCGIRequest& request) {
@@ -805,20 +959,9 @@ int handle_request(FastCGIRequest& request) {
 }
 
 int handle_data(FastCGIRequest& request) {
-    // This event occurs when data is received on the standard input stream.
-    // A simple String is used to hold the input stream, so it is the
-    // responsibility of the application to remember which data it has
-    // processed. The application may modify it; new data will be appended
-    // to it by the server. The same goes for the output and error streams:
-    // the application should append data to them; the server will remove
-    // all sent data from them.
-    return 0;  // still OK
-
-    std::transform(request.in.begin(), request.in.end(),
-        std::back_inserter(request.err),
-        std::bind1st(std::plus<char>(), 1));
-    request.in.clear();  // don't process it again
-    return 0;  // still OK
+    // Request bodies are accumulated by the FastCGI transport and parsed once
+    // the input stream is closed in handle_complete().
+    return 0;
 }
 
 int handle_complete(FastCGIRequest& request) {
@@ -833,10 +976,10 @@ int handle_complete(FastCGIRequest& request) {
 	request.stats.time_start = time_precise();
 	//request.stats.mem_alloc = 0;
 	//request.stats.mem_high = 0;
-    request.header["Content-Type"] = context->server->config["CONTENT_TYPE"];
+    request.header["Content-Type"] = (request.resources.is_cli ? "text/plain; charset=utf-8" : context->server->config["CONTENT_TYPE"]);
     request.get = parse_query(request.params["QUERY_STRING"]);
 	request.random_index = 0;
-	request.random_seed = gen_noise64(*reinterpret_cast<u64*>(&request.stats.time_start));
+	request.random_seed = request_seed_from_time(request.stats.time_start);
 	request.ob_start();
 	request_fault_request = &request;
 	request_fault_active = 1;
@@ -858,27 +1001,12 @@ int handle_complete(FastCGIRequest& request) {
 	{
 		try
 		{
-			if(request.params["HTTP_COOKIE"].length() > 0)
-				request.cookies = parse_cookies(request.params["HTTP_COOKIE"]);
-
-			String ct_info = request.params["CONTENT_TYPE"];
-			String ct_type = nibble(";", ct_info);
-
-			if(request.params["REQUEST_METHOD"] == "POST")
-			{
-				if(ct_type == "multipart/form-data")
-				{
-					nibble("boundary=", ct_info);
-					request.post = parse_multipart(request.in, String("--")+ct_info, request.uploaded_files);
-				}
-				else
-				{
-					request.post = parse_query(request.in);
-				}
-			}
-
+			prepare_request_body_maps(request);
 			request.props = DTree();
-			compiler_invoke(&request, request.params["SCRIPT_FILENAME"]);
+			if(request.resources.is_cli)
+				compiler_invoke_cli(&request, request.params["SCRIPT_FILENAME"]);
+			else
+				compiler_invoke(&request, request.params["SCRIPT_FILENAME"]);
 		}
 		catch(const std::exception& e)
 		{
@@ -1142,6 +1270,7 @@ void listen_for_connections()
 	server.on_request = &handle_request;
 	server.on_data = &handle_data;
 	server.on_complete = &handle_complete;
+	server.on_cli_complete = &handle_cli_complete;
 	server.on_websocket_message = &handle_websocket_message;
 	if(worker_accepts_http)
 		ensure_websocket_executor();
@@ -1174,6 +1303,12 @@ void init_base_process()
 	{
 		server.listen(server_state.config["FCGI_SOCKET_PATH"]);
 		chmod(server_state.config["FCGI_SOCKET_PATH"].c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+	}
+
+	if(server_state.config["CLI_SOCKET_PATH"] != "")
+	{
+		server.listen_cli(server_state.config["CLI_SOCKET_PATH"]);
+		chmod(server_state.config["CLI_SOCKET_PATH"].c_str(), S_IRWXU | S_IRGRP | S_IWGRP);
 	}
 
 	if(server_state.config["HTTP_PORT"] != "")

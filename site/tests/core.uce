@@ -55,6 +55,31 @@ RENDER(Request& context)
 	DTree decoded = json_decode(payload_json);
 	check("json_encode() / json_decode()", decoded["name"].to_string() == "uce" && int_val(decoded["count"].to_string()) == 3, payload_json);
 
+	DTree xml_doc;
+	xml_doc["name"] = "book";
+	xml_doc["attrs"]["id"] = "b1";
+	DTree xml_title;
+	xml_title["name"] = "title";
+	xml_title["text"] = "UCE & XML";
+	xml_doc["children"].push(xml_title);
+	String encoded_xml = xml_encode(xml_doc);
+	DTree decoded_xml = xml_decode(encoded_xml);
+	check("xml_encode() / xml_decode()", contains(encoded_xml, "id=\"b1\"") && contains(encoded_xml, "UCE &amp; XML") && decoded_xml["children"]["0"]["text"].to_string() == "UCE & XML", encoded_xml);
+
+	DTree xml_payload;
+	xml_payload["title"] = "Hello";
+	xml_payload["count"] = "3";
+	check("xml_encode() simple map", xml_encode(xml_payload, "payload") == "<payload><count>3</count><title>Hello</title></payload>", xml_encode(xml_payload, "payload"));
+	check("xml_decode() numeric entities", xml_decode("<x>&#x41;&#66;</x>")["text"].to_string() == "AB", xml_decode("<x>&#x41;&#66;</x>")["text"].to_string());
+
+	String yaml_config = "app:\n  name: UCE Starter\n  debug: true\n  port: 8080\n  paths:\n    - site\n    - cache\nmessage: |\n  hello\n  world\n";
+	DTree decoded_yaml = yaml_decode(yaml_config);
+	check("yaml_decode() config", decoded_yaml["app"]["name"].to_string() == "UCE Starter" && decoded_yaml["app"]["debug"].to_bool() && decoded_yaml["app"]["port"].to_s64() == 8080 && decoded_yaml["app"]["paths"]["1"].to_string() == "cache" && decoded_yaml["message"].to_string() == "hello\nworld", json_encode(decoded_yaml));
+
+	String encoded_yaml = yaml_encode(decoded_yaml);
+	DTree yaml_roundtrip = yaml_decode(encoded_yaml);
+	check("yaml_encode() / yaml_decode()", contains(encoded_yaml, "app:") && contains(encoded_yaml, "paths:") && yaml_roundtrip["app"]["debug"].to_bool() && yaml_roundtrip["message"].to_string() == "hello\nworld", encoded_yaml);
+
 	DTree tree;
 	tree["suite"] = "core";
 	tree["nested"]["api"] = "dtree";

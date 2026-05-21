@@ -707,6 +707,11 @@ bool WSFrame::parse(const String& buffer, String& error)
 		if(buffer.length() < 4)
 			return(false);
 		payload_length = ((u64)raw[2] << 8) | (u64)raw[3];
+		if(payload_length < 126)
+		{
+			error = "non-minimal websocket frame length";
+			return(false);
+		}
 		header_length = 4;
 	}
 	else if(payload_length == 127)
@@ -721,6 +726,11 @@ bool WSFrame::parse(const String& buffer, String& error)
 		payload_length = 0;
 		for(u32 i = 0; i < 8; i++)
 			payload_length = (payload_length << 8) | (u64)raw[2 + i];
+		if(payload_length <= 0xFFFF)
+		{
+			error = "non-minimal websocket frame length";
+			return(false);
+		}
 		header_length = 10;
 	}
 

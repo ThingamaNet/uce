@@ -31,7 +31,7 @@ RENDER(Request& context)
 	if(mode != "stop")
 	{
 		short_pid = task("site-tests-short", []() {
-			sleep(2);
+			sleep(5);
 		});
 
 		repeat_pid = task_repeat("site-tests-repeat", 1.0, []() {
@@ -39,8 +39,23 @@ RENDER(Request& context)
 		}, 4);
 	}
 
+	pid_t timeout_pid = 0;
+	pid_t unsafe_key_pid = 0;
+	if(mode != "stop")
+	{
+		timeout_pid = task("site-tests-timeout", []() {
+			sleep(5);
+		}, 1);
+		unsafe_key_pid = task("site-tests/../unsafe key", []() {
+			sleep(5);
+		});
+		sleep(2);
+	}
+
 	pid_t seen_short_pid = task_pid("site-tests-short");
 	pid_t seen_repeat_pid = task_pid("site-tests-repeat");
+	pid_t seen_timeout_pid = task_pid("site-tests-timeout");
+	pid_t seen_unsafe_key_pid = task_pid("site-tests/../unsafe key");
 	int short_alive = seen_short_pid == 0 ? -1 : task_kill(seen_short_pid, 0);
 	int repeat_alive = seen_repeat_pid == 0 ? -1 : task_kill(seen_repeat_pid, 0);
 
@@ -57,6 +72,9 @@ RENDER(Request& context)
 		check("task_pid() + task_kill(pid, 0)", short_alive == 0, "kill(0) result=" + std::to_string(short_alive));
 		check("task_repeat()", repeat_pid != 0 && seen_repeat_pid != 0, "started=" + std::to_string(repeat_pid) + " seen=" + std::to_string(seen_repeat_pid));
 		check("repeat worker liveness", repeat_alive == 0, "kill(0) result=" + std::to_string(repeat_alive));
+		check("task() timeout", timeout_pid != 0 && seen_timeout_pid == 0, "started=" + std::to_string(timeout_pid) + " seen_after_timeout=" + std::to_string(seen_timeout_pid));
+		check("task key normalization", unsafe_key_pid != 0 && seen_unsafe_key_pid != 0, "started=" + std::to_string(unsafe_key_pid) + " seen=" + std::to_string(seen_unsafe_key_pid));
+		check("task_kill() rejects negative pid", task_kill(-1, 0) == -1, "kill(-1, 0) rejected");
 	}
 
 	?><div class="tests-section">

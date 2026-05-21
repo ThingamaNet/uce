@@ -1,0 +1,24 @@
+:sig
+String gz_compress(String src)
+
+:params
+src : uncompressed input bytes
+return value : gzip-format compressed bytes
+
+:see
+>sys
+gz_uncompress
+zip_create
+zip_read
+
+:content
+Compresses `src` and returns a gzip-format byte string.
+
+The result is binary data. Store it in a file, send it with an appropriate content type/encoding, or pass it directly to `gz_uncompress()`.
+
+```uce
+String compressed = gz_compress("hello\n");
+file_put_contents("/tmp/hello.txt.gz", compressed);
+```
+
+UCE writes a standard gzip wrapper around a deflate stream, including CRC32 and uncompressed-size footer fields.

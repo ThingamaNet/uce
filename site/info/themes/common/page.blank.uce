@@ -1,7 +1,4 @@
-#load "../../lib/app.uce"
-
 COMPONENT(Request& context)
 {
-	starter_boot(context);
-	print(starter_page_main_html(context));
+	print(component("page_helpers.uce:MAIN_HTML", context.props, context));
 }

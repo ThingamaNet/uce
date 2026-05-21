@@ -85,6 +85,7 @@ struct SharedUnit {
 	request_ref_handler on_render = 0;
 	request_ref_handler on_component = 0;
 	request_ref_handler on_websocket = 0;
+	request_ref_handler on_cli = 0;
 	request_ref_handler on_once = 0;
 	request_ref_handler on_init = 0;
 
@@ -210,6 +211,7 @@ struct Request {
 		u64 client_socket = 0;
 		u64 server_socket = 0;
 		bool is_websocket = false;
+		bool is_cli = false;
 		String websocket_connection_id = "";
 		String websocket_scope = "";
 		DTree* websocket_connection_state = 0;

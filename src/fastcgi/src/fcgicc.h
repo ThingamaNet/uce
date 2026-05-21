@@ -48,10 +48,12 @@ public:
 	std::function<int(FastCGIRequest&)> on_request = 0;
 	std::function<int(FastCGIRequest&)> on_data = 0;
 	std::function<int(FastCGIRequest&)> on_complete = 0;
+	std::function<int(FastCGIRequest&)> on_cli_complete = 0;
 	std::function<int(FastCGIRequest&, const String&, u8)> on_websocket_message = 0;
 
 	int listen(unsigned tcp_port);
 	int listen_http(unsigned tcp_port);
+	int listen_cli(const std::string& local_path);
 	int listen(const std::string& local_path);
 
 	void process(int timeout_ms = -1); // timeout_ms<0 blocks forever
@@ -75,7 +77,9 @@ public:
 		DTree websocket_state;
 		String websocket_fragment_buffer;
 		u8 websocket_fragment_opcode = 0;
-		char type = 'F'; // F = FastCGI, H = HttpServer
+		f64 opened_at = 0;
+		f64 last_activity_at = 0;
+		char type = 'F'; // F = FastCGI, H = HttpServer/WebSocket, C = CLI-over-HTTP Unix socket
 	};
 
 	typedef StringMap Pairs;
@@ -88,7 +92,15 @@ public:
 
 	void close_http_listeners();
 	void read_fgci(Connection&);
+	static bool is_http_like_type(char type);
+	Connection* open_client_connection(int server_socket, int client_socket);
+	void enforce_connection_timeouts(Connection& connection);
+	bool reject_http_connection(Connection& connection, String status_line, String body, String extra_headers = "");
+	bool queue_websocket_frame(Connection& connection, String frame);
+	bool queue_websocket_payload(Connection& connection, String message, bool binary = false);
 	void process_websocket_input(Connection&);
+	bool validate_websocket_upgrade(FastCGIRequest& request, Connection& connection);
+	void begin_websocket_upgrade(FastCGIRequest& request, Connection& connection, String& data);
 	void fail_websocket_connection(Connection& connection, u16 status_code, String reason = "");
 	void close_websocket_connection(Connection& connection, u16 status_code = 1000, String reason = "");
 	void dispatch_websocket_message(Connection& connection, RequestID request_id, String payload, u8 opcode);
@@ -105,7 +117,10 @@ public:
 		const std::string& input, unsigned char type);
 	static void assemble_output_buffer(FastCGIRequest& request, Connection* connection = 0);
 	int send_output_buffer(Connection& con);
+	bool parse_http_message(FastCGIRequest& request, String& data);
 	void process_http_request(FastCGIRequest& request, String& data);
+	void process_cli_request(FastCGIRequest& request, String& data);
+	void process_http_like_connection_input(Connection& connection);
 
 };
 

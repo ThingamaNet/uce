@@ -77,5 +77,5 @@ Each callback receives a `TestContext` and may use helpers such as:
 ## Included Plugins
 
 - `uce_http_smoke.py`: HTTP 200/body-marker checks for stable published doc pages
-- `uce_site_suite.py`: HTTP 200/body-marker checks for the published `site/tests` coverage pages; local-only pages are tagged `internal`
+- `uce_site_suite.py`: HTTP 200/body-marker checks for the published `site/tests` coverage pages; local-only pages such as filesystem, ZIP, services, and tasks are tagged `internal`
 - `uce_tcp_smoke.py`: basic TCP listener checks, with public smoke checks on port 80 and an internal-only HTTP/WebSocket listener probe on port `8080` tagged `internal`

@@ -1,0 +1,38 @@
+:sig
+DTree zip_list(String zip_file_name)
+
+:params
+zip_file_name : path to the ZIP archive to inspect
+return value : DTree containing archive metadata and an `entries` array
+
+:see
+>sys
+zip_create
+zip_read
+zip_extract
+DTree
+
+:content
+Reads the central directory from `zip_file_name` and returns structured metadata.
+
+The returned tree contains:
+
+- `file` : archive path
+- `count` : number of entries
+- `entries` : list of entry metadata
+
+Each entry contains:
+
+- `name`
+- `index`
+- `size`
+- `compressed_size`
+- `is_directory`
+- `method`
+
+Example:
+
+```uce
+DTree info = zip_list("/tmp/example.zip");
+print(json_encode(info));
+```

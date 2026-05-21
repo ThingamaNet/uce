@@ -12,6 +12,7 @@ RENDER(Request& context)
 		site_tests_card("units.uce", "Units", "unit_call(), lifecycle hooks, and unit metadata.", "public");
 		site_tests_card("websockets.ws.uce", "WebSockets", "Browser-driven WebSocket helper checks.", "public websocket");
 		site_tests_card("io.uce", "Filesystem", "Filesystem helpers that are restricted outside trusted networks.", "internal");
+		site_tests_card("zip.uce", "ZIP", "Archive helpers that create and extract temporary server-side files.", "internal");
 		site_tests_card("services.uce", "Sockets And Services", "Network/service helpers that are restricted outside trusted networks.", "internal");
 		site_tests_card("tasks.uce", "Tasks", "Background task helper coverage.", "internal");
 	?></div><?

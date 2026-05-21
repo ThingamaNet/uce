@@ -1,0 +1,41 @@
+:title
+cli_input
+
+:sig
+DTree cli_input(Request& context)
+
+:see
+>1_CLI
+>json_decode
+>DTree
+
+:content
+Returns a structured parameter tree for a `CLI(Request& context)` invocation.
+
+`cli_input()` merges simple command inputs into one `DTree`:
+
+1. query parameters from `context.get`
+2. form parameters from `context.post`
+3. JSON object fields from an `application/json` or `*+json` request body
+
+Later sources override earlier ones, so a JSON body can override a query or form key with the same name.
+
+If the JSON body is a scalar or array instead of an object, the decoded value is stored under `input["_"]`.
+
+```cpp
+CLI(Request& context)
+{
+    DTree input = cli_input(context);
+    String action = first(input["action"].to_string(), "help");
+
+    if(action == "echo")
+        print(input["message"].to_string(), "\n");
+}
+```
+
+Convenience script usage:
+
+```sh
+scripts/uce-cli /tests/cli.uce action=echo message=hello
+scripts/uce-cli --json '{"action":"echo","message":"hello"}' /tests/cli.uce
+```

@@ -1,0 +1,39 @@
+:sig
+bool zip_create(String zip_file_name, DTree entries)
+
+:params
+zip_file_name : path to the archive to create
+entries : map or list of archive entries
+return value : `true` when the archive is written
+
+:see
+>sys
+zip_list
+zip_read
+zip_extract
+DTree
+
+:content
+Creates a ZIP archive at `zip_file_name`.
+
+`entries` can be a simple map where each key is the archive member name and each value is the file content:
+
+```uce
+DTree entries;
+entries["hello.txt"] = "Hello ZIP";
+entries["nested/readme.txt"] = "Nested file";
+zip_create("/tmp/example.zip", entries);
+```
+
+For list-shaped input or when the map key should not be the member name, each child can provide explicit fields:
+
+```uce
+DTree item;
+item["name"] = "data/value.txt";
+item["content"] = "42";
+entries["ignored-key"] = item;
+```
+
+An entry may also provide `file` instead of `content`; UCE reads that source file and stores its contents under `name`.
+
+Entry names are normalized to forward slashes and rejected when they are absolute paths, drive-qualified paths, empty names, or contain `..` path segments.

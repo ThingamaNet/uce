@@ -1,0 +1,63 @@
+:sig
+DTree xml_decode(String s)
+
+:params
+s : XML source string
+return value : element-shaped DTree
+
+:see
+>markup
+xml_encode
+json_decode
+0_DTree
+String
+
+:content
+Parses a simple XML document into a structured `DTree`.
+
+`xml_decode()` is intentionally small. It does not validate schemas, DTDs, namespaces, or document types. It parses the first root element and returns the same structural element shape accepted by `xml_encode()`.
+
+Try the live example in the [XML demo](../demo/xml.uce).
+
+Return shape:
+
+```text
+node["name"] = element name
+node["attrs"] = map of attributes
+node["text"] = text content when non-empty
+node["children"] = list of child element nodes
+```
+
+Example:
+
+```uce
+DTree book = xml_decode("<book id=\"b1\"><title>UCE &amp; XML</title></book>");
+
+book["name"].to_string();                         // book
+book["attrs"]["id"].to_string();                  // b1
+book["children"]["0"]["name"].to_string();        // title
+book["children"]["0"]["text"].to_string();        // UCE & XML
+```
+
+CDATA and numeric entities are folded into text:
+
+```uce
+DTree note = xml_decode("<note><![CDATA[5 < 6]]><symbol>&#x41;&#66;</symbol></note>");
+
+note["text"].to_string();                         // 5 < 6
+note["children"]["0"]["text"].to_string();        // AB
+```
+
+Supported parser features:
+
+- elements
+- attributes with quoted values
+- self-closing tags
+- text nodes
+- XML entities such as `&amp;`, `&lt;`, `&gt;`, `&quot;`, and `&apos;`
+- decimal and hexadecimal numeric entities
+- comments, processing instructions, and CDATA sections
+
+Whitespace-only text between child elements is ignored. Mixed non-empty text is concatenated into `node["text"]`.
+
+Malformed XML raises a request-visible runtime error.

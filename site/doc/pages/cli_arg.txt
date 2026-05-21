@@ -1,0 +1,24 @@
+:title
+cli_arg
+
+:sig
+String cli_arg(Request& context, String key, String default_value = "")
+
+:see
+>1_CLI
+>cli_input
+
+:content
+Reads one value from the merged `cli_input(context)` parameter tree.
+
+If the key is missing, or the resolved value is empty, `default_value` is returned.
+
+```cpp
+CLI(Request& context)
+{
+    String action = cli_arg(context, "action", "help");
+    print("action=", action, "\n");
+}
+```
+
+For commands that need multiple values or typed reads, prefer calling `cli_input(context)` once and reading the returned `DTree` directly.

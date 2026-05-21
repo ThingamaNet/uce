@@ -5,6 +5,7 @@
 #define ONCE(X) extern "C" void __uce_once(X)
 #define INIT(X) extern "C" void __uce_init(X)
 #define WS(X) extern "C" void __uce_websocket(X)
+#define CLI(X) extern "C" void __uce_cli(X)
 #define EXPORT extern "C"
 
 String preprocess_shared_unit(Request* context, SharedUnit* su);
@@ -14,6 +15,7 @@ void compile_shared_unit(Request* context, SharedUnit* su);
 SharedUnit* get_shared_unit(Request* context, String file_name, bool opt_so_optional = false);
 void compiler_invoke(Request* context, String file_name);
 void compiler_invoke_websocket(Request* context, String file_name);
+void compiler_invoke_cli(Request* context, String file_name);
 SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String current_path = "", bool opt_so_optional = false);
 String compiler_site_directory(Request* context);
 StringList compiler_scan_site_units(Request* context);

@@ -4,6 +4,8 @@ def register(registry):
 		("doc singlepage", "/doc/singlepage.uce", "<html>"),
 		("doc component page", "/doc/index.uce?p=component", "component()"),
 		("doc regex page", "/doc/index.uce?p=regex_search", "regex_search"),
+		("doc xml page", "/doc/index.uce?p=xml_encode", "xml_encode"),
+		("doc yaml page", "/doc/index.uce?p=yaml_encode", "yaml_encode"),
 		("doc relative time page", "/doc/index.uce?p=time_format_relative", "time_format_relative"),
 	]
 

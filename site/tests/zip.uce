@@ -1,0 +1,84 @@
+#include "testlib.h"
+
+RENDER(Request& context)
+{
+	if(!test_demo_request_allowed(context))
+	{
+		site_tests_restricted(context, "ZIP", "create and extract temporary server-side archive files");
+		return;
+	}
+
+	u64 passed = 0;
+	u64 failed = 0;
+	u64 skipped = 0;
+
+	auto check = [&](String name, bool ok, String detail)
+	{
+		site_tests_case(name, ok ? "pass" : "fail", detail);
+		if(ok)
+			passed++;
+		else
+			failed++;
+	};
+
+	site_tests_page_start("ZIP", "Local-only coverage for zip_create(), zip_list(), zip_read(), and zip_extract().");
+
+	String base = "/tmp/uce-site-tests-zip";
+	String archive = path_join(base, "sample.zip");
+	String extract_dir = path_join(base, "extract");
+	mkdir(base);
+	mkdir(extract_dir);
+
+	DTree entries;
+	entries["hello.txt"] = "Hello ZIP";
+	entries["nested/readme.txt"] = "Nested file";
+	DTree explicit_entry;
+	explicit_entry["name"] = "data/value.txt";
+	explicit_entry["content"] = "42";
+	entries["ignored-map-key"] = explicit_entry;
+
+	bool created = zip_create(archive, entries);
+	DTree listed = zip_list(archive);
+	String hello = zip_read(archive, "hello.txt");
+	bool extracted = zip_extract(archive, extract_dir);
+	String nested = file_get_contents(path_join(extract_dir, "nested/readme.txt"));
+	String value = file_get_contents(path_join(extract_dir, "data/value.txt"));
+
+	check("zip_create()", created && file_exists(archive), archive);
+	check("zip_list()", listed["count"].to_u64() == 3 && listed["entries"]["0"]["name"].to_string() != "", json_encode(listed));
+	check("zip_read()", hello == "Hello ZIP", hello);
+	check("zip_extract()", extracted && nested == "Nested file" && value == "42", nested + " / " + value);
+
+	bool unsafe_rejected = false;
+	try
+	{
+		DTree unsafe_entries;
+		unsafe_entries["/absolute.txt"] = "bad";
+		zip_create(path_join(base, "unsafe.zip"), unsafe_entries);
+	}
+	catch(std::exception& e)
+	{
+		unsafe_rejected = contains(e.what(), "unsafe");
+	}
+	check("zip_create() rejects unsafe names", unsafe_rejected, "absolute member name rejected");
+
+	String gz_source = "UCE gzip payload\nline two\n";
+	String gz_body = gz_compress(gz_source);
+	String gz_roundtrip = gz_uncompress(gz_body);
+	check("gz_compress()", gz_body.size() > gz_source.size() && (u8)gz_body[0] == 0x1f && (u8)gz_body[1] == 0x8b, "bytes=" + std::to_string((u64)gz_body.size()));
+	check("gz_uncompress()", gz_roundtrip == gz_source, gz_roundtrip);
+
+	bool bad_gz_rejected = false;
+	try
+	{
+		gz_uncompress("not gzip data");
+	}
+	catch(std::exception& e)
+	{
+		bad_gz_rejected = contains(e.what(), "gz_uncompress");
+	}
+	check("gz_uncompress() rejects invalid data", bad_gz_rejected, "invalid stream rejected");
+
+	site_tests_summary(passed, failed, skipped, "ZIP tests write only under /tmp/uce-site-tests-zip.");
+	site_tests_page_end();
+}

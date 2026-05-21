@@ -37,6 +37,8 @@ RENDER(Request& context)
 			<div class="grid-heading">Data Types &amp; Parsing</div>
 			<? render_card("dtree.uce", "DTree", "Dynamic hierarchical data tree"); ?>
 			<? render_card("json.uce", "JSON", "Parse and encode JSON data"); ?>
+			<? render_card("xml.uce", "XML", "Structural XML encode/decode with DTree"); ?>
+			<? render_card("yaml.uce", "YAML", "Concise config files with DTree"); ?>
 			<? render_card("preprocessor-comments.uce", "Preprocessor Comments", "Regression coverage for comment parsing in templates"); ?>
 			<? render_card("regex.uce", "Regular Expressions", "PCRE2 matching, captures, replacement, and splitting"); ?>
 			<? render_card("string.uce", "String", "String operations"); ?>
@@ -54,6 +56,7 @@ RENDER(Request& context)
 
 			<div class="grid-heading">Storage &amp; I/O</div>
 			<? render_card("fileio.uce", "File I/O", "Read and write files"); ?>
+			<? if(allow_server_demos) { render_card("zip.uce", "ZIP", "Create, list, read, and extract ZIP archives"); } ?>
 			<? if(allow_server_demos) { render_card("file_append.uce", "File Append", "Append data to files"); } ?>
 			<? if(allow_server_demos) { render_card("shell.uce", "Shell", "Execute shell commands"); } ?>
 			<? if(allow_server_demos) { render_card("memcached.uce", "Memcached", "Memcached key-value store"); } ?>

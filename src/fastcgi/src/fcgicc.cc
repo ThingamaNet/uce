@@ -44,9 +44,41 @@
 #include <netinet/in.h> // sockaddr_in, INADDR_*
 #include <sys/select.h> // select, fd_set, FD_*, timeval
 #include <sys/socket.h> // socket, bind, accept, listen, sockaddr, AF_*, SOCK_*
+#include <sys/stat.h> // mkdir
 #include <sys/un.h> // sockaddr_un
 
 #include "../fastcgi_devkit/fastcgi.h"
+
+namespace {
+
+struct TransportLimits {
+	u64 max_client_connections = 256;
+	u64 max_http_header_bytes = 16 * 1024;
+	u64 max_http_body_bytes = 1024 * 1024;
+	u64 max_websocket_frame_bytes = 1024 * 1024;
+	u64 max_websocket_message_bytes = 1024 * 1024;
+	u64 max_websocket_output_bytes = 4 * 1024 * 1024;
+	f64 http_request_timeout_seconds = 15.0;
+	f64 connection_idle_timeout_seconds = 120.0;
+
+	u64 max_http_buffer_bytes() const
+	{
+		return(max_http_header_bytes + max_http_body_bytes);
+	}
+
+	u64 max_websocket_buffer_bytes() const
+	{
+		return(max_websocket_message_bytes + 16 * 1024);
+	}
+};
+
+const TransportLimits& transport_limits()
+{
+	static const TransportLimits limits;
+	return(limits);
+}
+
+}
 
 static String
 make_http_text_response(String status_line, String body, String extra_headers = "")
@@ -73,6 +105,27 @@ is_valid_close_code(u16 status_code)
 	if(status_code >= 3000 && status_code <= 4999)
 		return(true);
 	return(false);
+}
+
+static void
+ensure_parent_directories(const std::string& path)
+{
+	std::string::size_type slash = path.rfind('/');
+	if(slash == std::string::npos || slash == 0)
+		return;
+
+	std::string current;
+	std::string directory = path.substr(0, slash);
+	for(std::string::size_type i = 1; i <= directory.length(); ++i)
+	{
+		if(i != directory.length() && directory[i] != '/')
+			continue;
+		current = directory.substr(0, i);
+		if(current == "")
+			continue;
+		if(::mkdir(current.c_str(), 0775) == -1 && errno != EEXIST)
+			throw std::runtime_error("mkdir() failed for Unix socket directory");
+	}
 }
 
 static void
@@ -133,6 +186,15 @@ FastCGIServer::listen_http(unsigned tcp_port)
 }
 
 int
+FastCGIServer::listen_cli(const std::string& local_path)
+{
+	int server_socket = listen(local_path);
+	server_socket_types[server_socket] = 'C';
+	printf("(P) CLI command socket ready at %s\n", local_path.c_str());
+	return server_socket;
+}
+
+int
 FastCGIServer::listen(unsigned tcp_port)
 {
 	int server_socket = socket(PF_INET, SOCK_STREAM, 0);
@@ -188,6 +250,7 @@ FastCGIServer::listen(const std::string& local_path)
 
 		std::memcpy(sa.sun_path, local_path.data(), size);
 
+		ensure_parent_directories(local_path);
 		file_unlink(local_path);
 		try {
 			if (bind(server_socket, (struct sockaddr*)&sa,
@@ -250,9 +313,95 @@ FastCGIServer::close_http_listeners()
 	}
 }
 
+bool
+FastCGIServer::is_http_like_type(char type)
+{
+	return(type == 'H' || type == 'C');
+}
+
+FastCGIServer::Connection*
+FastCGIServer::open_client_connection(int server_socket, int client_socket)
+{
+	set_socket_nonblocking(client_socket);
+	printf("Opening socket %i\n", client_socket);
+	Connection* connection = new Connection();
+	connection->client_socket = client_socket;
+	connection->server_socket = server_socket;
+	connection->type = server_socket_types[server_socket];
+	connection->opened_at = time_precise();
+	connection->last_activity_at = connection->opened_at;
+	client_sockets[client_socket] = connection;
+
+	if(is_http_like_type(connection->type))
+	{
+		FastCGIRequest* new_request = new FastCGIRequest();
+		new_request->resources.client_socket = client_socket;
+		new_request->resources.server_socket = server_socket;
+		new_request->stats.time_init = connection->opened_at;
+		connection->requests[client_socket] = new_request;
+	}
+
+	return(connection);
+}
+
+bool
+FastCGIServer::reject_http_connection(Connection& connection, String status_line, String body, String extra_headers)
+{
+	connection.output_buffer += make_http_text_response(status_line, body, extra_headers);
+	connection.close_socket = true;
+	return(false);
+}
+
+void
+FastCGIServer::enforce_connection_timeouts(Connection& connection)
+{
+	if(connection.close_socket)
+		return;
+
+	const TransportLimits& limits = transport_limits();
+	f64 now = time_precise();
+	if(is_http_like_type(connection.type) && !connection.is_websocket && !connection.requests.empty())
+	{
+		FastCGIRequest* pending_request = connection.requests.begin()->second;
+		if(!pending_request->flags.input_closed && now - connection.opened_at > limits.http_request_timeout_seconds)
+		{
+			reject_http_connection(connection, "HTTP/1.1 408 Request Timeout", "request timed out\n");
+			return;
+		}
+	}
+	if(now - connection.last_activity_at > limits.connection_idle_timeout_seconds)
+		connection.close_socket = true;
+}
+
+bool
+FastCGIServer::queue_websocket_frame(Connection& connection, String frame)
+{
+	if(connection.output_buffer.length() + frame.length() > transport_limits().max_websocket_output_bytes)
+	{
+		fail_websocket_connection(connection, 1013, "websocket output queue is full");
+		return(false);
+	}
+	connection.output_buffer += frame;
+	return(true);
+}
+
+bool
+FastCGIServer::queue_websocket_payload(Connection& connection, String message, bool binary)
+{
+	if(message.length() > transport_limits().max_websocket_message_bytes)
+		return(false);
+	return(queue_websocket_frame(connection, ws_encode_frame(message, binary ? 0x2 : 0x1)));
+}
+
 void
 FastCGIServer::close_websocket_connection(Connection& connection, u16 status_code, String reason)
 {
+	if(!is_valid_close_code(status_code))
+		status_code = 1002;
+	if(reason.length() > 123)
+		reason = reason.substr(0, 123);
+	if(!ws_is_valid_utf8(reason))
+		reason = "";
 	if(!connection.close_socket)
 		connection.output_buffer += ws_close_frame(status_code, reason);
 	connection.close_socket = true;
@@ -261,6 +410,12 @@ FastCGIServer::close_websocket_connection(Connection& connection, u16 status_cod
 void
 FastCGIServer::fail_websocket_connection(Connection& connection, u16 status_code, String reason)
 {
+	// Drop stale application frames on failure so slow peers cannot keep a large
+	// queued buffer alive. Preserve an unsent 101 response, though: if the client
+	// pipelined a bad WebSocket frame immediately after the HTTP upgrade, the
+	// close frame must still follow the accepted upgrade response.
+	if(!str_starts_with(connection.output_buffer, "HTTP/1.1 101 Switching Protocols\r\n"))
+		connection.output_buffer = "";
 	close_websocket_connection(connection, status_code, reason);
 }
 
@@ -339,20 +494,14 @@ FastCGIServer::process(int timeout_ms)
 				throw std::runtime_error("accept() failed");
 			}
 
-			set_socket_nonblocking(client_socket);
-			printf("Opening socket %i\n", client_socket);
-			client_sockets[client_socket] = new Connection();
-			client_sockets[client_socket]->client_socket = client_socket;
-			client_sockets[client_socket]->server_socket = socket_handle;
-			client_sockets[client_socket]->type = server_socket_types[socket_handle];
-			if(client_sockets[client_socket]->type == 'H')
+			if(client_sockets.size() >= transport_limits().max_client_connections)
 			{
-				FastCGIRequest* new_request = new FastCGIRequest();
-				new_request->resources.client_socket = client_socket;
-				new_request->resources.server_socket = socket_handle;
-				new_request->stats.time_init = time_precise();
-				client_sockets[client_socket]->requests[client_socket] = new_request;
+				printf("(!) rejecting socket %i: too many clients\n", client_socket);
+				close(client_socket);
+				continue;
 			}
+
+			open_client_connection(socket_handle, client_socket);
 		}
 	}
 
@@ -361,6 +510,7 @@ FastCGIServer::process(int timeout_ms)
 	{
 		int read_socket = it->first;
 		Connection* connection = it->second;
+		enforce_connection_timeouts(*connection);
 
 		if(FD_ISSET(read_socket, &fs_read))
 		{
@@ -378,15 +528,12 @@ FastCGIServer::process(int timeout_ms)
 				{
 					connection->close_socket = true;
 				}
-				else if(connection->type == 'H' && connection->input_buffer != "")
+				else if(is_http_like_type(connection->type) && connection->input_buffer != "")
 				{
-					process_http_request(
-						*client_sockets[connection->client_socket]->requests[connection->client_socket],
-						connection->input_buffer
-					);
-					if(connection->close_socket || !connection->output_buffer.empty())
+					process_http_like_connection_input(*connection);
+					if(!connection->is_websocket && (connection->close_socket || !connection->output_buffer.empty()))
 						connection->input_buffer = "";
-					else
+					else if(!connection->is_websocket)
 						connection->close_socket = true;
 				}
 				else
@@ -396,22 +543,16 @@ FastCGIServer::process(int timeout_ms)
 			}
 			else
 			{
+				connection->last_activity_at = time_precise();
 				connection->input_buffer.append(buffer, read_result);
-				if(connection->type == 'H')
+				if(is_http_like_type(connection->type))
 				{
-					if(connection->is_websocket)
-					{
-						process_websocket_input(*connection);
-					}
+					if(!connection->is_websocket && connection->input_buffer.length() > transport_limits().max_http_buffer_bytes())
+						reject_http_connection(*connection, "HTTP/1.1 413 Payload Too Large", "request is too large\n");
 					else
-					{
-						process_http_request(
-							*client_sockets[connection->client_socket]->requests[connection->client_socket],
-							connection->input_buffer
-						);
-						if(connection->close_socket || !connection->output_buffer.empty())
-							connection->input_buffer = "";
-					}
+						process_http_like_connection_input(*connection);
+					if(!connection->is_websocket && (connection->close_socket || !connection->output_buffer.empty()))
+						connection->input_buffer = "";
 				}
 				else
 				{
@@ -420,6 +561,9 @@ FastCGIServer::process(int timeout_ms)
 			}
 		}
 
+		if(connection->is_websocket && connection->output_buffer.length() > transport_limits().max_websocket_output_bytes)
+			fail_websocket_connection(*connection, 1013, "websocket output queue is full");
+
 		if(!connection->output_buffer.empty() && FD_ISSET(read_socket, &fs_write))
 		{
 			if(connection->type == 'F')
@@ -427,6 +571,9 @@ FastCGIServer::process(int timeout_ms)
 			if(send_output_buffer(*connection) == -1)
 				goto close_socket;
 		}
+
+		if(connection->is_websocket && connection->output_buffer.empty() && !connection->input_buffer.empty() && !connection->close_socket)
+			process_websocket_input(*connection);
 
 		if(connection->close_socket && connection->output_buffer.empty())
 		{
@@ -452,141 +599,160 @@ FastCGIServer::process(int timeout_ms)
 	}
 }
 
-void
-FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
+bool
+FastCGIServer::parse_http_message(FastCGIRequest& request, String& data)
 {
+	Connection* connection = client_sockets[request.resources.client_socket];
+	const TransportLimits& limits = transport_limits();
 	auto header_end = data.find("\r\n\r\n");
 	if(header_end == String::npos)
-		return;
+	{
+		if(data.length() > limits.max_http_header_bytes)
+			reject_http_connection(*connection, "HTTP/1.1 431 Request Header Fields Too Large", "request headers are too large\n");
+		return(false);
+	}
+
+	if(header_end > limits.max_http_header_bytes)
+		return(reject_http_connection(*connection, "HTTP/1.1 431 Request Header Fields Too Large", "request headers are too large\n"));
 
 	if(request.params.size() == 0)
 	{
 		request.params = split_http_headers(data.substr(0, header_end));
 		request.flags.params_closed = true;
-		if(request.params["HTTP_SCRIPT_FILENAME"] != "")
-			request.params["SCRIPT_FILENAME"] = request.params["HTTP_SCRIPT_FILENAME"];
-		else if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
-		{
-			String document_root = first(request.params["DOCUMENT_ROOT"], cwd_get());
-			if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
-				document_root.resize(document_root.length()-1);
-			request.params["DOCUMENT_ROOT"] = document_root;
-			request.params["SCRIPT_FILENAME"] = document_root + request.params["DOCUMENT_URI"];
-		}
 	}
 
 	u64 content_length = int_val(first(request.params["CONTENT_LENGTH"], "0"));
+	if(content_length > limits.max_http_body_bytes)
+		return(reject_http_connection(*connection, "HTTP/1.1 413 Payload Too Large", "request body is too large\n"));
+
 	u64 request_size = header_end + 4 + content_length;
+	if(request_size > limits.max_http_buffer_bytes())
+		return(reject_http_connection(*connection, "HTTP/1.1 413 Payload Too Large", "request is too large\n"));
 	if(data.length() < request_size)
-		return;
+		return(false);
+
 	request.in = data.substr(header_end + 4, content_length);
 	request.flags.input_closed = true;
 	data.erase(0, request_size);
+	return(true);
+}
+
+void
+FastCGIServer::process_http_like_connection_input(Connection& connection)
+{
+	if(connection.type == 'H' && connection.is_websocket)
+	{
+		process_websocket_input(connection);
+		return;
+	}
+
+	FastCGIRequest& request = *connection.requests[connection.client_socket];
+	if(connection.type == 'C')
+		process_cli_request(request, connection.input_buffer);
+	else
+		process_http_request(request, connection.input_buffer);
+}
+
+void
+FastCGIServer::process_cli_request(FastCGIRequest& request, String& data)
+{
+	if(!parse_http_message(request, data))
+		return;
+
+	Connection* connection = client_sockets[request.resources.client_socket];
+	if(!on_cli_complete)
+	{
+		connection->output_buffer += make_http_text_response(
+			"HTTP/1.1 500 Internal Server Error",
+			"UCE CLI dispatcher is not configured\n"
+		);
+	}
+	else
+	{
+		on_cli_complete(request);
+		assemble_output_buffer(request, connection);
+	}
+	connection->close_socket = true;
+}
+
+bool
+FastCGIServer::validate_websocket_upgrade(FastCGIRequest& request, Connection& connection)
+{
+	String request_method = trim(request.params["REQUEST_METHOD"]);
+	String request_protocol = trim(request.params["SERVER_PROTOCOL"]);
+	String websocket_connection = to_lower(request.params["HTTP_CONNECTION"]);
+	String websocket_host = trim(request.params["HTTP_HOST"]);
+	String websocket_key = trim(request.params["HTTP_SEC_WEBSOCKET_KEY"]);
+	String websocket_version = trim(request.params["HTTP_SEC_WEBSOCKET_VERSION"]);
+
+	if(request_method != "GET")
+		return(reject_http_connection(connection, "HTTP/1.1 405 Method Not Allowed", "websocket upgrades require GET"));
+	if(request_protocol != "HTTP/1.1")
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "websocket upgrades require HTTP/1.1"));
+	if(websocket_host == "")
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "missing Host header"));
+	if(websocket_connection.find("upgrade") == String::npos)
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "missing Connection: Upgrade header"));
+	if(websocket_key == "")
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "missing Sec-WebSocket-Key header"));
+	if(!ws_is_valid_client_key(websocket_key))
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "invalid Sec-WebSocket-Key header"));
+	if(websocket_version == "")
+		return(reject_http_connection(connection, "HTTP/1.1 400 Bad Request", "missing Sec-WebSocket-Version header"));
+	if(websocket_version != "13")
+		return(reject_http_connection(connection, "HTTP/1.1 426 Upgrade Required", "unsupported websocket version", "Sec-WebSocket-Version: 13\r\n"));
+
+	return(true);
+}
+
+void
+FastCGIServer::begin_websocket_upgrade(FastCGIRequest& request, Connection& connection, String& data)
+{
+	connection.is_websocket = true;
+	connection.websocket_connection_id = std::to_string(getpid()) + ":" + std::to_string(connection.client_socket);
+	connection.websocket_scope = first(
+		request.params["SCRIPT_FILENAME"],
+		request.params["DOCUMENT_URI"],
+		request.params["REQUEST_URI"]
+	);
+	request.resources.is_websocket = true;
+	request.resources.websocket_connection_id = connection.websocket_connection_id;
+	request.resources.websocket_scope = connection.websocket_scope;
+	request.resources.websocket_connection_state = &connection.websocket_state;
+	request.connection.set_reference(&connection.websocket_state);
+
+	connection.output_buffer +=
+		"HTTP/1.1 101 Switching Protocols\r\n"
+		"Upgrade: websocket\r\n"
+		"Connection: Upgrade\r\n"
+		"Sec-WebSocket-Accept: " + ws_make_accept_key(trim(request.params["HTTP_SEC_WEBSOCKET_KEY"])) + "\r\n\r\n";
+
+	if(!data.empty())
+		process_websocket_input(connection);
+}
+
+void
+FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
+{
+	if(!parse_http_message(request, data))
+		return;
+
+	if(request.params["HTTP_SCRIPT_FILENAME"] != "")
+		request.params["SCRIPT_FILENAME"] = request.params["HTTP_SCRIPT_FILENAME"];
+	else if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
+	{
+		String document_root = first(request.params["DOCUMENT_ROOT"], cwd_get());
+		if(document_root.length() > 1 && document_root[document_root.length()-1] == '/')
+			document_root.resize(document_root.length()-1);
+		request.params["DOCUMENT_ROOT"] = document_root;
+		request.params["SCRIPT_FILENAME"] = document_root + request.params["DOCUMENT_URI"];
+	}
 
 	if(to_lower(request.params["HTTP_UPGRADE"]) == "websocket")
 	{
 		Connection* connection = client_sockets[request.resources.client_socket];
-		String request_method = trim(request.params["REQUEST_METHOD"]);
-		String request_protocol = trim(request.params["SERVER_PROTOCOL"]);
-		String websocket_connection = to_lower(request.params["HTTP_CONNECTION"]);
-		String websocket_host = trim(request.params["HTTP_HOST"]);
-		String websocket_key = trim(request.params["HTTP_SEC_WEBSOCKET_KEY"]);
-		String websocket_version = trim(request.params["HTTP_SEC_WEBSOCKET_VERSION"]);
-		if(request_method != "GET")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 405 Method Not Allowed",
-				"websocket upgrades require GET"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(request_protocol != "HTTP/1.1")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"websocket upgrades require HTTP/1.1"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(websocket_host == "")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"missing Host header"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(websocket_connection.find("upgrade") == String::npos)
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"missing Connection: Upgrade header"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(websocket_key == "")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"missing Sec-WebSocket-Key header"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(!ws_is_valid_client_key(websocket_key))
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"invalid Sec-WebSocket-Key header"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(websocket_version == "")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 400 Bad Request",
-				"missing Sec-WebSocket-Version header"
-			);
-			connection->close_socket = true;
-			return;
-		}
-		if(websocket_version != "" && websocket_version != "13")
-		{
-			connection->output_buffer += make_http_text_response(
-				"HTTP/1.1 426 Upgrade Required",
-				"unsupported websocket version",
-				"Sec-WebSocket-Version: 13\r\n"
-			);
-			connection->close_socket = true;
-			return;
-		}
-
-		connection->is_websocket = true;
-		connection->websocket_connection_id = std::to_string(getpid()) + ":" + std::to_string(connection->client_socket);
-		connection->websocket_scope = first(
-			request.params["SCRIPT_FILENAME"],
-			request.params["DOCUMENT_URI"],
-			request.params["REQUEST_URI"]
-		);
-		request.resources.is_websocket = true;
-		request.resources.websocket_connection_id = connection->websocket_connection_id;
-		request.resources.websocket_scope = connection->websocket_scope;
-		request.resources.websocket_connection_state = &connection->websocket_state;
-		request.connection.set_reference(&connection->websocket_state);
-
-		connection->output_buffer +=
-			"HTTP/1.1 101 Switching Protocols\r\n"
-			"Upgrade: websocket\r\n"
-			"Connection: Upgrade\r\n"
-			"Sec-WebSocket-Accept: " + ws_make_accept_key(websocket_key) + "\r\n\r\n";
-
-		if(!data.empty())
-			process_websocket_input(*connection);
+		if(validate_websocket_upgrade(request, *connection))
+			begin_websocket_upgrade(request, *connection, data);
 	}
 	else
 	{
@@ -606,6 +772,13 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 void
 FastCGIServer::process_websocket_input(Connection& connection)
 {
+	const TransportLimits& limits = transport_limits();
+	if(connection.input_buffer.length() > limits.max_websocket_buffer_bytes())
+	{
+		fail_websocket_connection(connection, 1009, "websocket input buffer is too large");
+		return;
+	}
+
 	while(!connection.input_buffer.empty())
 	{
 		WSFrame frame;
@@ -613,10 +786,13 @@ FastCGIServer::process_websocket_input(Connection& connection)
 		if(!frame.parse(connection.input_buffer, error))
 		{
 			if(error != "")
-			{
-				connection.output_buffer += ws_close_frame(1002, error);
-				connection.close_socket = true;
-			}
+				fail_websocket_connection(connection, 1002, error);
+			return;
+		}
+
+		if(frame.payload_length > limits.max_websocket_frame_bytes)
+		{
+			fail_websocket_connection(connection, 1009, "websocket frame is too large");
 			return;
 		}
 
@@ -645,6 +821,11 @@ FastCGIServer::process_websocket_input(Connection& connection)
 					return;
 				}
 
+				if(connection.websocket_fragment_buffer.length() + frame.payload.length() > limits.max_websocket_message_bytes)
+				{
+					fail_websocket_connection(connection, 1009, "websocket message is too large");
+					return;
+				}
 				connection.websocket_fragment_buffer += frame.payload;
 				if(!frame.is_final_fragment)
 					break;
@@ -669,6 +850,12 @@ FastCGIServer::process_websocket_input(Connection& connection)
 				if(connection.websocket_fragment_opcode != 0)
 				{
 					fail_websocket_connection(connection, 1002, "new data frame while fragmented message is active");
+					return;
+				}
+
+				if(frame.payload.length() > limits.max_websocket_message_bytes)
+				{
+					fail_websocket_connection(connection, 1009, "websocket message is too large");
 					return;
 				}
 
@@ -720,7 +907,8 @@ FastCGIServer::process_websocket_input(Connection& connection)
 				return;
 			}
 			case 0x9:
-				connection.output_buffer += ws_encode_frame(frame.payload, 0xA);
+				if(!queue_websocket_frame(connection, ws_encode_frame(frame.payload, 0xA)))
+					return;
 				break;
 			case 0xA:
 				break;
@@ -734,15 +922,11 @@ FastCGIServer::process_websocket_input(Connection& connection)
 bool
 FastCGIServer::websocket_send_to(String connection_id, String message, bool binary)
 {
-	u8 opcode = binary ? 0x2 : 0x1;
 	for(auto& item : client_sockets)
 	{
 		Connection* connection = item.second;
 		if(connection->is_websocket && connection->websocket_connection_id == connection_id)
-		{
-			connection->output_buffer += ws_encode_frame(message, opcode);
-			return(true);
-		}
+			return(queue_websocket_payload(*connection, message, binary));
 	}
 	return(false);
 }
@@ -751,7 +935,10 @@ u64
 FastCGIServer::websocket_broadcast(String scope, String message, bool binary)
 {
 	u64 sent = 0;
-	u8 opcode = binary ? 0x2 : 0x1;
+	if(message.length() > transport_limits().max_websocket_message_bytes)
+		return(sent);
+
+	String frame = ws_encode_frame(message, binary ? 0x2 : 0x1);
 	for(auto& item : client_sockets)
 	{
 		Connection* connection = item.second;
@@ -759,8 +946,8 @@ FastCGIServer::websocket_broadcast(String scope, String message, bool binary)
 			continue;
 		if(scope != "" && connection->websocket_scope != scope)
 			continue;
-		connection->output_buffer += ws_encode_frame(message, opcode);
-		sent += 1;
+		if(queue_websocket_frame(*connection, frame))
+			sent += 1;
 	}
 	return(sent);
 }
@@ -789,8 +976,7 @@ FastCGIServer::websocket_close(String connection_id, u16 status_code, String rea
 		Connection* connection = item.second;
 		if(connection->is_websocket && connection->websocket_connection_id == connection_id)
 		{
-			connection->output_buffer += ws_close_frame(status_code, reason);
-			connection->close_socket = true;
+			close_websocket_connection(*connection, status_code, reason);
 			return(true);
 		}
 	}

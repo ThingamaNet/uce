@@ -16,3 +16,9 @@ cwd_set
 shell_escape
 shell_exec
 file_unlink
+zip_create
+zip_list
+zip_read
+zip_extract
+gz_compress
+gz_uncompress

@@ -17,6 +17,7 @@ def register(registry):
 		("site tests units", "/tests/units.uce", "Units", ["http", "suite", "uce", "public"]),
 		("site tests websockets page", "/tests/websockets.ws.uce", "WebSockets", ["http", "suite", "uce", "public", "websocket"]),
 		("site tests filesystem", "/tests/io.uce", "Filesystem", ["http", "suite", "uce", "internal"]),
+		("site tests zip", "/tests/zip.uce", "ZIP", ["http", "suite", "uce", "internal"]),
 		("site tests services", "/tests/services.uce", "Sockets And Services", ["http", "suite", "uce", "internal"]),
 		("site tests tasks", "/tests/tasks.uce", "Tasks", ["http", "suite", "uce", "internal"]),
 	]

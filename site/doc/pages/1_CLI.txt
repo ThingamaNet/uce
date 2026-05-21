@@ -1,0 +1,67 @@
+:title
+CLI
+
+:sig
+CLI(Request& context)
+
+:see
+>1_RENDER
+>1_COMPONENT
+>1_WS
+>1_INIT
+>1_ONCE
+>unit_call
+>cli_input
+>cli_arg
+
+:content
+Defines a local command-line entrypoint for a UCE unit.
+
+`CLI(Request& context)` is invoked only through the local UCE CLI Unix socket, not through ordinary public HTTP requests. This lets web apps keep test runners, migrations, maintenance tasks, and admin tooling beside the rest of their UCE units while still separating those commands from browser-facing `RENDER()` routes.
+
+The default CLI socket path is `/run/uce/cli.sock` and is configured with `CLI_SOCKET_PATH`.
+
+Example convenience script usage:
+
+```sh
+scripts/uce-cli /tests/cli.uce
+scripts/uce-cli /tests/cli.uce action=echo message=hello
+scripts/uce-cli --json '{"action":"echo","message":"hello"}' /tests/cli.uce
+```
+
+Equivalent curl probe:
+
+```sh
+curl --unix-socket /run/uce/cli.sock http://localhost/tests/cli.uce
+```
+
+For structured commands, prefer JSON POST bodies. The `scripts/uce-cli` helper sends `key=value` parameters as JSON POST by default, while still allowing `--get` for simple query-string probes.
+
+Inside the handler, the usual `Request& context` fields are available:
+
+- `context.get` for command query parameters
+- `context.post` and `context.in` for POST bodies
+- `context.params["UCE_CLI"] == "1"` for CLI socket dispatch
+- `context.params["SCRIPT_FILENAME"]` for the invoked unit file
+
+CLI responses default to `text/plain; charset=utf-8`, but the handler may set headers and status explicitly.
+
+Use `cli_input(context)` to merge query parameters, form parameters, and JSON POST fields into one `DTree`.
+
+```cpp
+CLI(Request& context)
+{
+    DTree input = cli_input(context);
+    String action = first(input["action"].to_string(), "ping");
+    if(action == "ping")
+    {
+        print("ok\n");
+        return;
+    }
+
+    context.set_status(400, "Bad Command");
+    print("unknown action: ", action, "\n");
+}
+```
+
+`ONCE(Request& context)` runs before `CLI()` in the same way it runs before render and component entrypoints. `INIT(Request& context)` runs when the unit is loaded into a worker.

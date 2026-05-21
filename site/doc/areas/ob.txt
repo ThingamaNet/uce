@@ -1,6 +1,9 @@
 Output / Invocation Functions
 
 1_RENDER
+1_CLI
+cli_input
+cli_arg
 unit_call
 component
 component_exists

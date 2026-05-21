@@ -68,7 +68,7 @@ RENDER(Request& context)
 
 			<pre style="white-space: pre-wrap"><?
 
-				print("New Task ID: ", task_repeat("example-task", 5, []() {
+				print("New Task ID: ", task_repeat(task_name, 5, []() {
 
 					sleep(1);
 

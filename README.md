@@ -11,6 +11,7 @@ UCE is a PHP-inspired server-side runtime that lets you build web pages and hand
 - `.uce` pages compile to shared objects on demand
 - normal HTTP pages expose `RENDER(Request& context)`
 - WebSocket pages can additionally expose `WS(Request& context)`
+- local CLI/admin/test entrypoints can expose `CLI(Request& context)` and are invoked through the Unix CLI socket
 - sub-rendering and components pass structured data through `context.props`
 - nginx can forward normal `.uce` requests and ordinary `.ws.uce` page loads to the FastCGI socket, while real WebSocket upgrade requests for `.ws.uce` endpoints go to the built-in HTTP/WebSocket listener
 - the nginx-published application tree lives under `site/`
@@ -57,6 +58,7 @@ UCE pages use explicit request handlers instead of implicit globals:
 
 - `RENDER(Request& context)` for normal HTTP rendering
 - `WS(Request& context)` for inbound WebSocket messages
+- `CLI(Request& context)` for local command-line/admin/test invocations through `CLI_SOCKET_PATH`
 
 Useful related runtime patterns:
 
@@ -64,6 +66,7 @@ Useful related runtime patterns:
 - `context.cfg` for request-local structured configuration
 - `context.props` for invocation-local structured input such as component props
 - `context.connection` for broker-owned per-WebSocket-connection state shared across `WS(Request& context)` calls
+- `context.params["UCE_CLI"] == "1"` while handling a local CLI socket request
 - `context.in` for the current request body, including the current WebSocket message payload inside `WS(Request& context)`
 - `context.params["WS_..."]` for direct WebSocket message metadata on the request parameter map
 - `context.params`, `context.get`, `context.post`, `context.cookies`, `context.session`, and `context.header` for request/response state
@@ -77,6 +80,8 @@ Useful helpers for that data model include:
 - `json_encode(String)` for emitting JavaScript-safe string literals directly
 - `ascii_safe_name(String)` for conservative ASCII identifier normalization
 - `path_join(base, child)` for filesystem-style path assembly
+- `zip_create()`, `zip_list()`, `zip_read()`, and `zip_extract()` for minimal ZIP archive workflows
+- `gz_compress()` and `gz_uncompress()` for gzip-format byte strings
 
 Named component handlers are also supported:
 
@@ -94,7 +99,17 @@ Those are intended for sub-rendering through helpers such as `component("compone
 Additional lifecycle hooks are also available on ordinary `.uce` units:
 
 - `INIT(Request& context)` runs once when a worker loads that unit's shared object into memory
-- `ONCE(Request& context)` runs once per request before the first `RENDER()` or `COMPONENT...` entrypoint from that file
+- `ONCE(Request& context)` runs once per request before the first `RENDER()`, `CLI()`, or `COMPONENT...` entrypoint from that file
+
+CLI units can be invoked locally with the convenience wrapper or directly over HTTP-over-Unix:
+
+```bash
+scripts/uce-cli /tests/cli.uce action=echo message=hello
+scripts/uce-cli --json '{"action":"echo","message":"hello"}' /tests/cli.uce
+curl --unix-socket /run/uce/cli.sock http://localhost/tests/cli.uce
+```
+
+For structured CLI commands, prefer JSON POST bodies and read them with `cli_input(context)`.
 
 ## Template Output
 

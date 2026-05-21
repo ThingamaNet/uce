@@ -613,89 +613,201 @@ pid_t spawn_subprocess(std::function<void()> exec_after_spawn)
 	}
 }
 
+String task_safe_key(String key)
+{
+	key = trim(key);
+	if(key == "")
+		throw std::runtime_error("task key cannot be empty");
+	return(gen_sha1(key));
+}
+
+String task_file_prefix(String key)
+{
+	return(path_join(context->server->config["BIN_DIRECTORY"], "task-" + task_safe_key(key)));
+}
+
+struct TaskStatus {
+	pid_t pid = 0;
+	String process_start_ticks = "";
+};
+
+TaskStatus task_status_parse(String status_file)
+{
+	TaskStatus status;
+	auto lines = split(trim(status_file), "\n");
+	if(lines.size() > 0)
+		status.pid = (pid_t)int_val(trim(lines[0]));
+	if(lines.size() > 1)
+		status.process_start_ticks = trim(lines[1]);
+	return(status);
+}
+
+String task_process_start_ticks(pid_t pid)
+{
+	if(pid <= 0)
+		return("");
+	String stat_file_name = "/proc/" + std::to_string(pid) + "/stat";
+	int fd = open(stat_file_name.c_str(), O_RDONLY);
+	if(fd == -1)
+		return("");
+	char buffer[4096];
+	ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+	close(fd);
+	if(bytes_read <= 0)
+		return("");
+	buffer[bytes_read] = '\0';
+	String stat = buffer;
+	size_t command_end = stat.rfind(") ");
+	if(command_end == String::npos)
+		return("");
+	String after_command = stat.substr(command_end + 2);
+	auto fields = split_space(after_command);
+	if(fields.size() <= 19)
+		return("");
+	return(fields[19]);
+}
+
+String task_status_content(pid_t pid)
+{
+	return(std::to_string(pid) + "\n" + task_process_start_ticks(pid) + "\n");
+}
+
+bool task_status_is_alive(TaskStatus status)
+{
+	if(status.pid <= 0)
+		return(false);
+	if(kill(status.pid, 0) != 0)
+		return(false);
+	if(status.process_start_ticks == "")
+		return(true);
+	return(task_process_start_ticks(status.pid) == status.process_start_ticks);
+}
+
 int task_kill(pid_t pid, int sig)
 {
+	if(pid <= 0)
+	{
+		errno = EINVAL;
+		return(-1);
+	}
 	return(kill(pid, sig));
 }
 
 pid_t task_pid(String key)
 {
-	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
+	String status_file_name = task_file_prefix(key);
 	String lock_file_name = status_file_name + ".lock";
-	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644);
+	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task-pid:" + key);
+	if(lock_fd == -1)
+	{
+		fprintf(stderr, "task_pid(): could not lock task key '%s'\n", key.c_str());
+		return(0);
+	}
 	String status_file = file_get_contents(status_file_name);
-	pid_t p = 0;
 	if(status_file != "")
 	{
-		p = int_val(status_file);
-		if(task_kill(p, 0) == 0) // process is still running
+		TaskStatus status = task_status_parse(status_file);
+		if(task_status_is_alive(status))
 		{
 			file_close_locked(lock_fd);
-			return(p);
+			return(status.pid);
 		}
 		file_unlink(status_file_name);
 	}
 	file_close_locked(lock_fd);
-	return(p);
+	return(0);
 }
 
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 {
-	String status_file_name = context->server->config["BIN_DIRECTORY"] + "/task-" + key;
+	String status_file_name = task_file_prefix(key);
 	String lock_file_name = status_file_name + ".lock";
 	int lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task:" + key);
 	if(lock_fd == -1)
+	{
+		fprintf(stderr, "task(): could not lock task key '%s'\n", key.c_str());
 		return(0);
+	}
 	String status_file = file_get_contents(status_file_name);
-	pid_t p;
+	pid_t p = 0;
 	if(status_file != "")
 	{
-		p = int_val(status_file);
-		if(task_kill(p, 0) == 0) // process is still running
+		TaskStatus status = task_status_parse(status_file);
+		if(task_status_is_alive(status))
 		{
-			printf("(P) worker process '%s' already running: PID %i\n", key.c_str(), p);
+			printf("(P) worker process '%s' already running: PID %i\n", key.c_str(), status.pid);
 			file_close_locked(lock_fd);
-			return(p);
+			return(status.pid);
 		}
-		//printf("(P) worker process '%s' had crashed: PID %i\n", key.c_str(), p);
 		file_unlink(status_file_name);
 	}
 	p = fork();
+	if(p < 0)
+	{
+		fprintf(stderr, "task(): fork failed for key '%s': %s\n", key.c_str(), strerror(errno));
+		file_close_locked(lock_fd);
+		return(0);
+	}
 	if(p == 0)
 	{
 		file_release_process_locks("task child startup");
 		file_close_locked(lock_fd);
 		my_pid = getpid();
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
+		if(timeout > 0)
+			alarm(timeout);
 
-		close(context->resources.client_socket);
-		context->resources.client_socket = 0;
-		//printf("(C) child procress started, PID:%i\n", my_pid);
-		//prctl(PR_SET_PDEATHSIG, SIGHUP);
+		if(context->resources.client_socket > 0)
+		{
+			close(context->resources.client_socket);
+			context->resources.client_socket = 0;
+		}
 		exec_after_spawn();
 		int exit_lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task-exit:" + key);
-		file_unlink(status_file_name);
-		file_close_locked(exit_lock_fd);
+		if(exit_lock_fd != -1)
+		{
+			file_unlink(status_file_name);
+			file_close_locked(exit_lock_fd);
+		}
+		else
+		{
+			fprintf(stderr, "task(): could not lock task key '%s' during child cleanup\n", key.c_str());
+		}
 		printf("(P) worker process '%s' terminated: PID %i\n", key.c_str(), my_pid);
 		exit(0);
 	}
-	else
+
+	if(!file_put_contents(status_file_name, task_status_content(p)))
 	{
-		file_put_contents(status_file_name, std::to_string(p));
+		fprintf(stderr, "task(): could not write status file for key '%s'; terminating child PID %i\n", key.c_str(), p);
+		kill(p, SIGTERM);
 		file_close_locked(lock_fd);
-		printf("(P) worker process '%s' spawned: PID %i\n", key.c_str(), p);
-		return(p);
+		return(0);
 	}
+	file_close_locked(lock_fd);
+	printf("(P) worker process '%s' spawned: PID %i\n", key.c_str(), p);
+	return(p);
 }
 
 #include <unistd.h>
 pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spawn, u64 timeout)
 {
-	auto repeater_function = [&]() {
-		while (true)
+	if(interval <= 0)
+		throw std::runtime_error("task_repeat(): interval must be greater than zero");
+	auto repeater_function = [key, interval, exec_after_spawn, timeout]() {
+		f64 started_at = time_precise();
+		while (timeout == 0 || time_precise() - started_at < (f64)timeout)
 		{
 			exec_after_spawn();
+			f64 elapsed = time_precise() - started_at;
+			if(timeout > 0 && elapsed >= (f64)timeout)
+				break;
+			f64 sleep_seconds = interval;
+			if(timeout > 0 && elapsed + sleep_seconds > (f64)timeout)
+				sleep_seconds = (f64)timeout - elapsed;
 			printf("(P) worker process '%s' sleeping\n", key.c_str());
-			usleep((s64)(interval*1000000));
+			if(sleep_seconds > 0)
+				usleep((useconds_t)(sleep_seconds * 1000000.0));
 		}
 	};
 	return(task(key, repeater_function, timeout));
@@ -703,17 +815,21 @@ pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spa
 
 void on_child_exit(int sig)
 {
-    pid_t pid;
-    int   status;
-    if ((pid = waitpid(-1, &status, WNOHANG)) != -1)
-    {
+	(void)sig;
+	pid_t pid;
+	int status;
+	while((pid = waitpid(-1, &status, WNOHANG)) > 0)
+	{
 		if(workers.count(pid) > 0)
 		{
 			workers.erase(pid);
 			printf("(P) child terminated (PID:%i)\n", pid);
-			//spawn_subprocess();
 		}
-    }
+		else
+		{
+			printf("(P) task child reaped (PID:%i)\n", pid);
+		}
+	}
 }
 
 StringList ls(String dir)
@@ -731,6 +847,7 @@ StringMap make_server_settings()
 	cfg["LIT_ESC"] = "3d5b5_1";
 	cfg["CONTENT_TYPE"] = "text/html; charset=utf-8";
 	cfg["FCGI_SOCKET_PATH"] = "/run/uce.sock";
+	cfg["CLI_SOCKET_PATH"] = "/run/uce/cli.sock";
 	cfg["TMP_UPLOAD_PATH"] = "/tmp/uce/uploads";
 	cfg["SESSION_PATH"] = "/tmp/uce/sessions";
 	cfg["COMPILER_SYS_PATH"] = ".";

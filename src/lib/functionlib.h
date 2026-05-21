@@ -94,6 +94,10 @@ String html_escape(f64 a);
 String json_encode(String s, char quote_char = '"');
 String json_encode(DTree t, char quote_char = '"');
 DTree json_decode(String s);
+String xml_encode(DTree t, String root_name = "root");
+DTree xml_decode(String s);
+String yaml_encode(DTree t);
+DTree yaml_decode(String s);
 
 String var_dump(StringMap map, String prefix = "", String postfix = "\n");
 String var_dump(StringList slist, String prefix = "", String postfix = "\n");

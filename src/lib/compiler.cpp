@@ -13,6 +13,7 @@ const char* UCE_SETUP_SYMBOL = "__uce_set_current_request";
 const char* UCE_RENDER_SYMBOL = "__uce_render";
 const char* UCE_COMPONENT_SYMBOL = "__uce_component";
 const char* UCE_WEBSOCKET_SYMBOL = "__uce_websocket";
+const char* UCE_CLI_SYMBOL = "__uce_cli";
 const char* UCE_ONCE_SYMBOL = "__uce_once";
 const char* UCE_INIT_SYMBOL = "__uce_init";
 const u64 UCE_UNIT_ABI_VERSION = 1;
@@ -690,6 +691,8 @@ void load_shared_unit(Request* context, SharedUnit* su)
 		dlerror();
 		su->on_websocket = (request_ref_handler)dlsym(su->so_handle, UCE_WEBSOCKET_SYMBOL);
 		dlerror();
+		su->on_cli = (request_ref_handler)dlsym(su->so_handle, UCE_CLI_SYMBOL);
+		dlerror();
 		su->on_once = (request_ref_handler)dlsym(su->so_handle, UCE_ONCE_SYMBOL);
 		dlerror();
 		su->on_init = (request_ref_handler)dlsym(su->so_handle, UCE_INIT_SYMBOL);
@@ -1191,7 +1194,8 @@ enum class UnitCallMacroKind
 	render,
 	component,
 	once,
-	init
+	init,
+	cli
 };
 
 struct UnitCallMacroTarget
@@ -1234,6 +1238,7 @@ void compiler_unload_failed_shared_unit(SharedUnit* su)
 	su->on_render = 0;
 	su->on_component = 0;
 	su->on_websocket = 0;
+	su->on_cli = 0;
 	su->on_once = 0;
 	su->on_init = 0;
 }
@@ -1358,6 +1363,11 @@ UnitCallMacroTarget unit_call_macro_target(String function_name)
 		target.kind = UnitCallMacroKind::init;
 		return(target);
 	}
+	if(function_name == "CLI")
+	{
+		target.kind = UnitCallMacroKind::cli;
+		return(target);
+	}
 
 	return(target);
 }
@@ -1465,6 +1475,8 @@ String compiler_missing_request_handler_message(UnitCallMacroKind kind, String h
 	}
 	if(kind == UnitCallMacroKind::once)
 		return("no ONCE() entry point");
+	if(kind == UnitCallMacroKind::cli)
+		return("no CLI() entry point");
 	if(kind == UnitCallMacroKind::init)
 		return("no INIT() entry point");
 	return("request handler not found");
@@ -1544,20 +1556,24 @@ request_ref_handler get_component_handler(SharedUnit* su, String render_name)
 	return(handler);
 }
 
-bool compiler_invoke_render(Request* context, String file_name, String render_name, String* error_out = 0)
+bool compiler_invoke_loaded_request_handler(
+	Request* context,
+	SharedUnit* su,
+	request_ref_handler handler,
+	UnitCallMacroKind kind,
+	String handler_name,
+	bool count_request,
+	String runtime_error_status,
+	String* error_out = 0
+)
 {
-	auto su = compiler_load_shared_unit(context, file_name, "", false);
-	if(!su)
-		return(false);
-
 	if(!compiler_prepare_request_handler(context, su, error_out, true))
 		return(false);
 
-	auto handler = get_page_render_handler(su, render_name);
 	if(!handler)
 	{
 		if(error_out)
-			*error_out = compiler_missing_request_handler_message(UnitCallMacroKind::render, render_name);
+			*error_out = compiler_missing_request_handler_message(kind, handler_name);
 		return(false);
 	}
 
@@ -1565,10 +1581,28 @@ bool compiler_invoke_render(Request* context, String file_name, String render_na
 		context,
 		su,
 		handler,
-		compiler_is_request_entry_unit(context, su),
-		"uncaught exception during render"
+		count_request,
+		runtime_error_status
 	);
 	return(true);
+}
+
+bool compiler_invoke_render(Request* context, String file_name, String render_name, String* error_out = 0)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(!su)
+		return(false);
+
+	return(compiler_invoke_loaded_request_handler(
+		context,
+		su,
+		get_page_render_handler(su, render_name),
+		UnitCallMacroKind::render,
+		render_name,
+		compiler_is_request_entry_unit(context, su),
+		"uncaught exception during render",
+		error_out
+	));
 }
 
 bool compiler_invoke_component(Request* context, String file_name, String render_name, String* error_out = 0)
@@ -1577,25 +1611,16 @@ bool compiler_invoke_component(Request* context, String file_name, String render
 	if(!su)
 		return(false);
 
-	if(!compiler_prepare_request_handler(context, su, error_out, true))
-		return(false);
-
-	auto handler = get_component_handler(su, render_name);
-	if(!handler)
-	{
-		if(error_out)
-			*error_out = compiler_missing_request_handler_message(UnitCallMacroKind::component, render_name);
-		return(false);
-	}
-
-	compiler_execute_request_handler(
+	return(compiler_invoke_loaded_request_handler(
 		context,
 		su,
-		handler,
+		get_component_handler(su, render_name),
+		UnitCallMacroKind::component,
+		render_name,
 		false,
-		"uncaught exception during component render"
-	);
-	return(true);
+		"uncaught exception during component render",
+		error_out
+	));
 }
 
 void compiler_invoke(Request* context, String file_name)
@@ -1607,6 +1632,33 @@ void compiler_invoke(Request* context, String file_name)
 		if(context->stats.invoke_count == 1)
 			context->header["Content-Type"] = "text/plain";
 		print(error_message);
+	}
+}
+
+void compiler_invoke_cli(Request* context, String file_name)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(!su)
+		return;
+
+	String error_message = "";
+	if(!compiler_invoke_loaded_request_handler(
+		context,
+		su,
+		su->on_cli,
+		UnitCallMacroKind::cli,
+		"",
+		compiler_is_request_entry_unit(context, su),
+		"uncaught exception during cli handler",
+		&error_message
+	))
+	{
+		if(!su->on_cli)
+			context->set_status(404, "CLI Entry Point Not Found");
+		else
+			context->set_status(500, "CLI Unit Error");
+		if(error_message != "")
+			print(error_message);
 	}
 }
 
@@ -1767,19 +1819,31 @@ DTree* unit_call(String file_name, String function_name, DTree* call_param)
 				}
 				else
 				{
-					UnitInvocationScope invoke_scope(context, su);
-					su->on_setup(context);
 					request_ref_handler handler = 0;
 
 					if(macro_target.kind == UnitCallMacroKind::once)
 						handler = su->on_once;
 					else if(macro_target.kind == UnitCallMacroKind::init)
 						handler = su->on_init;
+					else if(macro_target.kind == UnitCallMacroKind::cli)
+						handler = su->on_cli;
 
 					if(!handler)
 						print("Error: unit_call() ", compiler_missing_request_handler_message(macro_target.kind, macro_target.handler_name));
+					else if(macro_target.kind == UnitCallMacroKind::cli)
+					{
+						String prepare_error = "";
+						if(!compiler_prepare_request_handler(context, su, &prepare_error, true))
+							print("Error: unit_call() ", prepare_error);
+						else
+							compiler_execute_request_handler(context, su, handler, false, "uncaught exception during cli handler");
+					}
 					else
+					{
+						UnitInvocationScope invoke_scope(context, su);
+						su->on_setup(context);
 						handler(*context);
+					}
 				}
 			}
 			else

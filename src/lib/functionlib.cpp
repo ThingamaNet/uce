@@ -908,6 +908,1127 @@ String json_encode(DTree t, char quote_char)
 	return(result);
 }
 
+namespace {
+
+String xml_escape_text(String s)
+{
+	String result;
+	for(char c : s)
+	{
+		switch(c)
+		{
+			case('&'):
+				result += "&amp;";
+				break;
+			case('<'):
+				result += "&lt;";
+				break;
+			case('>'):
+				result += "&gt;";
+				break;
+			default:
+				result.append(1, c);
+				break;
+		}
+	}
+	return(result);
+}
+
+String xml_escape_attr(String s)
+{
+	String result;
+	for(char c : s)
+	{
+		switch(c)
+		{
+			case('&'):
+				result += "&amp;";
+				break;
+			case('<'):
+				result += "&lt;";
+				break;
+			case('>'):
+				result += "&gt;";
+				break;
+			case('"'):
+				result += "&quot;";
+				break;
+			case('\''):
+				result += "&apos;";
+				break;
+			default:
+				result.append(1, c);
+				break;
+		}
+	}
+	return(result);
+}
+
+bool xml_name_start_char(char c)
+{
+	return(isalpha((unsigned char)c) || c == '_' || c == ':');
+}
+
+bool xml_name_char(char c)
+{
+	return(isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.' || c == ':');
+}
+
+String xml_safe_name(String raw, String fallback = "item")
+{
+	raw = trim(raw);
+	if(raw == "")
+		return(fallback);
+
+	String result;
+	for(char c : raw)
+	{
+		if(xml_name_char(c))
+			result.append(1, c);
+		else
+			result.append(1, '_');
+	}
+
+	if(result == "" || !xml_name_start_char(result[0]))
+		result = "_" + result;
+	return(result);
+}
+
+String xml_tree_scalar_text(DTree t)
+{
+	const DTree& target = t.deref();
+	if(target.type == 'B')
+		return(target._bool ? "true" : "false");
+	return(t.to_string());
+}
+
+const DTree* xml_tree_key(const DTree& t, String key)
+{
+	return(t.deref().key(key));
+}
+
+bool xml_tree_has_element_shape(const DTree& t)
+{
+	const DTree& target = t.deref();
+	return(target.type == 'M' && target.key("name"));
+}
+
+String xml_encode_element(DTree tree, String name_hint)
+{
+	const DTree& target = tree.deref();
+	bool shaped = xml_tree_has_element_shape(target);
+	String name = xml_safe_name(name_hint, "root");
+
+	if(shaped)
+	{
+		const DTree* name_node = xml_tree_key(target, "name");
+		DTree name_copy = *name_node;
+		name = xml_safe_name(name_copy.to_string(), name);
+	}
+
+	String result = "<" + name;
+
+	if(shaped)
+	{
+		const DTree* attrs = xml_tree_key(target, "attrs");
+		if(attrs && attrs->deref().type == 'M')
+		{
+			for(const auto& entry : attrs->deref()._map)
+			{
+				DTree attr_value = entry.second;
+				result += " " + xml_safe_name(entry.first, "attr") + "=\"" + xml_escape_attr(xml_tree_scalar_text(attr_value)) + "\"";
+			}
+		}
+	}
+
+	String content;
+	if(shaped)
+	{
+		const DTree* text = xml_tree_key(target, "text");
+		if(text)
+		{
+			DTree text_copy = *text;
+			content += xml_escape_text(xml_tree_scalar_text(text_copy));
+		}
+
+		const DTree* children = xml_tree_key(target, "children");
+		if(children && children->deref().type == 'M')
+		{
+			const DTree& child_map = children->deref();
+			if(child_map.is_list())
+			{
+				for(u32 i = 0; i < child_map._map.size(); i += 1)
+				{
+					auto it = child_map._map.find(std::to_string(i));
+					if(it != child_map._map.end())
+						content += xml_encode_element(it->second, "item");
+				}
+			}
+			else
+			{
+				for(const auto& entry : child_map._map)
+					content += xml_encode_element(entry.second, entry.first);
+			}
+		}
+	}
+	else if(target.type == 'M')
+	{
+		if(target.is_list())
+		{
+			for(u32 i = 0; i < target._map.size(); i += 1)
+			{
+				auto it = target._map.find(std::to_string(i));
+				if(it != target._map.end())
+					content += xml_encode_element(it->second, "item");
+			}
+		}
+		else
+		{
+			for(const auto& entry : target._map)
+				content += xml_encode_element(entry.second, entry.first);
+		}
+	}
+	else
+	{
+		content += xml_escape_text(xml_tree_scalar_text(tree));
+	}
+
+	if(content == "")
+		return(result + "/>");
+	return(result + ">" + content + "</" + name + ">");
+}
+
+String xml_utf8_from_codepoint(u64 codepoint)
+{
+	String result;
+	if(codepoint == 0 || codepoint > 0x10ffff || (codepoint >= 0xd800 && codepoint <= 0xdfff))
+		return(result);
+	if(codepoint <= 0x7f)
+	{
+		result.append(1, (char)codepoint);
+	}
+	else if(codepoint <= 0x7ff)
+	{
+		result.append(1, (char)(0xc0 | (codepoint >> 6)));
+		result.append(1, (char)(0x80 | (codepoint & 0x3f)));
+	}
+	else if(codepoint <= 0xffff)
+	{
+		result.append(1, (char)(0xe0 | (codepoint >> 12)));
+		result.append(1, (char)(0x80 | ((codepoint >> 6) & 0x3f)));
+		result.append(1, (char)(0x80 | (codepoint & 0x3f)));
+	}
+	else
+	{
+		result.append(1, (char)(0xf0 | (codepoint >> 18)));
+		result.append(1, (char)(0x80 | ((codepoint >> 12) & 0x3f)));
+		result.append(1, (char)(0x80 | ((codepoint >> 6) & 0x3f)));
+		result.append(1, (char)(0x80 | (codepoint & 0x3f)));
+	}
+	return(result);
+}
+
+String xml_decode_entity(String entity)
+{
+	if(entity == "amp")
+		return("&");
+	if(entity == "lt")
+		return("<");
+	if(entity == "gt")
+		return(">");
+	if(entity == "quot")
+		return("\"");
+	if(entity == "apos")
+		return("'");
+	if(entity.length() > 1 && entity[0] == '#')
+	{
+		u32 base = 10;
+		String digits = entity.substr(1);
+		if(digits.length() > 1 && (digits[0] == 'x' || digits[0] == 'X'))
+		{
+			base = 16;
+			digits = digits.substr(1);
+		}
+		u64 codepoint = int_val(digits, base);
+		String utf8 = xml_utf8_from_codepoint(codepoint);
+		if(utf8 != "")
+			return(utf8);
+	}
+	return("&" + entity + ";");
+}
+
+String xml_decode_text(String s)
+{
+	String result;
+	for(u32 i = 0; i < s.length(); i += 1)
+	{
+		if(s[i] == '&')
+		{
+			auto end = s.find(";", i + 1);
+			if(end != String::npos)
+			{
+				result += xml_decode_entity(s.substr(i + 1, end - i - 1));
+				i = end;
+				continue;
+			}
+		}
+		result.append(1, s[i]);
+	}
+	return(result);
+}
+
+void xml_throw(String message)
+{
+	throw std::runtime_error("xml_decode(): " + message);
+}
+
+struct XmlParser
+{
+	String src;
+	u32 i = 0;
+
+	XmlParser(String source)
+	{
+		src = source;
+	}
+
+	bool starts_with(String token)
+	{
+		return(src.compare(i, token.length(), token) == 0);
+	}
+
+	void skip_space()
+	{
+		while(i < src.length() && isspace((unsigned char)src[i]))
+			i += 1;
+	}
+
+	void skip_until(String token)
+	{
+		auto end = src.find(token, i);
+		if(end == String::npos)
+		{
+			i = src.length();
+			return;
+		}
+		i = end + token.length();
+	}
+
+	void skip_misc()
+	{
+		bool again = true;
+		while(again)
+		{
+			again = false;
+			skip_space();
+			if(starts_with("<?"))
+			{
+				skip_until("?>");
+				again = true;
+			}
+			else if(starts_with("<!--"))
+			{
+				skip_until("-->");
+				again = true;
+			}
+			else if(starts_with("<!DOCTYPE") || starts_with("<!doctype"))
+			{
+				skip_until(">");
+				again = true;
+			}
+		}
+	}
+
+	String read_name()
+	{
+		if(i >= src.length() || !xml_name_start_char(src[i]))
+			xml_throw("expected XML name at byte " + std::to_string((u64)i));
+		u32 start = i;
+		i += 1;
+		while(i < src.length() && xml_name_char(src[i]))
+			i += 1;
+		return(src.substr(start, i - start));
+	}
+
+	String read_quoted_value()
+	{
+		skip_space();
+		if(i >= src.length() || (src[i] != '"' && src[i] != '\''))
+			xml_throw("expected quoted attribute value at byte " + std::to_string((u64)i));
+		char quote = src[i];
+		i += 1;
+		u32 start = i;
+		while(i < src.length() && src[i] != quote)
+			i += 1;
+		if(i >= src.length())
+			xml_throw("unterminated attribute value");
+		String value = src.substr(start, i - start);
+		i += 1;
+		return(xml_decode_text(value));
+	}
+
+	String read_text_until_markup()
+	{
+		u32 start = i;
+		while(i < src.length() && src[i] != '<')
+			i += 1;
+		return(xml_decode_text(src.substr(start, i - start)));
+	}
+
+	DTree parse_element()
+	{
+		if(i >= src.length() || src[i] != '<')
+			xml_throw("expected element at byte " + std::to_string((u64)i));
+		i += 1;
+
+		DTree node;
+		String name = read_name();
+		node["name"] = name;
+
+		while(i < src.length())
+		{
+			skip_space();
+			if(starts_with("/>"))
+			{
+				i += 2;
+				return(node);
+			}
+			if(starts_with(">"))
+			{
+				i += 1;
+				break;
+			}
+
+			String attr_name = read_name();
+			skip_space();
+			if(i >= src.length() || src[i] != '=')
+				xml_throw("expected '=' after attribute " + attr_name);
+			i += 1;
+			node["attrs"][attr_name] = read_quoted_value();
+		}
+
+		String text;
+		while(i < src.length())
+		{
+			if(starts_with("</"))
+			{
+				i += 2;
+				String close_name = read_name();
+				skip_space();
+				if(i >= src.length() || src[i] != '>')
+					xml_throw("expected '>' after closing tag " + close_name);
+				i += 1;
+				if(close_name != name)
+					xml_throw("mismatched closing tag: expected " + name + " but found " + close_name);
+				if(trim(text) != "")
+					node["text"] = text;
+				return(node);
+			}
+
+			if(starts_with("<!--"))
+			{
+				skip_until("-->");
+				continue;
+			}
+
+			if(starts_with("<![CDATA["))
+			{
+				i += 9;
+				auto end = src.find("]]>", i);
+				if(end == String::npos)
+					xml_throw("unterminated CDATA section");
+				text += src.substr(i, end - i);
+				i = end + 3;
+				continue;
+			}
+
+			if(starts_with("<?"))
+			{
+				skip_until("?>");
+				continue;
+			}
+
+			if(src[i] == '<')
+			{
+				DTree child = parse_element();
+				node["children"].push(child);
+				continue;
+			}
+
+			String chunk = read_text_until_markup();
+			if(trim(chunk) != "")
+				text += chunk;
+		}
+
+		xml_throw("missing closing tag for " + name);
+		return(node);
+	}
+
+	DTree parse_document()
+	{
+		skip_misc();
+		if(i >= src.length())
+			xml_throw("empty document");
+		DTree result = parse_element();
+		skip_misc();
+		if(i < src.length())
+			xml_throw("unexpected content after root element at byte " + std::to_string((u64)i));
+		return(result);
+	}
+};
+
+}
+
+String xml_encode(DTree t, String root_name)
+{
+	return(xml_encode_element(t, root_name));
+}
+
+DTree xml_decode(String s)
+{
+	XmlParser parser(s);
+	return(parser.parse_document());
+}
+
+namespace {
+
+String yaml_indent(u32 width)
+{
+	return(String(width, ' '));
+}
+
+String yaml_rtrim(String raw)
+{
+	while(raw.length() > 0)
+	{
+		char c = raw[raw.length() - 1];
+		if(c != ' ' && c != '\t' && c != '\r')
+			break;
+		raw.erase(raw.length() - 1);
+	}
+	return(raw);
+}
+
+u32 yaml_count_indent(String raw)
+{
+	u32 result = 0;
+	while(result < raw.length() && raw[result] == ' ')
+		result += 1;
+	return(result);
+}
+
+bool yaml_is_plain_key(String key)
+{
+	if(key == "")
+		return(false);
+	for(char c : key)
+	{
+		if(!(isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.'))
+			return(false);
+	}
+	return(true);
+}
+
+bool yaml_is_list_item(String content)
+{
+	return(content == "-" || str_starts_with(content, "- "));
+}
+
+bool yaml_is_number_like(String raw)
+{
+	if(raw == "")
+		return(false);
+	char* end = 0;
+	strtod(raw.c_str(), &end);
+	if(end == raw.c_str())
+		return(false);
+	while(end && *end != 0)
+	{
+		if(!isspace((unsigned char)*end))
+			return(false);
+		end += 1;
+	}
+	return(true);
+}
+
+bool yaml_plain_scalar_safe(String raw)
+{
+	if(raw == "")
+		return(false);
+	String lower = to_lower(raw);
+	if(lower == "true" || lower == "false" || lower == "null" || lower == "~" || lower == "yes" || lower == "no" || lower == "on" || lower == "off")
+		return(false);
+	if(yaml_is_number_like(raw))
+		return(false);
+	if(raw[0] == '-' || raw[0] == '?' || raw[0] == ':' || raw[0] == '@' || raw[0] == '`' || raw[0] == '!' || raw[0] == '&' || raw[0] == '*' || raw[0] == '#')
+		return(false);
+	for(u32 i = 0; i < raw.length(); i += 1)
+	{
+		char c = raw[i];
+		if(c == '\n' || c == '\r' || c == '\t')
+			return(false);
+		if(c == '[' || c == ']' || c == '{' || c == '}' || c == ',' || c == '"' || c == '\'')
+			return(false);
+		if(c == '#')
+		{
+			if(i == 0 || isspace((unsigned char)raw[i - 1]))
+				return(false);
+		}
+		if(c == ':')
+		{
+			if(i + 1 >= raw.length() || isspace((unsigned char)raw[i + 1]))
+				return(false);
+		}
+	}
+	return(true);
+}
+
+String yaml_double_quote(String raw)
+{
+	String result = "\"";
+	for(char c : raw)
+	{
+		switch(c)
+		{
+			case('\\'):
+				result += "\\\\";
+				break;
+			case('"'):
+				result += "\\\"";
+				break;
+			case('\n'):
+				result += "\\n";
+				break;
+			case('\r'):
+				result += "\\r";
+				break;
+			case('\t'):
+				result += "\\t";
+				break;
+			default:
+				result.append(1, c);
+				break;
+		}
+	}
+	result += "\"";
+	return(result);
+}
+
+String yaml_quote_key(String key)
+{
+	if(yaml_is_plain_key(key))
+		return(key);
+	return(yaml_double_quote(key));
+}
+
+String yaml_scalar_to_string(DTree t)
+{
+	const DTree& target = t.deref();
+	switch(target.type)
+	{
+		case('B'):
+			return(target._bool ? "true" : "false");
+		case('F'):
+		{
+			String value = std::to_string(target._float);
+			if(value.find(".") != String::npos)
+			{
+				while(value.length() > 0 && value[value.length() - 1] == '0')
+					value.erase(value.length() - 1);
+				if(value.length() > 0 && value[value.length() - 1] == '.')
+					value.erase(value.length() - 1);
+			}
+			if(value == "-0")
+				value = "0";
+			return(value);
+		}
+		case('P'):
+			return(std::to_string((u64)target._ptr));
+		default:
+			return(t.to_string());
+	}
+}
+
+String yaml_encode_scalar(DTree t, u32 indent)
+{
+	String raw = yaml_scalar_to_string(t);
+	const DTree& target = t.deref();
+	if(target.type == 'B' || target.type == 'F')
+		return(raw);
+	if(raw.find("\n") != String::npos)
+	{
+		String result = "|\n";
+		u32 start = 0;
+		while(start <= raw.length())
+		{
+			auto end = raw.find("\n", start);
+			String line = (end == String::npos) ? raw.substr(start) : raw.substr(start, end - start);
+			result += yaml_indent(indent + 2) + line + "\n";
+			if(end == String::npos)
+				break;
+			start = end + 1;
+		}
+		return(result.substr(0, result.length() - 1));
+	}
+	if(yaml_plain_scalar_safe(raw))
+		return(raw);
+	return(yaml_double_quote(raw));
+}
+
+String yaml_encode_node(DTree t, u32 indent)
+{
+	const DTree& target = t.deref();
+	String result;
+	if(target.type == 'M')
+	{
+		if(target.is_list())
+		{
+			for(u32 i = 0; i < target._map.size(); i += 1)
+			{
+				auto it = target._map.find(std::to_string(i));
+				if(it == target._map.end())
+					continue;
+				const DTree& child = it->second.deref();
+				if(child.type == 'M')
+				{
+					result += yaml_indent(indent) + "-\n";
+					result += yaml_encode_node(it->second, indent + 2);
+				}
+				else
+				{
+					result += yaml_indent(indent) + "- " + yaml_encode_scalar(it->second, indent) + "\n";
+				}
+			}
+			return(result);
+		}
+
+		for(const auto& entry : target._map)
+		{
+			const DTree& child = entry.second.deref();
+			result += yaml_indent(indent) + yaml_quote_key(entry.first) + ":";
+			if(child.type == 'M')
+			{
+				result += "\n" + yaml_encode_node(entry.second, indent + 2);
+			}
+			else
+			{
+				result += " " + yaml_encode_scalar(entry.second, indent) + "\n";
+			}
+		}
+		return(result);
+	}
+	return(yaml_indent(indent) + yaml_encode_scalar(t, indent) + "\n");
+}
+
+String yaml_strip_comment(String raw)
+{
+	bool in_single = false;
+	bool in_double = false;
+	bool escaped = false;
+	for(u32 i = 0; i < raw.length(); i += 1)
+	{
+		char c = raw[i];
+		if(in_double && escaped)
+		{
+			escaped = false;
+			continue;
+		}
+		if(in_double && c == '\\')
+		{
+			escaped = true;
+			continue;
+		}
+		if(!in_double && c == '\'')
+			in_single = !in_single;
+		else if(!in_single && c == '"')
+			in_double = !in_double;
+		else if(!in_single && !in_double && c == '#' && (i == 0 || isspace((unsigned char)raw[i - 1])))
+			return(yaml_rtrim(raw.substr(0, i)));
+	}
+	return(yaml_rtrim(raw));
+}
+
+String yaml_ltrim(String raw)
+{
+	u32 i = 0;
+	while(i < raw.length() && (raw[i] == ' ' || raw[i] == '\t'))
+		i += 1;
+	return(raw.substr(i));
+}
+
+struct YamlLine
+{
+	String raw;
+	String content;
+	u32 indent = 0;
+	bool empty = false;
+};
+
+String yaml_decode_quoted(String raw)
+{
+	if(raw.length() < 2)
+		return(raw);
+	char quote = raw[0];
+	String body = raw.substr(1, raw.length() - 2);
+	if(quote == '\'')
+		return(replace(body, "''", "'"));
+
+	String result;
+	for(u32 i = 0; i < body.length(); i += 1)
+	{
+		char c = body[i];
+		if(c == '\\' && i + 1 < body.length())
+		{
+			i += 1;
+			switch(body[i])
+			{
+				case('n'):
+					result.append(1, '\n');
+					break;
+				case('r'):
+					result.append(1, '\r');
+					break;
+				case('t'):
+					result.append(1, '\t');
+					break;
+				case('"'):
+					result.append(1, '"');
+					break;
+				case('\\'):
+					result.append(1, '\\');
+					break;
+				default:
+					result.append(1, body[i]);
+					break;
+			}
+		}
+		else
+		{
+			result.append(1, c);
+		}
+	}
+	return(result);
+}
+
+void yaml_throw(String message)
+{
+	throw std::runtime_error("yaml_decode(): " + message);
+}
+
+struct YamlParser
+{
+	std::vector<YamlLine> lines;
+	u32 i = 0;
+
+	YamlParser(String source)
+	{
+		u32 start = 0;
+		while(start <= source.length())
+		{
+			auto end = source.find("\n", start);
+			String raw = (end == String::npos) ? source.substr(start) : source.substr(start, end - start);
+			if(end == String::npos && raw == "" && start == source.length())
+				break;
+			if(raw.length() > 0 && raw[raw.length() - 1] == '\r')
+				raw.erase(raw.length() - 1);
+			YamlLine line;
+			line.raw = raw;
+			line.indent = yaml_count_indent(raw);
+			line.content = yaml_ltrim(yaml_strip_comment(raw));
+			line.empty = (trim(line.content) == "");
+			lines.push_back(line);
+			if(end == String::npos)
+				break;
+			start = end + 1;
+		}
+	}
+
+	void skip_empty()
+	{
+		while(i < lines.size() && lines[i].empty)
+			i += 1;
+	}
+
+	bool split_key_value(String content, String& key, String& value)
+	{
+		bool in_single = false;
+		bool in_double = false;
+		bool escaped = false;
+		for(u32 pos = 0; pos < content.length(); pos += 1)
+		{
+			char c = content[pos];
+			if(in_double && escaped)
+			{
+				escaped = false;
+				continue;
+			}
+			if(in_double && c == '\\')
+			{
+				escaped = true;
+				continue;
+			}
+			if(!in_double && c == '\'')
+				in_single = !in_single;
+			else if(!in_single && c == '"')
+				in_double = !in_double;
+			else if(!in_single && !in_double && c == ':' && (pos + 1 >= content.length() || isspace((unsigned char)content[pos + 1])))
+			{
+				key = trim(content.substr(0, pos));
+				value = trim(content.substr(pos + 1));
+				if(key == "")
+					yaml_throw("empty mapping key at line " + std::to_string((u64)i + 1));
+				if((key[0] == '"' && key[key.length() - 1] == '"') || (key[0] == '\'' && key[key.length() - 1] == '\''))
+					key = yaml_decode_quoted(key);
+				return(true);
+			}
+		}
+		return(false);
+	}
+
+	DTree parse_scalar(String value)
+	{
+		DTree result;
+		value = trim(value);
+		if(value == "")
+		{
+			result = "";
+			return(result);
+		}
+		if((value[0] == '"' && value[value.length() - 1] == '"') || (value[0] == '\'' && value[value.length() - 1] == '\''))
+		{
+			result = yaml_decode_quoted(value);
+			return(result);
+		}
+		String lower = to_lower(value);
+		if(lower == "true")
+		{
+			result.set_bool(true);
+			return(result);
+		}
+		if(lower == "false")
+		{
+			result.set_bool(false);
+			return(result);
+		}
+		if(lower == "null" || lower == "~")
+		{
+			result = "";
+			return(result);
+		}
+		result = value;
+		return(result);
+	}
+
+	String parse_block_scalar(u32 parent_indent, String style)
+	{
+		String literal;
+		bool found = false;
+		u32 content_indent = parent_indent + 2;
+		while(i < lines.size())
+		{
+			String raw = lines[i].raw;
+			if(trim(raw) == "")
+			{
+				if(found)
+					literal += "\n";
+				i += 1;
+				continue;
+			}
+			u32 indent = yaml_count_indent(raw);
+			if(indent <= parent_indent)
+				break;
+			if(!found)
+			{
+				content_indent = indent;
+				found = true;
+			}
+			if(indent < content_indent)
+				break;
+			String text = raw.substr(std::min((u32)raw.length(), content_indent));
+			literal += text + "\n";
+			i += 1;
+		}
+		if(literal.length() > 0)
+			literal.erase(literal.length() - 1);
+		if(style == ">")
+		{
+			String folded;
+			bool last_newline = false;
+			for(char c : literal)
+			{
+				if(c == '\n')
+				{
+					if(last_newline)
+						folded += "\n";
+					else
+						folded += " ";
+					last_newline = true;
+				}
+				else
+				{
+					folded.append(1, c);
+					last_newline = false;
+				}
+			}
+			return(folded);
+		}
+		return(literal);
+	}
+
+	DTree parse_value_after_line(String value, u32 parent_indent)
+	{
+		if(value == "|" || value == ">")
+		{
+			DTree result;
+			result = parse_block_scalar(parent_indent, value);
+			return(result);
+		}
+		if(value == "")
+		{
+			skip_empty();
+			if(i < lines.size() && lines[i].indent > parent_indent)
+				return(parse_block(lines[i].indent));
+			DTree result;
+			result = "";
+			return(result);
+		}
+		return(parse_scalar(value));
+	}
+
+	void merge_map(DTree& target, DTree source)
+	{
+		if(source.deref().type != 'M' || source.deref().is_list())
+			return;
+		for(const auto& entry : source.deref()._map)
+			target[entry.first] = entry.second;
+	}
+
+	DTree parse_list(u32 indent)
+	{
+		DTree result;
+		result.set_array();
+		while(i < lines.size())
+		{
+			skip_empty();
+			if(i >= lines.size() || lines[i].indent < indent)
+				break;
+			if(lines[i].indent != indent || !yaml_is_list_item(lines[i].content))
+				break;
+
+			String after = trim(lines[i].content.substr(1));
+			u32 line_indent = lines[i].indent;
+			i += 1;
+
+			DTree item;
+			if(after == "")
+			{
+				skip_empty();
+				if(i < lines.size() && lines[i].indent > line_indent)
+					item = parse_block(lines[i].indent);
+				else
+					item = "";
+			}
+			else
+			{
+				String key;
+				String value;
+				if(split_key_value(after, key, value))
+				{
+					item[key] = parse_value_after_line(value, line_indent);
+					skip_empty();
+					if(i < lines.size() && lines[i].indent > line_indent)
+						merge_map(item, parse_block(lines[i].indent));
+				}
+				else
+				{
+					item = parse_scalar(after);
+				}
+			}
+			result.push(item);
+		}
+		return(result);
+	}
+
+	DTree parse_map(u32 indent)
+	{
+		DTree result;
+		result.set_type('M');
+		while(i < lines.size())
+		{
+			skip_empty();
+			if(i >= lines.size() || lines[i].indent < indent)
+				break;
+			if(lines[i].indent != indent || yaml_is_list_item(lines[i].content))
+				break;
+
+			String key;
+			String value;
+			if(!split_key_value(lines[i].content, key, value))
+			{
+				if(result.deref()._map.size() == 0)
+				{
+					DTree scalar = parse_scalar(lines[i].content);
+					i += 1;
+					return(scalar);
+				}
+				yaml_throw("expected mapping entry at line " + std::to_string((u64)i + 1));
+			}
+			u32 line_indent = lines[i].indent;
+			i += 1;
+			result[key] = parse_value_after_line(value, line_indent);
+		}
+		return(result);
+	}
+
+	DTree parse_block(u32 indent)
+	{
+		skip_empty();
+		if(i >= lines.size())
+		{
+			DTree empty;
+			empty.set_type('M');
+			return(empty);
+		}
+		if(lines[i].indent < indent)
+		{
+			DTree empty;
+			empty.set_type('M');
+			return(empty);
+		}
+		if(yaml_is_list_item(lines[i].content))
+			return(parse_list(lines[i].indent));
+		return(parse_map(lines[i].indent));
+	}
+
+	DTree parse_document()
+	{
+		skip_empty();
+		if(i < lines.size() && lines[i].content == "---")
+			i += 1;
+		DTree result = parse_block(i < lines.size() ? lines[i].indent : 0);
+		skip_empty();
+		if(i < lines.size() && lines[i].content == "...")
+			i += 1;
+		skip_empty();
+		if(i < lines.size())
+			yaml_throw("unexpected content at line " + std::to_string((u64)i + 1));
+		return(result);
+	}
+};
+
+}
+
+String yaml_encode(DTree t)
+{
+	return(yaml_encode_node(t, 0));
+}
+
+DTree yaml_decode(String s)
+{
+	YamlParser parser(s);
+	return(parser.parse_document());
+}
+
 // https://i.stack.imgur.com/SHLOB.gif
 String json_decode_String(String s, u32& i, char termination_char)
 {
