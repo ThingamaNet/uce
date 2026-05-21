@@ -74,6 +74,9 @@ pid_t my_pid = 0;
 void on_segfault(int sig);
 int task_kill(pid_t pid, int sig = 0);
 
+String runtime_safe_key(String key, String label = "runtime key");
 pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout = 60*10);
 pid_t task_repeat(String key, f64 interval, std::function<void()> exec_after_spawn, u64 timeout = 60*10);
 pid_t task_pid(String key);
+pid_t server_start_http(String key, String socket_fn_or_port, String call_uce_filename, String call_function = "");
+bool server_stop(String key);

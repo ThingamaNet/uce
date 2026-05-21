@@ -25,7 +25,7 @@ RENDER(Request& context)
 			failed++;
 	};
 
-	u64 sockfd = socket_connect("localhost", 80);
+	u64 sockfd = socket_connect("127.0.0.1", 80);
 	if(sockfd != 0)
 	{
 		bool write_ok = socket_write(sockfd, "GET /tests/index.uce HTTP/1.0\r\nHost: uce.openfu.com\r\n\r\n");
@@ -39,7 +39,28 @@ RENDER(Request& context)
 	}
 	else
 	{
-		mark("socket_connect() / socket_write() / socket_read()", "fail", "socket_connect(localhost, 80) returned 0");
+		mark("socket_connect() / socket_write() / socket_read()", "fail", "socket_connect(127.0.0.1, 80) returned 0");
+	}
+
+	pid_t custom_http_pid = server_start_http("site-tests-http", "19091", "servers/http.uce", "named");
+	usleep(200000);
+	u64 custom_http_sockfd = socket_connect("127.0.0.1", 19091);
+	if(custom_http_sockfd != 0)
+	{
+		bool write_ok = socket_write(custom_http_sockfd, "GET /custom-test?alpha=1 HTTP/1.0\r\nHost: localhost\r\n\r\n");
+		String response = socket_read(custom_http_sockfd, 4096, 2);
+		socket_close(custom_http_sockfd);
+		server_stop("site-tests-http");
+		mark(
+			"server_start_http() / SERVE_HTTP:named",
+			(custom_http_pid != 0 && write_ok && response.find("custom-http-named") != String::npos && response.find("query=alpha=1") != String::npos) ? "pass" : "fail",
+			response.substr(0, response.length() > 260 ? 260 : response.length())
+		);
+	}
+	else
+	{
+		server_stop("site-tests-http");
+		mark("server_start_http() / SERVE_HTTP:named", "fail", "socket_connect(127.0.0.1, 19091) returned 0; pid=" + std::to_string(custom_http_pid));
 	}
 
 	u64 memfd = memcache_connect();
@@ -60,7 +81,7 @@ RENDER(Request& context)
 	}
 
 	MySQL mysql;
-	mysql.connect("localhost", "root", "");
+	mysql.connect("127.0.0.1", "root", "");
 	String mysql_error_text = trim(mysql.error());
 	if(mysql_error_text != "")
 	{

@@ -58,6 +58,7 @@ struct TransportLimits {
 	u64 max_websocket_frame_bytes = 1024 * 1024;
 	u64 max_websocket_message_bytes = 1024 * 1024;
 	u64 max_websocket_output_bytes = 4 * 1024 * 1024;
+	u64 max_response_bytes = 8 * 1024 * 1024;
 	f64 http_request_timeout_seconds = 15.0;
 	f64 connection_idle_timeout_seconds = 120.0;
 
@@ -72,9 +73,38 @@ struct TransportLimits {
 	}
 };
 
-const TransportLimits& transport_limits()
+u64 transport_config_u64(String key, u64 fallback)
 {
-	static const TransportLimits limits;
+	if(!context || !context->server)
+		return(fallback);
+	String raw = trim(context->server->config[key]);
+	if(raw == "")
+		return(fallback);
+	return(int_val(raw));
+}
+
+f64 transport_config_f64(String key, f64 fallback)
+{
+	if(!context || !context->server)
+		return(fallback);
+	String raw = trim(context->server->config[key]);
+	if(raw == "")
+		return(fallback);
+	return(float_val(raw));
+}
+
+TransportLimits transport_limits()
+{
+	TransportLimits limits;
+	limits.max_client_connections = transport_config_u64("TRANSPORT_MAX_CLIENT_CONNECTIONS", limits.max_client_connections);
+	limits.max_http_header_bytes = transport_config_u64("TRANSPORT_MAX_HTTP_HEADER_BYTES", limits.max_http_header_bytes);
+	limits.max_http_body_bytes = transport_config_u64("TRANSPORT_MAX_HTTP_BODY_BYTES", limits.max_http_body_bytes);
+	limits.max_websocket_frame_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_FRAME_BYTES", limits.max_websocket_frame_bytes);
+	limits.max_websocket_message_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_MESSAGE_BYTES", limits.max_websocket_message_bytes);
+	limits.max_websocket_output_bytes = transport_config_u64("TRANSPORT_MAX_WEBSOCKET_OUTPUT_BYTES", limits.max_websocket_output_bytes);
+	limits.max_response_bytes = transport_config_u64("TRANSPORT_MAX_RESPONSE_BYTES", limits.max_response_bytes);
+	limits.http_request_timeout_seconds = transport_config_f64("TRANSPORT_HTTP_REQUEST_TIMEOUT_SECONDS", limits.http_request_timeout_seconds);
+	limits.connection_idle_timeout_seconds = transport_config_f64("TRANSPORT_CONNECTION_IDLE_TIMEOUT_SECONDS", limits.connection_idle_timeout_seconds);
 	return(limits);
 }
 
@@ -186,6 +216,14 @@ FastCGIServer::listen_http(unsigned tcp_port)
 }
 
 int
+FastCGIServer::listen_http(unsigned tcp_port, const std::string& bind_address)
+{
+	int server_socket = listen(tcp_port, bind_address);
+	server_socket_types[server_socket] = 'H';
+	return server_socket;
+}
+
+int
 FastCGIServer::listen_cli(const std::string& local_path)
 {
 	int server_socket = listen(local_path);
@@ -196,6 +234,12 @@ FastCGIServer::listen_cli(const std::string& local_path)
 
 int
 FastCGIServer::listen(unsigned tcp_port)
+{
+	return(listen(tcp_port, "0.0.0.0"));
+}
+
+int
+FastCGIServer::listen(unsigned tcp_port, const std::string& bind_address)
 {
 	int server_socket = socket(PF_INET, SOCK_STREAM, 0);
 	if (server_socket == -1)
@@ -211,7 +255,10 @@ FastCGIServer::listen(unsigned tcp_port)
 		bzero(&sa, sizeof(sa));
 		sa.sin_family = AF_INET;
 		sa.sin_port = htons(tcp_port);
-		sa.sin_addr.s_addr = htonl(INADDR_ANY);
+		if(bind_address == "" || bind_address == "0.0.0.0" || bind_address == "*")
+			sa.sin_addr.s_addr = htonl(INADDR_ANY);
+		else if(inet_pton(AF_INET, bind_address.c_str(), &sa.sin_addr) != 1)
+			throw std::runtime_error("invalid bind address");
 		if (bind(server_socket, (struct sockaddr*)&sa, sizeof(sa)) == -1)
 			throw std::runtime_error("bind() failed");
 
@@ -226,7 +273,7 @@ FastCGIServer::listen(unsigned tcp_port)
 	}
 
 	server_socket_types[server_socket] = 'F';
-	printf("(P) listening to #%i port %i\n", server_socket, tcp_port);
+	printf("(P) listening to #%i %s:%i\n", server_socket, bind_address.c_str(), tcp_port);
 	return server_socket;
 }
 
@@ -358,7 +405,7 @@ FastCGIServer::enforce_connection_timeouts(Connection& connection)
 	if(connection.close_socket)
 		return;
 
-	const TransportLimits& limits = transport_limits();
+	TransportLimits limits = transport_limits();
 	f64 now = time_precise();
 	if(is_http_like_type(connection.type) && !connection.is_websocket && !connection.requests.empty())
 	{
@@ -603,7 +650,7 @@ bool
 FastCGIServer::parse_http_message(FastCGIRequest& request, String& data)
 {
 	Connection* connection = client_sockets[request.resources.client_socket];
-	const TransportLimits& limits = transport_limits();
+	TransportLimits limits = transport_limits();
 	auto header_end = data.find("\r\n\r\n");
 	if(header_end == String::npos)
 	{
@@ -772,7 +819,7 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 void
 FastCGIServer::process_websocket_input(Connection& connection)
 {
-	const TransportLimits& limits = transport_limits();
+	TransportLimits limits = transport_limits();
 	if(connection.input_buffer.length() > limits.max_websocket_buffer_bytes())
 	{
 		fail_websocket_connection(connection, 1009, "websocket input buffer is too large");
@@ -1121,8 +1168,15 @@ FastCGIServer::read_fgci(Connection& connection)
 			FastCGIRequest& request = *it->second;
 			//switch_to_arena(it->second->mem);
 			if (!request.flags.params_closed)
-				if (content_length != 0)
+				if (content_length != 0) {
+					if(request.resources.params_buffer.size() + content_length > transport_limits().max_http_header_bytes)
+					{
+						request.flags.status = 1;
+						connection.close_socket = true;
+						break;
+					}
 					request.resources.params_buffer.append(content, content_length);
+				}
 				else {
 					request.params = parse_pairs_fcgi(
 						request.resources.params_buffer.data(),
@@ -1152,6 +1206,12 @@ FastCGIServer::read_fgci(Connection& connection)
 			//switch_to_arena(it->second->mem);
 			if (!request.flags.input_closed)
 				if (content_length != 0) {
+					if(request.in.size() + content_length > transport_limits().max_http_body_bytes)
+					{
+						request.flags.status = 1;
+						connection.close_socket = true;
+						break;
+					}
 					request.in.append(content, content_length);
 					if (request.flags.params_closed && request.flags.status == 0)
 					{
@@ -1202,6 +1262,13 @@ FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* conne
 	{
 		request.out += obs->str();
 		delete obs;
+	}
+	if(request.out.length() > transport_limits().max_response_bytes)
+	{
+		request.set_status(500, "Response Too Large");
+		request.header.clear();
+		request.header["Content-Type"] = "text/plain; charset=utf-8";
+		request.out = request.response_code + "\r\n" + var_dump(request.header, "", "\r\n") + "\r\nresponse exceeded configured output limit\n";
 	}
 	request.ob_stack.clear();
 	request.flags.output_closed = true;

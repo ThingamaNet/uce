@@ -121,6 +121,7 @@ void install_request_fault_handlers()
 	signal(SIGBUS, on_request_fault_signal);
 	signal(SIGILL, on_request_fault_signal);
 	signal(SIGFPE, on_request_fault_signal);
+	signal(SIGALRM, on_request_fault_signal);
 }
 
 void restore_request_fault_handlers()
@@ -130,6 +131,7 @@ void restore_request_fault_handlers()
 	signal(SIGBUS, on_segfault);
 	signal(SIGILL, on_segfault);
 	signal(SIGFPE, on_segfault);
+	signal(SIGALRM, on_segfault);
 }
 
 namespace {
@@ -1005,6 +1007,8 @@ int handle_complete(FastCGIRequest& request) {
 			request.props = DTree();
 			if(request.resources.is_cli)
 				compiler_invoke_cli(&request, request.params["SCRIPT_FILENAME"]);
+			else if(request.params["UCE_SERVE_HTTP"] == "1")
+				compiler_invoke_serve_http(&request, request.params["SCRIPT_FILENAME"], request.params["UCE_SERVE_HTTP_FUNCTION"]);
 			else
 				compiler_invoke(&request, request.params["SCRIPT_FILENAME"]);
 		}
@@ -1104,6 +1108,270 @@ void close_inherited_server_sockets()
 		close(socket_handle);
 	server.server_sockets.clear();
 	server.server_socket_types.clear();
+}
+
+void install_process_fault_handlers()
+{
+	signal(SIGSEGV, on_segfault);
+	signal(SIGABRT, on_segfault);
+	signal(SIGBUS, on_segfault);
+	signal(SIGILL, on_segfault);
+	signal(SIGFPE, on_segfault);
+	signal(SIGPIPE, SIG_IGN);
+}
+
+String custom_server_safe_key(String key)
+{
+	return(runtime_safe_key(key, "server key"));
+}
+
+String custom_server_config_file(String key)
+{
+	return(path_join(server_state.config["BIN_DIRECTORY"], "server-" + custom_server_safe_key(key) + ".cfg"));
+}
+
+String custom_server_task_key(String key)
+{
+	return("server:" + custom_server_safe_key(key));
+}
+
+String custom_server_config_encode(String key, String type, String bind, String file_name, String function_name)
+{
+	DTree config;
+	config["key"] = key;
+	config["type"] = type;
+	config["bind"] = bind;
+	config["file"] = file_name;
+	config["function"] = function_name;
+	return(json_encode(config));
+}
+
+StringMap custom_server_config_decode(String content)
+{
+	StringMap result;
+	content = trim(content);
+	if(content == "")
+		return(result);
+
+	if(content[0] == '{')
+		return(json_decode(content).to_stringmap());
+
+	// Compatibility for early newline/key=value config files from development.
+	for(auto line : split(content, "\n"))
+	{
+		line = trim(line);
+		if(line == "")
+			continue;
+		String key = trim(nibble(line, "="));
+		if(key != "")
+			result[key] = json_decode(line).to_string();
+	}
+	return(result);
+}
+
+u64 custom_server_config_u64(String key, u64 fallback)
+{
+	String raw = trim(server_state.config[key]);
+	if(raw == "")
+		return(fallback);
+	return(int_val(raw));
+}
+
+bool custom_server_config_truthy(String key, bool fallback)
+{
+	String raw = to_lower(trim(server_state.config[key]));
+	if(raw == "")
+		return(fallback);
+	return(raw == "1" || raw == "true" || raw == "yes" || raw == "on");
+}
+
+bool custom_server_is_numeric_port(String value)
+{
+	value = trim(value);
+	if(value == "")
+		return(false);
+	for(char c : value)
+	{
+		if(c < '0' || c > '9')
+			return(false);
+	}
+	return(true);
+}
+
+u64 custom_server_registry_count()
+{
+	u64 count = 0;
+	for(auto file_name : ls(server_state.config["BIN_DIRECTORY"]))
+	{
+		if(str_starts_with(file_name, "server-") && str_ends_with(file_name, ".cfg"))
+			count++;
+	}
+	return(count);
+}
+
+bool custom_server_wait_for_stop(String task_key, f64 timeout_seconds = 2.0)
+{
+	f64 deadline = time_precise() + timeout_seconds;
+	while(time_precise() < deadline)
+	{
+		if(task_pid(task_key) == 0)
+			return(true);
+		usleep(50000);
+	}
+	return(task_pid(task_key) == 0);
+}
+
+int custom_server_bind_http(FastCGIServer& dispatcher, String bind)
+{
+	bind = trim(bind);
+	if(custom_server_is_numeric_port(bind))
+	{
+		u64 port = int_val(bind);
+		u64 min_port = custom_server_config_u64("CUSTOM_SERVER_MIN_PORT", 1024);
+		u64 max_port = custom_server_config_u64("CUSTOM_SERVER_MAX_PORT", 65535);
+		if(port < min_port || port > max_port)
+			throw std::runtime_error("server_start_http(): TCP port is outside configured custom server range");
+		String bind_address = custom_server_config_truthy("CUSTOM_SERVER_ALLOW_PUBLIC_BIND", false) ? "0.0.0.0" : "127.0.0.1";
+		return(dispatcher.listen_http((unsigned)port, bind_address));
+	}
+	String socket_prefix = first(server_state.config["CUSTOM_SERVER_UNIX_SOCKET_PREFIX"], "/tmp/uce/custom-servers/");
+	if(!str_starts_with(bind, socket_prefix))
+		throw std::runtime_error("server_start_http(): Unix socket path is outside configured custom server prefix");
+	int socket_handle = dispatcher.listen(bind);
+	dispatcher.server_socket_types[socket_handle] = 'H';
+	return(socket_handle);
+}
+
+StringMap custom_server_read_config(String key)
+{
+	String config_file = custom_server_config_file(key);
+	if(!file_exists(config_file))
+		return(StringMap());
+	return(custom_server_config_decode(file_get_contents(config_file)));
+}
+
+static String custom_server_dispatcher_key = "";
+
+int custom_server_http_complete(FastCGIRequest& request)
+{
+	String key = first(request.params["UCE_SERVER_KEY"], custom_server_dispatcher_key);
+	StringMap cfg = custom_server_read_config(key);
+	if(cfg["type"] != "http" || cfg["file"] == "")
+	{
+		request.set_status(503, "Service Unavailable");
+		request.header["Content-Type"] = "text/plain; charset=utf-8";
+		request.ob_start();
+		(*request.ob) << "custom HTTP server is not configured\n";
+		return(request.flags.status);
+	}
+
+	request.params["UCE_SERVE_HTTP"] = "1";
+	request.params["UCE_SERVE_HTTP_KEY"] = key;
+	request.params["UCE_SERVE_HTTP_BIND"] = cfg["bind"];
+	request.params["UCE_SERVE_HTTP_FUNCTION"] = cfg["function"];
+	request.params["SCRIPT_FILENAME"] = cfg["file"];
+	u64 timeout = custom_server_config_u64("CUSTOM_SERVER_HANDLER_TIMEOUT_SECONDS", 30);
+	if(timeout > 0)
+		alarm(timeout);
+	int status = handle_complete(request);
+	if(timeout > 0)
+		alarm(0);
+	return(status);
+}
+
+void custom_server_http_dispatcher_loop(String key)
+{
+	my_pid = getpid();
+	custom_server_dispatcher_key = key;
+	close_inherited_server_sockets();
+	install_process_fault_handlers();
+
+	StringMap cfg = custom_server_read_config(key);
+	if(cfg["type"] != "http" || cfg["bind"] == "")
+	{
+		fprintf(stderr, "server_start_http(): missing config for key '%s'\n", key.c_str());
+		exit(1);
+	}
+
+	try
+	{
+		FastCGIServer dispatcher;
+		custom_server_bind_http(dispatcher, cfg["bind"]);
+		dispatcher.calls_until_termination = -1;
+		dispatcher.on_complete = &custom_server_http_complete;
+		for(;;)
+			dispatcher.process(-1);
+	}
+	catch(const std::exception& e)
+	{
+		fprintf(stderr, "server_start_http(): dispatcher for key '%s' stopped: %s\n", key.c_str(), e.what());
+		exit(1);
+	}
+	catch(...)
+	{
+		fprintf(stderr, "server_start_http(): dispatcher for key '%s' stopped with unknown error\n", key.c_str());
+		exit(1);
+	}
+}
+
+pid_t server_start_http(String key, String socket_fn_or_port, String call_uce_filename, String call_function)
+{
+	key = trim(key);
+	socket_fn_or_port = trim(socket_fn_or_port);
+	call_uce_filename = trim(call_uce_filename);
+	call_function = trim(call_function);
+	if(key == "")
+		throw std::runtime_error("server_start_http(): key cannot be empty");
+	if(socket_fn_or_port == "")
+		throw std::runtime_error("server_start_http(): socket_fn_or_port cannot be empty");
+	if(call_uce_filename == "")
+		throw std::runtime_error("server_start_http(): call_uce_filename cannot be empty");
+	if(call_uce_filename[0] != '/')
+		call_uce_filename = expand_path(call_uce_filename, cwd_get());
+	String allowed_root = first(server_state.config["CUSTOM_SERVER_UCE_ROOT"], path_join(server_state.config["COMPILER_SYS_PATH"], server_state.config["SITE_DIRECTORY"]));
+	if(allowed_root[allowed_root.length() - 1] != '/')
+		allowed_root += "/";
+	if(!str_starts_with(call_uce_filename, allowed_root))
+		throw std::runtime_error("server_start_http(): call_uce_filename is outside configured custom server UCE root");
+
+	String config_file = custom_server_config_file(key);
+	StringMap previous_config;
+	if(file_exists(config_file))
+		previous_config = custom_server_config_decode(file_get_contents(config_file));
+	String new_config = custom_server_config_encode(key, "http", socket_fn_or_port, call_uce_filename, call_function);
+	String task_key = custom_server_task_key(key);
+	u64 max_servers = custom_server_config_u64("CUSTOM_SERVER_MAX_SERVERS", 16);
+	if(!file_exists(config_file) && max_servers > 0 && custom_server_registry_count() >= max_servers)
+		throw std::runtime_error("server_start_http(): custom server quota exceeded");
+	pid_t existing_pid = task_pid(task_key);
+	if(existing_pid != 0 && previous_config["bind"] != "" && previous_config["bind"] != socket_fn_or_port)
+	{
+		task_kill(existing_pid, SIGTERM);
+		custom_server_wait_for_stop(task_key);
+		existing_pid = 0;
+	}
+	if(!file_put_contents(config_file, new_config))
+		throw std::runtime_error("server_start_http(): could not write server config");
+	if(existing_pid != 0)
+		return(existing_pid);
+	return(task(task_key, [key]() {
+		custom_server_http_dispatcher_loop(key);
+	}, 0));
+}
+
+bool server_stop(String key)
+{
+	key = trim(key);
+	if(key == "")
+		return(false);
+	String task_key = custom_server_task_key(key);
+	pid_t pid = task_pid(task_key);
+	file_unlink(custom_server_config_file(key));
+	if(pid == 0)
+		return(true);
+	if(task_kill(pid, SIGTERM) != 0)
+		return(false);
+	return(custom_server_wait_for_stop(task_key));
 }
 
 bool proactive_compile_queue_has(StringList& queue, String file_name)
@@ -1251,12 +1519,7 @@ void ensure_proactive_compiler()
 
 void listen_for_connections()
 {
-	signal(SIGSEGV, on_segfault);
-	signal(SIGABRT, on_segfault);
-	signal(SIGBUS, on_segfault);
-	signal(SIGILL, on_segfault);
-	signal(SIGFPE, on_segfault);
-	signal(SIGPIPE, SIG_IGN);
+	install_process_fault_handlers();
 	if(worker_accepts_http)
 	{
 		// Keep the dedicated HTTP/WebSocket worker alive. If it ages out like a

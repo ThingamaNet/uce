@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include "sys.h"
+#include "hash.h"
 
 namespace {
 
@@ -613,17 +614,17 @@ pid_t spawn_subprocess(std::function<void()> exec_after_spawn)
 	}
 }
 
-String task_safe_key(String key)
+String runtime_safe_key(String key, String label)
 {
 	key = trim(key);
 	if(key == "")
-		throw std::runtime_error("task key cannot be empty");
+		throw std::runtime_error(label + " cannot be empty");
 	return(gen_sha1(key));
 }
 
 String task_file_prefix(String key)
 {
-	return(path_join(context->server->config["BIN_DIRECTORY"], "task-" + task_safe_key(key)));
+	return(path_join(context->server->config["BIN_DIRECTORY"], "task-" + runtime_safe_key(key, "task key")));
 }
 
 struct TaskStatus {
@@ -683,6 +684,15 @@ bool task_status_is_alive(TaskStatus status)
 	return(task_process_start_ticks(status.pid) == status.process_start_ticks);
 }
 
+void task_close_inherited_fds()
+{
+	long max_fd = sysconf(_SC_OPEN_MAX);
+	if(max_fd < 0 || max_fd > 65536)
+		max_fd = 4096;
+	for(int fd = 3; fd < max_fd; fd++)
+		close(fd);
+}
+
 int task_kill(pid_t pid, int sig)
 {
 	if(pid <= 0)
@@ -703,7 +713,7 @@ pid_t task_pid(String key)
 		fprintf(stderr, "task_pid(): could not lock task key '%s'\n", key.c_str());
 		return(0);
 	}
-	String status_file = file_get_contents(status_file_name);
+	String status_file = file_exists(status_file_name) ? file_get_contents(status_file_name) : "";
 	if(status_file != "")
 	{
 		TaskStatus status = task_status_parse(status_file);
@@ -728,7 +738,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		fprintf(stderr, "task(): could not lock task key '%s'\n", key.c_str());
 		return(0);
 	}
-	String status_file = file_get_contents(status_file_name);
+	String status_file = file_exists(status_file_name) ? file_get_contents(status_file_name) : "";
 	pid_t p = 0;
 	if(status_file != "")
 	{
@@ -753,7 +763,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 		file_release_process_locks("task child startup");
 		file_close_locked(lock_fd);
 		my_pid = getpid();
-		prctl(PR_SET_PDEATHSIG, SIGHUP);
+		signal(SIGALRM, SIG_DFL);
 		if(timeout > 0)
 			alarm(timeout);
 
@@ -762,6 +772,7 @@ pid_t task(String key, std::function<void()> exec_after_spawn, u64 timeout)
 			close(context->resources.client_socket);
 			context->resources.client_socket = 0;
 		}
+		task_close_inherited_fds();
 		exec_after_spawn();
 		int exit_lock_fd = file_open_locked(lock_file_name, O_RDWR | O_CREAT, LOCK_EX, 0644, FILE_LOCK_WAIT_TIMEOUT_SECONDS, "task-exit:" + key);
 		if(exit_lock_fd != -1)
@@ -857,6 +868,25 @@ StringMap make_server_settings()
 	cfg["PROACTIVE_COMPILE_ENABLED"] = "1";
 	cfg["COMPILE_FAILURE_RETRY_SECONDS"] = std::to_string(10);
 	cfg["PROACTIVE_COMPILE_CHECK_INTERVAL"] = std::to_string(60);
+	cfg["TRANSPORT_MAX_CLIENT_CONNECTIONS"] = std::to_string(256);
+	cfg["TRANSPORT_MAX_HTTP_HEADER_BYTES"] = std::to_string(16 * 1024);
+	cfg["TRANSPORT_MAX_HTTP_BODY_BYTES"] = std::to_string(1024 * 1024);
+	cfg["TRANSPORT_MAX_WEBSOCKET_FRAME_BYTES"] = std::to_string(1024 * 1024);
+	cfg["TRANSPORT_MAX_WEBSOCKET_MESSAGE_BYTES"] = std::to_string(1024 * 1024);
+	cfg["TRANSPORT_MAX_WEBSOCKET_OUTPUT_BYTES"] = std::to_string(4 * 1024 * 1024);
+	cfg["TRANSPORT_MAX_RESPONSE_BYTES"] = std::to_string(8 * 1024 * 1024);
+	cfg["TRANSPORT_HTTP_REQUEST_TIMEOUT_SECONDS"] = "15";
+	cfg["TRANSPORT_CONNECTION_IDLE_TIMEOUT_SECONDS"] = "120";
+	cfg["CUSTOM_SERVER_MAX_SERVERS"] = "16";
+	cfg["CUSTOM_SERVER_MIN_PORT"] = "1024";
+	cfg["CUSTOM_SERVER_MAX_PORT"] = "65535";
+	cfg["CUSTOM_SERVER_ALLOW_PUBLIC_BIND"] = "0";
+	cfg["CUSTOM_SERVER_UNIX_SOCKET_PREFIX"] = "/tmp/uce/custom-servers/";
+	cfg["CUSTOM_SERVER_HANDLER_TIMEOUT_SECONDS"] = "30";
+	cfg["CUSTOM_SERVER_UCE_ROOT"] = "";
+	cfg["ARCHIVE_MAX_INPUT_BYTES"] = std::to_string(64 * 1024 * 1024);
+	cfg["ARCHIVE_MAX_OUTPUT_BYTES"] = std::to_string(64 * 1024 * 1024);
+	cfg["ARCHIVE_MAX_ZIP_ENTRIES"] = "4096";
 
 	cfg["HTTP_PORT"] = std::to_string(8080);
 	cfg["SESSION_TIME"] = std::to_string(60*60*24*30);

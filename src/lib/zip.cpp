@@ -14,6 +14,23 @@ String zip_error(String api, String detail)
 	return(api + "(): " + detail);
 }
 
+u64 archive_config_u64(String key, u64 fallback)
+{
+	if(!context || !context->server)
+		return(fallback);
+	String raw = trim(context->server->config[key]);
+	if(raw == "")
+		return(fallback);
+	return(int_val(raw));
+}
+
+void archive_check_size(String api, String label, u64 size, String config_key, u64 fallback)
+{
+	u64 limit = archive_config_u64(config_key, fallback);
+	if(limit > 0 && size > limit)
+		throw std::runtime_error(zip_error(api, label + " exceeds configured limit"));
+}
+
 bool zip_entry_name_safe(String name)
 {
 	if(name == "")
@@ -78,6 +95,7 @@ DTree zip_list(String zip_file_name)
 	try
 	{
 		mz_uint count = mz_zip_reader_get_num_files(&archive);
+		archive_check_size("zip_list", "entry count", count, "ARCHIVE_MAX_ZIP_ENTRIES", 4096);
 		result["file"] = zip_file_name;
 		result["count"] = (f64)count;
 		result["entries"].set_array();
@@ -111,6 +129,7 @@ String zip_read(String zip_file_name, String entry_name)
 		mz_zip_reader_end(&archive);
 		throw std::runtime_error(zip_error("zip_read", "entry not found or not readable: " + entry_name));
 	}
+	archive_check_size("zip_read", "uncompressed entry", size, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 	String result((char*)data, size);
 	mz_free(data);
 	mz_zip_reader_end(&archive);
@@ -138,6 +157,7 @@ String zip_entry_name(String key, DTree item)
 
 void zip_add_entry(mz_zip_archive* archive, String name, String content)
 {
+	archive_check_size("zip_create", "entry content", content.size(), "ARCHIVE_MAX_INPUT_BYTES", 64 * 1024 * 1024);
 	name = zip_normalize_entry_name(name);
 	if(!zip_entry_name_safe(name))
 		throw std::runtime_error(zip_error("zip_create", "unsafe or empty entry name '" + name + "'"));
@@ -157,8 +177,11 @@ bool zip_create(String zip_file_name, DTree entries)
 
 	try
 	{
+		u64 entry_count = 0;
 		entries.each([&](DTree item, String key)
 		{
+			entry_count++;
+			archive_check_size("zip_create", "entry count", entry_count, "ARCHIVE_MAX_ZIP_ENTRIES", 4096);
 			String name = zip_entry_name(key, item);
 			String content = zip_entry_content(item);
 			zip_add_entry(&archive, name, content);
@@ -242,6 +265,7 @@ size_t gz_deflate_offset(String compressed)
 
 String gz_compress(String src)
 {
+	archive_check_size("gz_compress", "input", src.size(), "ARCHIVE_MAX_INPUT_BYTES", 64 * 1024 * 1024);
 	mz_stream stream;
 	std::memset(&stream, 0, sizeof(stream));
 	int status = mz_deflateInit2(&stream, MZ_DEFAULT_COMPRESSION, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY);
@@ -289,6 +313,7 @@ String gz_uncompress(String compressed)
 	if(!out)
 		throw std::runtime_error("gz_uncompress(): decompression failed");
 
+	archive_check_size("gz_uncompress", "output", out_len, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 	String result((char*)out, out_len);
 	mz_free(out);
 
@@ -317,12 +342,14 @@ bool zip_extract(String zip_file_name, String destination_directory)
 	try
 	{
 		mz_uint count = mz_zip_reader_get_num_files(&archive);
+		archive_check_size("zip_extract", "entry count", count, "ARCHIVE_MAX_ZIP_ENTRIES", 4096);
 		for(mz_uint i = 0; i < count; i++)
 		{
 			mz_zip_archive_file_stat stat;
 			std::memset(&stat, 0, sizeof(stat));
 			if(!mz_zip_reader_file_stat(&archive, i, &stat))
 				throw std::runtime_error(zip_error("zip_extract", "could not read file metadata at index " + std::to_string((u64)i)));
+			archive_check_size("zip_extract", "uncompressed entry", stat.m_uncomp_size, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
 			String name = zip_normalize_entry_name(stat.m_filename);
 			if(!zip_entry_name_safe(name))
 				throw std::runtime_error(zip_error("zip_extract", "refusing unsafe entry name '" + name + "'"));

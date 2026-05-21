@@ -22,3 +22,5 @@ zip_read
 zip_extract
 gz_compress
 gz_uncompress
+server_start_http
+server_stop

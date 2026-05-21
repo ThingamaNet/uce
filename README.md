@@ -82,6 +82,7 @@ Useful helpers for that data model include:
 - `path_join(base, child)` for filesystem-style path assembly
 - `zip_create()`, `zip_list()`, `zip_read()`, and `zip_extract()` for minimal ZIP archive workflows
 - `gz_compress()` and `gz_uncompress()` for gzip-format byte strings
+- `server_start_http()` / `server_stop()` for runtime-managed custom HTTP listeners backed by `SERVE_HTTP` handlers
 
 Named component handlers are also supported:
 

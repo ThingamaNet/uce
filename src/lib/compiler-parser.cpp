@@ -6,6 +6,7 @@ namespace {
 
 const char* UCE_NAMED_RENDER_SYMBOL = "__uce_render";
 const char* UCE_NAMED_COMPONENT_SYMBOL = "__uce_component";
+const char* UCE_NAMED_SERVE_HTTP_SYMBOL = "__uce_serve_http";
 
 struct CompilerCodeState
 {
@@ -315,6 +316,31 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 	return(parsed_content);
 }
 
+bool compiler_rewrite_named_entrypoint_line(String& line, String macro_prefix, String symbol_prefix)
+{
+	u32 indent_length = 0;
+	while(indent_length < line.length() && isspace(line[indent_length]))
+		indent_length += 1;
+
+	String indent = line.substr(0, indent_length);
+	String trimmed = trim(line);
+	if(trimmed.rfind(macro_prefix, 0) != 0)
+		return(false);
+
+	String signature = trimmed.substr(macro_prefix.length());
+	auto open_paren_pos = signature.find("(");
+	if(open_paren_pos == String::npos)
+		return(false);
+
+	String render_name = trim(signature.substr(0, open_paren_pos));
+	String render_signature = signature.substr(open_paren_pos);
+	if(render_name == "")
+		return(false);
+
+	line = indent + "EXPORT void " + symbol_prefix + "_" + safe_name(render_name) + render_signature;
+	return(true);
+}
+
 String compiler_rewrite_named_render_syntax(String content)
 {
 	String result = "";
@@ -332,36 +358,9 @@ String compiler_rewrite_named_render_syntax(String content)
 			line.pop_back();
 		}
 
-		u32 indent_length = 0;
-		while(indent_length < line.length() && isspace(line[indent_length]))
-			indent_length += 1;
-
-		String indent = line.substr(0, indent_length);
-		String trimmed = trim(line);
-		if(trimmed.rfind("RENDER:", 0) == 0)
-		{
-			String signature = trimmed.substr(7);
-			auto open_paren_pos = signature.find("(");
-			if(open_paren_pos != String::npos)
-			{
-				String render_name = trim(signature.substr(0, open_paren_pos));
-				String render_signature = signature.substr(open_paren_pos);
-				if(render_name != "")
-					line = indent + "EXPORT void " + String(UCE_NAMED_RENDER_SYMBOL) + "_" + safe_name(render_name) + render_signature;
-			}
-		}
-		else if(trimmed.rfind("COMPONENT:", 0) == 0)
-		{
-			String signature = trimmed.substr(10);
-			auto open_paren_pos = signature.find("(");
-			if(open_paren_pos != String::npos)
-			{
-				String render_name = trim(signature.substr(0, open_paren_pos));
-				String render_signature = signature.substr(open_paren_pos);
-				if(render_name != "")
-					line = indent + "EXPORT void " + String(UCE_NAMED_COMPONENT_SYMBOL) + "_" + safe_name(render_name) + render_signature;
-			}
-		}
+		compiler_rewrite_named_entrypoint_line(line, "RENDER:", UCE_NAMED_RENDER_SYMBOL) ||
+		compiler_rewrite_named_entrypoint_line(line, "COMPONENT:", UCE_NAMED_COMPONENT_SYMBOL) ||
+		compiler_rewrite_named_entrypoint_line(line, "SERVE_HTTP:", UCE_NAMED_SERVE_HTTP_SYMBOL);
 
 		result += line + line_break;
 		current_line = "";

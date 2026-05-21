@@ -43,7 +43,10 @@ MySQL* mysql_connect(String host = "localhost", String username = "root", String
 
 void mysql_disconnect(MySQL* m)
 {
+	if(!m)
+		return;
 	m->disconnect();
+	delete m;
 }
 
 String mysql_error(MySQL* m)

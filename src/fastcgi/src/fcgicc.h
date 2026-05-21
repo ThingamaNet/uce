@@ -52,7 +52,9 @@ public:
 	std::function<int(FastCGIRequest&, const String&, u8)> on_websocket_message = 0;
 
 	int listen(unsigned tcp_port);
+	int listen(unsigned tcp_port, const std::string& bind_address);
 	int listen_http(unsigned tcp_port);
+	int listen_http(unsigned tcp_port, const std::string& bind_address);
 	int listen_cli(const std::string& local_path);
 	int listen(const std::string& local_path);
 

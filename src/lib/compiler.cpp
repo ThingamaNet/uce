@@ -14,6 +14,7 @@ const char* UCE_RENDER_SYMBOL = "__uce_render";
 const char* UCE_COMPONENT_SYMBOL = "__uce_component";
 const char* UCE_WEBSOCKET_SYMBOL = "__uce_websocket";
 const char* UCE_CLI_SYMBOL = "__uce_cli";
+const char* UCE_SERVE_HTTP_SYMBOL = "__uce_serve_http";
 const char* UCE_ONCE_SYMBOL = "__uce_once";
 const char* UCE_INIT_SYMBOL = "__uce_init";
 const u64 UCE_UNIT_ABI_VERSION = 1;
@@ -1195,7 +1196,8 @@ enum class UnitCallMacroKind
 	component,
 	once,
 	init,
-	cli
+	cli,
+	serve_http
 };
 
 struct UnitCallMacroTarget
@@ -1368,6 +1370,17 @@ UnitCallMacroTarget unit_call_macro_target(String function_name)
 		target.kind = UnitCallMacroKind::cli;
 		return(target);
 	}
+	if(function_name == "SERVE_HTTP")
+	{
+		target.kind = UnitCallMacroKind::serve_http;
+		return(target);
+	}
+	if(function_name.rfind("SERVE_HTTP:", 0) == 0)
+	{
+		target.kind = UnitCallMacroKind::serve_http;
+		target.handler_name = trim(function_name.substr(11));
+		return(target);
+	}
 
 	return(target);
 }
@@ -1458,6 +1471,14 @@ String component_handler_symbol(String render_name)
 	return(String(UCE_COMPONENT_SYMBOL) + "_" + safe_name(render_name));
 }
 
+String serve_http_handler_symbol(String handler_name)
+{
+	handler_name = trim(handler_name);
+	if(handler_name == "")
+		return(UCE_SERVE_HTTP_SYMBOL);
+	return(String(UCE_SERVE_HTTP_SYMBOL) + "_" + safe_name(handler_name));
+}
+
 String compiler_missing_request_handler_message(UnitCallMacroKind kind, String handler_name)
 {
 	handler_name = trim(handler_name);
@@ -1477,6 +1498,12 @@ String compiler_missing_request_handler_message(UnitCallMacroKind kind, String h
 		return("no ONCE() entry point");
 	if(kind == UnitCallMacroKind::cli)
 		return("no CLI() entry point");
+	if(kind == UnitCallMacroKind::serve_http)
+	{
+		if(handler_name == "")
+			return("no SERVE_HTTP() entry point");
+		return("no SERVE_HTTP:" + handler_name + "() entry point");
+	}
 	if(kind == UnitCallMacroKind::init)
 		return("no INIT() entry point");
 	return("request handler not found");
@@ -1524,11 +1551,10 @@ void compiler_execute_request_handler(
 	}
 }
 
-request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
+request_ref_handler get_request_handler_symbol(SharedUnit* su, String symbol, request_ref_handler default_handler = 0)
 {
-	String symbol = page_render_handler_symbol(render_name);
-	if(symbol == UCE_RENDER_SYMBOL)
-		return(su->on_render);
+	if(default_handler && symbol == "")
+		return(default_handler);
 
 	auto it = su->api_functions.find(symbol);
 	if(it != su->api_functions.end())
@@ -1540,20 +1566,25 @@ request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
 	return(handler);
 }
 
+request_ref_handler get_page_render_handler(SharedUnit* su, String render_name)
+{
+	String symbol = page_render_handler_symbol(render_name);
+	if(symbol == UCE_RENDER_SYMBOL)
+		return(su->on_render);
+	return(get_request_handler_symbol(su, symbol));
+}
+
 request_ref_handler get_component_handler(SharedUnit* su, String render_name)
 {
 	String symbol = component_handler_symbol(render_name);
 	if(symbol == UCE_COMPONENT_SYMBOL)
 		return(su->on_component);
+	return(get_request_handler_symbol(su, symbol));
+}
 
-	auto it = su->api_functions.find(symbol);
-	if(it != su->api_functions.end())
-		return((request_ref_handler)it->second);
-
-	auto handler = (request_ref_handler)dlsym(su->so_handle, symbol.c_str());
-	dlerror();
-	su->api_functions[symbol] = (void*)handler;
-	return(handler);
+request_ref_handler get_serve_http_handler(SharedUnit* su, String handler_name)
+{
+	return(get_request_handler_symbol(su, serve_http_handler_symbol(handler_name)));
 }
 
 bool compiler_invoke_loaded_request_handler(
@@ -1657,6 +1688,30 @@ void compiler_invoke_cli(Request* context, String file_name)
 			context->set_status(404, "CLI Entry Point Not Found");
 		else
 			context->set_status(500, "CLI Unit Error");
+		if(error_message != "")
+			print(error_message);
+	}
+}
+
+void compiler_invoke_serve_http(Request* context, String file_name, String handler_name)
+{
+	auto su = compiler_load_shared_unit(context, file_name, "", false);
+	if(!su)
+		return;
+
+	String error_message = "";
+	if(!compiler_invoke_loaded_request_handler(
+		context,
+		su,
+		get_serve_http_handler(su, handler_name),
+		UnitCallMacroKind::serve_http,
+		handler_name,
+		true,
+		"uncaught exception during HTTP server handler",
+		&error_message
+	))
+	{
+		context->set_status(500, "HTTP Server Handler Error");
 		if(error_message != "")
 			print(error_message);
 	}

@@ -300,5 +300,6 @@ void cleanup_mysql_connections()
 	//switch_to_system_alloc();
 	for(auto& con : context->resources.mysql_connections)
 		mysql_close((MYSQL*)con);
+	context->resources.mysql_connections.clear();
 	//switch_to_arena(context->mem);
 }
