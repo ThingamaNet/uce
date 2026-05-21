@@ -291,9 +291,11 @@ bool http_set_cookie_header_valid(String header)
 
 String http_status_line_clean(String status_line)
 {
-	if(status_line.find('\r') != String::npos || status_line.find('\n') != String::npos)
-		return("Status: 500 Internal Server Error");
-	return(status_line);
+	if(status_line.find('\r') == String::npos && status_line.find('\n') == String::npos)
+		return(status_line);
+	if(str_starts_with(status_line, "HTTP/"))
+		return("HTTP/1.1 500 Internal Server Error");
+	return("Status: 500 Internal Server Error");
 }
 
 namespace {

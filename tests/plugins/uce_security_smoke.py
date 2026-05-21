@@ -58,6 +58,9 @@ def register(registry):
 		location = response.headers.get("Location", "")
 		if "\r" in location or "\n" in location:
 			raise TestFailure("Location header contains raw CR/LF")
+		status, direct_headers, direct_body = _direct_http_request("/site/tests/security_headers.uce")
+		if status >= 500 and "security header sanitizer test" not in direct_body:
+			raise TestFailure("direct HTTP sanitizer test did not render successfully; status=%s" % status)
 		return "CRLF response header injection was sanitized"
 
 	def unknown_session_id_is_not_adopted(context):
