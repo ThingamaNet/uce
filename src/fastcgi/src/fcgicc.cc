@@ -36,7 +36,6 @@
 
 #include <cstring>
 #include <stdexcept>
-#include <cctype>
 
 #include <errno.h> // E*
 #include <fcntl.h>
@@ -124,39 +123,15 @@ make_http_text_response(String status_line, String body, String extra_headers = 
 	);
 }
 
-static bool
-header_token_safe(String name)
-{
-	if(name == "")
-		return(false);
-	for(char c : name)
-	{
-		if(!(std::isalnum((unsigned char)c) || c == '-' || c == '_'))
-			return(false);
-	}
-	return(true);
-}
-
-static String
-header_value_sanitize(String value)
-{
-	for(char& c : value)
-	{
-		if(c == '\r' || c == '\n')
-			c = ' ';
-	}
-	return(value);
-}
-
 static String
 render_header_map(StringMap headers)
 {
 	String result;
 	for(auto& item : headers)
 	{
-		if(!header_token_safe(item.first))
+		if(!http_header_name_valid(item.first))
 			continue;
-		result += item.first + ": " + header_value_sanitize(item.second) + "\r\n";
+		result += item.first + ": " + http_header_value_clean(item.second) + "\r\n";
 	}
 	return(result);
 }
@@ -167,21 +142,11 @@ render_set_cookie_headers(StringList headers)
 	String result;
 	for(String header : headers)
 	{
-		if(header.find('\r') != String::npos || header.find('\n') != String::npos)
-			continue;
-		if(!str_starts_with(to_lower(header), "set-cookie: "))
+		if(!http_set_cookie_header_valid(header))
 			continue;
 		result += header + "\r\n";
 	}
 	return(result);
-}
-
-static String
-safe_status_line(String status_line)
-{
-	if(status_line.find('\r') != String::npos || status_line.find('\n') != String::npos)
-		return("Status: 500 Internal Server Error");
-	return(status_line);
 }
 
 static String
@@ -865,14 +830,14 @@ FastCGIServer::process_http_request(FastCGIRequest& request, String& data)
 	if(!parse_http_message(request, data))
 		return;
 
-	if(request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
+	if(resolve_http_script_filename && request.params["SCRIPT_FILENAME"] == "" && request.params["DOCUMENT_URI"] != "")
 	{
 		String document_root = http_script_root();
 		String document_uri = strip_leading_slashes(request.params["DOCUMENT_URI"]);
 		String candidate = path_join(document_root, document_uri);
 		String real_root = path_real(document_root);
 		String real_candidate = path_real(candidate);
-		if(real_root == "" || real_candidate == "" || !path_is_within(real_candidate, real_root))
+		if(real_root == "" || real_candidate == "" || !path_is_within(candidate, document_root))
 		{
 			reject_http_connection(*client_sockets[request.resources.client_socket], "HTTP/1.1 404 Not Found", "script not found\n");
 			return;
@@ -1339,7 +1304,7 @@ void
 FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* connection)
 {
 	request.out =
-		safe_status_line(request.response_code)+"\r\n"+
+		http_status_line_clean(request.response_code)+"\r\n"+
 		render_header_map(request.header) +
 		render_set_cookie_headers(request.set_cookies) +
 		"\r\n";
@@ -1354,7 +1319,7 @@ FastCGIServer::assemble_output_buffer(FastCGIRequest& request, Connection* conne
 		request.set_status(500, "Response Too Large");
 		request.header.clear();
 		request.header["Content-Type"] = "text/plain; charset=utf-8";
-		request.out = safe_status_line(request.response_code) + "\r\n" + render_header_map(request.header) + "\r\nresponse exceeded configured output limit\n";
+		request.out = http_status_line_clean(request.response_code) + "\r\n" + render_header_map(request.header) + "\r\nresponse exceeded configured output limit\n";
 	}
 	request.ob_stack.clear();
 	request.flags.output_closed = true;

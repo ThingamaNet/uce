@@ -30,6 +30,8 @@ RENDER(Request& context)
 	String uri_input = "alpha beta/?x=1&y=2";
 	String encoded = uri_encode(uri_input);
 	String decoded = uri_decode(encoded);
+	String malformed_percent = uri_decode("% %A %GG ok%20done");
+	URI empty_uri = parse_uri("");
 	String generated_session = session_id_create();
 	String query_dump = var_dump(query);
 	String set_cookie_dump = var_dump(context.set_cookies);
@@ -39,6 +41,8 @@ RENDER(Request& context)
 	site_tests_page_start("HTTP And Session", "Request helpers, cookies, headers, URI parsing, and session lifecycle checks.");
 
 	check("uri_encode() / uri_decode()", decoded == uri_input, encoded + " => " + decoded);
+	check("uri_decode() malformed percent literals", malformed_percent == "% %A %GG ok done", malformed_percent);
+	check("parse_uri() empty input", empty_uri.parts["raw"] == "", var_dump(empty_uri));
 	check("parse_query()", query["alpha"] == "1" && query["beta"] == "two words", query_dump);
 	check("set_cookie()", set_cookie_dump.find("site-tests-cookie") != String::npos && set_cookie_dump.find("cookie-value") != String::npos && set_cookie_dump.find("HttpOnly") != String::npos && set_cookie_dump.find("SameSite=Lax") != String::npos, set_cookie_dump);
 	check("response header mutation", context.header["X-Site-Tests"] == "http-suite", header_dump);

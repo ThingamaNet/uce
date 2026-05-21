@@ -222,7 +222,7 @@ struct Request {
 		bool websocket_is_binary = false;
 		bool websocket_is_text = false;
 		String current_unit_file = "";
-		std::string params_buffer;
+		String params_buffer;
 	} resources;
 
 	void ob_start();

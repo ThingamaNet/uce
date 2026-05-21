@@ -40,6 +40,12 @@ bool zip_entry_name_safe(String name)
 	if(name.find(":") != String::npos)
 		return(false);
 
+	for(char c : name)
+	{
+		if(c == '\0' || (unsigned char)c < 0x20)
+			return(false);
+	}
+
 	auto parts = split(replace(name, "\\", "/"), "/");
 	for(auto part : parts)
 	{
@@ -330,7 +336,12 @@ String gz_uncompress(String compressed)
 	if(!out)
 		throw std::runtime_error("gz_uncompress(): decompression failed");
 
-	archive_check_size("gz_uncompress", "output", out_len, "ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
+	u64 output_limit = archive_config_u64("ARCHIVE_MAX_OUTPUT_BYTES", 64 * 1024 * 1024);
+	if(output_limit > 0 && out_len > output_limit)
+	{
+		mz_free(out);
+		throw std::runtime_error("gz_uncompress(): output exceeds configured limit");
+	}
 	String result((char*)out, out_len);
 	mz_free(out);
 

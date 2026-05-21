@@ -2,6 +2,7 @@
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#include <cctype>
 #include <stdexcept>
 
 String var_dump(StringMap map, String prefix, String postfix)
@@ -47,14 +48,14 @@ u8 hex_to_u8(String src)
 String to_lower(String s)
 {
 	String result = s;
-	std::transform(result.begin(), result.end(),result.begin(), ::tolower);
+	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return((char)std::tolower(c)); });
 	return(result);
 }
 
 String to_upper(String s)
 {
 	String result = s;
-	std::transform(result.begin(), result.end(),result.begin(), ::toupper);
+	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return((char)std::toupper(c)); });
 	return(result);
 }
 

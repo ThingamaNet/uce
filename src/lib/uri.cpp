@@ -1,5 +1,6 @@
 #include "uri.h"
 
+#include <cctype>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -174,7 +175,7 @@ String uri_decode(String q)
 	for(u32 i = 0; i < q.length(); i++)
 	{
 		char c = q[i];
-		if(c == '%' && q[i+1] != '%')
+		if(c == '%' && i + 2 < q.length() && isxdigit((unsigned char)q[i + 1]) && isxdigit((unsigned char)q[i + 2]))
 		{
 			result.append(1, hex_to_u8(q.substr(i+1, 2)));
 			i += 2;
@@ -197,12 +198,12 @@ String uri_encode(String q)
 	for(u32 i = 0; i < q.length(); i++)
 	{
 		char c = q[i];
-		if(isalnum(c) || c == '~' || c == '.' || c == '_' || c == '-')
+		if(isalnum((unsigned char)c) || c == '~' || c == '.' || c == '_' || c == '-')
 			result.append(1, c);
 		else
 		{
 			result.append(1, '%');
-			result.append(to_hex(c));
+			result.append(to_hex((u8)c, 2));
 		}
 	}
 	return(result);
@@ -259,7 +260,17 @@ String encode_query(StringMap map)
 	return(result);
 }
 
-namespace {
+bool http_header_name_valid(String name)
+{
+	if(name == "")
+		return(false);
+	for(char c : name)
+	{
+		if(!(std::isalnum((unsigned char)c) || c == '-' || c == '_'))
+			return(false);
+	}
+	return(true);
+}
 
 String http_header_value_clean(String value)
 {
@@ -270,6 +281,22 @@ String http_header_value_clean(String value)
 	}
 	return(value);
 }
+
+bool http_set_cookie_header_valid(String header)
+{
+	if(header.find('\r') != String::npos || header.find('\n') != String::npos)
+		return(false);
+	return(str_starts_with(to_lower(header), "set-cookie: "));
+}
+
+String http_status_line_clean(String status_line)
+{
+	if(status_line.find('\r') != String::npos || status_line.find('\n') != String::npos)
+		return("Status: 500 Internal Server Error");
+	return(status_line);
+}
+
+namespace {
 
 String cookie_attribute_value_clean(String value)
 {
@@ -409,6 +436,12 @@ StringMap parse_multipart(String q, String boundary, std::vector<UploadedFile>& 
 URI parse_uri(String uri_String)
 {
 	URI result;
+
+	if(uri_String == "")
+	{
+		result.parts["raw"] = "";
+		return(result);
+	}
 
 	u8 state = 0;
 	String current = "";

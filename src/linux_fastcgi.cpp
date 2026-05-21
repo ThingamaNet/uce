@@ -1298,6 +1298,7 @@ void custom_server_http_dispatcher_loop(String key)
 		FastCGIServer dispatcher;
 		custom_server_bind_http(dispatcher, cfg["bind"]);
 		dispatcher.calls_until_termination = -1;
+		dispatcher.resolve_http_script_filename = false;
 		dispatcher.on_complete = &custom_server_http_complete;
 		for(;;)
 			dispatcher.process(-1);

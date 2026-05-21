@@ -62,11 +62,41 @@ RENDER(Request& context)
 	}
 	check("zip_create() rejects unsafe names", unsafe_rejected, "absolute member name rejected");
 
+	bool nul_name_rejected = false;
+	try
+	{
+		DTree unsafe_entries;
+		String nul_name = "prefix";
+		nul_name.push_back((char)0x00);
+		nul_name += "suffix.txt";
+		unsafe_entries[nul_name] = "bad";
+		zip_create(path_join(base, "nul-name.zip"), unsafe_entries);
+	}
+	catch(std::exception& e)
+	{
+		nul_name_rejected = contains(e.what(), "unsafe");
+	}
+	check("zip_create() rejects NUL entry names", nul_name_rejected, "embedded NUL member name rejected");
+
+	String binary_source("UCE", 3);
+	binary_source.push_back((char)0x00);
+	binary_source += "binary";
+	binary_source.push_back((char)0xff);
+	binary_source += "payload";
+	DTree binary_entries;
+	binary_entries["binary.dat"] = binary_source;
+	String binary_archive = path_join(base, "binary.zip");
+	bool binary_created = zip_create(binary_archive, binary_entries);
+	String binary_zip_roundtrip = zip_read(binary_archive, "binary.dat");
+	check("zip binary-safe String payload", binary_created && binary_zip_roundtrip == binary_source && binary_zip_roundtrip.size() == binary_source.size(), "bytes=" + std::to_string((u64)binary_zip_roundtrip.size()));
+
 	String gz_source = "UCE gzip payload\nline two\n";
 	String gz_body = gz_compress(gz_source);
 	String gz_roundtrip = gz_uncompress(gz_body);
+	String gz_binary_body = gz_compress(binary_source);
+	String gz_binary_roundtrip = gz_uncompress(gz_binary_body);
 	check("gz_compress()", gz_body.size() > gz_source.size() && (u8)gz_body[0] == 0x1f && (u8)gz_body[1] == 0x8b, "bytes=" + std::to_string((u64)gz_body.size()));
-	check("gz_uncompress()", gz_roundtrip == gz_source, gz_roundtrip);
+	check("gz_uncompress()", gz_roundtrip == gz_source && gz_binary_roundtrip == binary_source && gz_binary_roundtrip.size() == binary_source.size(), "text=" + gz_roundtrip + ", binary bytes=" + std::to_string((u64)gz_binary_roundtrip.size()));
 
 	bool bad_gz_rejected = false;
 	try

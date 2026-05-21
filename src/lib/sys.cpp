@@ -496,14 +496,12 @@ String socket_read(u64 sockfd, u32 max_length, u32 timeout)
 	tv.tv_sec = timeout;
 	tv.tv_usec = 0;
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-	char buf[max_length+1];
-	auto byte_count = recv(sockfd, buf, sizeof(buf), 0);
+	if(max_length == 0)
+		return("");
+	std::vector<char> buf(max_length);
+	auto byte_count = recv(sockfd, buf.data(), buf.size(), 0);
 	if(byte_count > 0)
-	{
-		buf[byte_count] = 0;
-		String result(buf, byte_count+1);
-		return(result);
-	}
+		return(String(buf.data(), byte_count));
 	return("");
 }
 
@@ -512,7 +510,7 @@ String memcache_escape_key(String key)
 	String result;
 	for(auto c : key)
 	{
-		if(isspace(c))
+		if(isspace((unsigned char)c))
 			c = '_';
 		result.append(1, c);
 	}

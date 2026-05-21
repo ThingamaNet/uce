@@ -32,8 +32,10 @@ def register(registry):
 				for marker in ERROR_MARKERS:
 					if marker in body_lower:
 						raise Exception("response body contained error marker %r for %s" % (marker, page_path))
+				if '<div class="tests-summary">' in body_lower and ('>fail</span>' in body_lower or '>failed 0<' not in body_lower):
+					raise Exception("site suite reported failed cases for %s" % page_path)
 
-				return "HTTP 200 with suite page marker for %s" % page_path
+				return "HTTP 200 with suite page marker and no failed cases for %s" % page_path
 
 			return run
 
