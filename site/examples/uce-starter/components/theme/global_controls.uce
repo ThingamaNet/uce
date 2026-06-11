@@ -2,10 +2,6 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
-	if(starter_page_embed_mode(context))
-		return;
-
 	String cookie_value = context.props["cookie_consent"].to_string();
 	bool cookie_consent = !(cookie_value == "0" || cookie_value == "false" || cookie_value == "FALSE" || cookie_value == "no" || cookie_value == "NO");
 

@@ -1,9 +1,8 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "OAuth Callback";
+	context.call["app"]["page_title"] = "OAuth Callback";
 	String code = context.get["code"];
 	String state = context.get["state"];
 	String error = context.get["error"];
@@ -18,8 +17,8 @@ RENDER(Request& context)
 						<h2>Authentication Failed</h2>
 						<p><?= first(error_description, error) ?></p>
 						<div class="callback-actions">
-							<a href="<?= starter_link("auth/demo", context) ?>" class="btn btn-primary">Try Again</a>
-							<a href="<?= starter_link("", context) ?>" class="btn btn-outline">Go Home</a>
+							<a href="<?= app_link("auth/demo", context) ?>" class="btn btn-primary">Try Again</a>
+							<a href="<?= app_link("", context) ?>" class="btn btn-outline">Go Home</a>
 						</div>
 					</div>
 				<? } else if(code != "" && state != "") { ?>
@@ -33,8 +32,8 @@ RENDER(Request& context)
 							<p><strong>State:</strong> <?= state ?></p>
 						</div>
 						<div class="callback-actions">
-							<a href="<?= starter_link("auth/demo", context) ?>" class="btn btn-primary">Back to Auth Demo</a>
-							<a href="<?= starter_link("", context) ?>" class="btn btn-outline">Go Home</a>
+							<a href="<?= app_link("auth/demo", context) ?>" class="btn btn-primary">Back to Auth Demo</a>
+							<a href="<?= app_link("", context) ?>" class="btn btn-outline">Go Home</a>
 						</div>
 					</div>
 				<? } else { ?>

@@ -20,6 +20,7 @@ struct MySQL {
 	u32 row_count = 0;
 	u64 insert_id = 0;
 	String statement_info = ""; //
+	bool request_cleanup_delete = false;
 
 	std::vector<MySQLFieldInfo> field_info;
 
@@ -37,6 +38,7 @@ struct MySQL {
 MySQL* mysql_connect(String host = "localhost", String username = "root", String password = "")
 {
 	MySQL* m = new MySQL();
+	m->request_cleanup_delete = true;
 	m->connect(host, username, password);
 	return(m);
 }

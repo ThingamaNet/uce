@@ -37,7 +37,8 @@ bool MySQL::connect(String host, String username, String password)
 	*/
 	//switch_to_arena(context->mem);
 	statement_info = String("connected");
-	context->resources.mysql_connections.push_back(connection);
+	if(context)
+		context->resources.mysql_connections.push_back(this);
 	return(true);
 }
 
@@ -181,8 +182,16 @@ DTree MySQL::get_pending_result()
     return(result_data);
 }
 
+static bool mysql_has_unquoted_positional_placeholder(String query);
+
 DTree MySQL::query(String q)
 {
+	if(mysql_has_unquoted_positional_placeholder(q))
+	{
+		_preload_next_error_code = CR_UNKNOWN_ERROR;
+		statement_info = "mysql positional ? placeholders are not supported; use named :name placeholders";
+		return(DTree());
+	}
 	_preload_next_error_code = mysql_query((MYSQL*)connection, q.c_str());
 	DTree result;
 	if(_preload_next_error_code == 0)
@@ -190,8 +199,50 @@ DTree MySQL::query(String q)
 	return(result);
 }
 
+static bool mysql_has_unquoted_positional_placeholder(String query)
+{
+	bool quoted = false;
+	char quote = 0;
+	bool escaped = false;
+	for(u32 i = 0; i < query.length(); i++)
+	{
+		char c = query[i];
+		if(quoted)
+		{
+			if(escaped)
+			{
+				escaped = false;
+				continue;
+			}
+			if(c == '\\')
+			{
+				escaped = true;
+				continue;
+			}
+			if(c == quote)
+				quoted = false;
+			continue;
+		}
+		if(c == '\'' || c == '"')
+		{
+			quoted = true;
+			quote = c;
+			continue;
+		}
+		if(c == '?')
+			return(true);
+	}
+	return(false);
+}
+
 DTree MySQL::query(String q, StringMap params)
 {
+	if(mysql_has_unquoted_positional_placeholder(q))
+	{
+		_preload_next_error_code = CR_UNKNOWN_ERROR;
+		statement_info = "mysql positional ? placeholders are not supported; use named :name placeholders";
+		return(DTree());
+	}
 	return(query(
 		parse_query_parameters(q, params).c_str()
 	));
@@ -255,12 +306,24 @@ void MySQL::disconnect()
 	if(connection)
 		mysql_close((MYSQL*)connection);
 	connection = NULL;
+	if(context)
+	{
+		auto& connections = context->resources.mysql_connections;
+		connections.erase(std::remove(connections.begin(), connections.end(), this), connections.end());
+	}
 }
 
 String MySQL::error()
 {
 	if(_preload_next_error_code)
 	{
+		if(statement_info != "")
+		{
+			String result = statement_info;
+			statement_info = "";
+			_preload_next_error_code = 0;
+			return(result);
+		}
 		String p = "Unknown error";
 		switch(_preload_next_error_code)
 		{
@@ -298,8 +361,16 @@ String MySQL::error()
 void cleanup_mysql_connections()
 {
 	//switch_to_system_alloc();
-	for(auto& con : context->resources.mysql_connections)
-		mysql_close((MYSQL*)con);
-	context->resources.mysql_connections.clear();
+	if(!context)
+		return;
+	while(!context->resources.mysql_connections.empty())
+	{
+		MySQL* db = (MySQL*)context->resources.mysql_connections.back();
+		context->resources.mysql_connections.pop_back();
+		bool should_delete = db->request_cleanup_delete;
+		db->disconnect();
+		if(should_delete)
+			delete db;
+	}
 	//switch_to_arena(context->mem);
 }

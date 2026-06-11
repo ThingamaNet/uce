@@ -3,6 +3,13 @@ Types
 0_Request
 array_merge
 0_DTree
+dtree_filter
+dtree_group_by
+dtree_keys
+dtree_map
+dtree_omit
+dtree_pick
+dtree_values
 get_by_path
 set_status
 String

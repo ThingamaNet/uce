@@ -140,7 +140,7 @@ u64 dtree_clamp_to_u64_range(long double value)
 
 }
 
-void DTree::each(std::function <void (DTree t, String key)> f)
+void DTree::each(std::function <void (const DTree& t, String key)> f)
 {
 	const DTree& target = deref();
 	switch(target.type)
@@ -695,7 +695,7 @@ void DTree::operator = (void* v) { set(v); }
 void DTree::operator = (DTree v) { set(v); }
 void DTree::operator = (StringMap v) { set(v); }
 
-void DTree::push(DTree& child)
+void DTree::push(const DTree& child)
 {
 	DTree* target = reference_target();
 	if(target)
@@ -733,6 +733,11 @@ DTree DTree::pop()
 	if(target)
 		return(target->pop());
 	set_type('M');
+	if(_map.empty())
+	{
+		_array_index = 0;
+		return(DTree());
+	}
 	auto last = _map.rbegin();
 	DTree result = last->second;
 	_map.erase(last->first);

@@ -1,4 +1,4 @@
-(function (root, factory) { // I really hate this convoluted bullshit
+(function (root, factory) {
 	if (typeof exports === 'object' && typeof module !== 'undefined') {
 		module.exports = factory();
 	} else if (typeof define === 'function' && define.amd) {

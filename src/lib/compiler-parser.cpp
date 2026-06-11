@@ -316,6 +316,118 @@ String compiler_process_text_literal(Request* context, SharedUnit* su, String co
 	return(parsed_content);
 }
 
+bool compiler_line_starts_entrypoint(String trimmed, String macro_name)
+{
+	if(trimmed.rfind(macro_name + "(", 0) == 0)
+		return(true);
+	return(trimmed.rfind(macro_name + ":", 0) == 0 && trimmed.find("(") != String::npos);
+}
+
+bool compiler_line_starts_fragmentable_entrypoint(String trimmed, String& kind)
+{
+	if(compiler_line_starts_entrypoint(trimmed, "ONCE"))
+	{
+		kind = "ONCE";
+		return(true);
+	}
+	if(compiler_line_starts_entrypoint(trimmed, "RENDER"))
+	{
+		kind = "RENDER";
+		return(true);
+	}
+	if(compiler_line_starts_entrypoint(trimmed, "COMPONENT"))
+	{
+		kind = "COMPONENT";
+		return(true);
+	}
+	return(false);
+}
+
+String compiler_fragment_capture_prelude(String slot)
+{
+	return("\nstruct __UceFragmentCapture { Request& context; String slot; __UceFragmentCapture(Request& c, String s) : context(c), slot(s) { ob_start(); } ~__UceFragmentCapture() { String html = ob_get_close(); if(html != \"\") context.call[\"fragments\"][slot] = context.call[\"fragments\"][slot].to_string() + html; } }; __UceFragmentCapture __uce_fragment_capture(context, " + compiler_cpp_string_literal(slot) + ");\n");
+}
+
+String compiler_rewrite_fragment_attributes(String content)
+{
+	StringList lines = split(content, "\n");
+	String result;
+	for(u32 i = 0; i < lines.size(); i++)
+	{
+		String line = lines[i];
+		String kind;
+		if(!compiler_line_starts_fragmentable_entrypoint(trim(line), kind))
+		{
+			result += line;
+			if(i + 1 < lines.size())
+				result += "\n";
+			continue;
+		}
+
+		String slot = (kind == "ONCE" ? "once" : "");
+		StringList pending;
+		bool has_fragment_attr = false;
+		u32 j = i + 1;
+		while(j < lines.size())
+		{
+			String attr_line = lines[j];
+			String attr_trimmed = trim(attr_line);
+			if(attr_trimmed.rfind("@fragment", 0) == 0 && (attr_trimmed.length() == 9 || isspace((unsigned char)attr_trimmed[9])))
+			{
+				slot = trim(attr_trimmed.substr(9));
+				has_fragment_attr = true;
+				j++;
+				continue;
+			}
+			break;
+		}
+
+		bool should_capture = (slot != "") && (kind == "ONCE" || has_fragment_attr);
+		if(!should_capture)
+		{
+			result += line;
+			if(j < lines.size())
+				result += "\n";
+			i = j - 1;
+			continue;
+		}
+
+		auto declaration_brace_pos = line.find("{");
+		if(declaration_brace_pos != String::npos)
+		{
+			result += line.substr(0, declaration_brace_pos + 1) + compiler_fragment_capture_prelude(slot) + line.substr(declaration_brace_pos + 1);
+			if(j < lines.size())
+				result += "\n";
+			i = j - 1;
+			continue;
+		}
+
+		result += line;
+		if(j < lines.size())
+			result += "\n";
+
+		while(j < lines.size())
+		{
+			String body_line = lines[j];
+			auto brace_pos = body_line.find("{");
+			if(brace_pos == String::npos)
+			{
+				result += body_line;
+				if(j + 1 < lines.size())
+					result += "\n";
+				j++;
+				continue;
+			}
+			result += body_line.substr(0, brace_pos + 1) + compiler_fragment_capture_prelude(slot) + body_line.substr(brace_pos + 1);
+			if(j + 1 < lines.size())
+				result += "\n";
+			i = j;
+			break;
+		}
+	}
+	return(result);
+}
+
 bool compiler_rewrite_named_entrypoint_line(String& line, String macro_prefix, String symbol_prefix)
 {
 	u32 indent_length = 0;
@@ -484,6 +596,7 @@ String compiler_preprocess_shared_unit_char_wise(Request* context, SharedUnit* s
 
 String compiler_preprocess_source(Request* context, SharedUnit* su, String content)
 {
+	content = compiler_rewrite_fragment_attributes(content);
 	content = compiler_rewrite_named_render_syntax(content);
 	return(compiler_preprocess_shared_unit_char_wise(context, su, content));
 }

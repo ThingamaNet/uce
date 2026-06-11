@@ -1,5 +1,11 @@
 #include "testlib.h"
 
+ONCE(Request& context)
+@fragment preprocessor-test
+{
+	<>fragment attr once</>
+}
+
 String preprocessor_nested_literal()
 {
 	ob_start();
@@ -35,6 +41,7 @@ RENDER(Request& context)
 	<?
 
 	check("raw string terminator in nested literal", contains(nested, "nested )\" marker"), nested);
+	check("entrypoint @fragment attribute captures output", context.call["fragments"]["preprocessor-test"].to_string() == "fragment attr once", context.call["fragments"]["preprocessor-test"].to_string());
 	check("inline code island after dangerous literal", true, "parser returned to C++ after rendering literal content containing )\"");
 
 	site_tests_summary(passed, failed, skipped, "Literal content containing the C++ raw-string terminator sequence must compile and render unchanged.");

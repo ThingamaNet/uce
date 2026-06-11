@@ -42,6 +42,7 @@ RENDER(Request& context)
 			<? render_card("preprocessor-comments.uce", "Preprocessor Comments", "Regression coverage for comment parsing in templates"); ?>
 			<? render_card("regex.uce", "Regular Expressions", "PCRE2 matching, captures, replacement, and splitting"); ?>
 			<? render_card("string.uce", "String", "String operations"); ?>
+			<? render_card("collections.uce", "Collection Helpers", "Map, filter, group, pick, and omit render data"); ?>
 			<? render_card("str_replace.uce", "String Replace", "Search and replace in strings"); ?>
 			<? render_card("utf8.uce", "UTF-8", "Unicode string handling"); ?>
 			<? render_card("random.uce", "RNG / Noise", "Random generation and noise"); ?>
@@ -60,6 +61,7 @@ RENDER(Request& context)
 			<? if(allow_server_demos) { render_card("file_append.uce", "File Append", "Append data to files"); } ?>
 			<? if(allow_server_demos) { render_card("shell.uce", "Shell", "Execute shell commands"); } ?>
 			<? if(allow_server_demos) { render_card("memcached.uce", "Memcached", "Memcached key-value store"); } ?>
+			<? if(allow_server_demos) { render_card("sqlite.uce", "SQLite", "Embedded SQLite database connector"); } ?>
 			<? if(allow_server_demos) { render_card("mysql.uce", "MySQL", "MySQL database connector"); } ?>
 
 			<div class="grid-heading">Advanced</div>

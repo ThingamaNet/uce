@@ -2,7 +2,6 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
 	StarterUser users(context);
 	DTree user = users.current();
 	bool signed_in = user["email"].to_string() != "";
@@ -16,14 +15,14 @@ COMPONENT(Request& context)
 			<? if(signed_in) { ?>
 				<span class="<?= name_class ?>"><?= first(user["username"].to_string(), user["email"].to_string(), "Account") ?></span>
 				<? if(links_class != "") { ?><div class="<?= links_class ?>"><? } ?>
-				<a href="<?= starter_link("account/profile", context) ?>">Profile</a>
-				<a href="<?= starter_link("account/logout", context) ?>">Logout</a>
+				<a href="<?= app_link("account/profile", context) ?>">Profile</a>
+				<a href="<?= app_link("account/logout", context) ?>">Logout</a>
 				<? if(links_class != "") { ?></div><? } ?>
 			<? } else { ?>
 				<? if(links_class != "") { ?><div class="<?= links_class ?>"><? } ?>
-				<a href="<?= starter_link("account/login", context) ?>">Login</a>
+				<a href="<?= app_link("account/login", context) ?>">Login</a>
 				<? if(context.cfg.get_by_path("users/enable_signup").to_string() != "") { ?>
-					<a href="<?= starter_link("account/register", context) ?>">Register</a>
+					<a href="<?= app_link("account/register", context) ?>">Register</a>
 				<? } ?>
 				<? if(links_class != "") { ?></div><? } ?>
 			<? } ?>

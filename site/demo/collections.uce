@@ -1,0 +1,41 @@
+#include "demo_guard.h"
+
+RENDER(Request& context)
+{
+	DTree p;
+	p.set(context.params);
+
+	StringList routes = {"index", "dashboard", "themes", "dashboard", "workspace/projects"};
+	StringList unique_routes = list_unique(routes);
+	StringList sorted_routes = list_sort(unique_routes);
+	StringList labels = map(sorted_routes, [](String route) { return(to_upper(replace(route, "/", " / "))); });
+
+	DTree cards;
+	DTree card;
+	card["title"] = "Dashboard"; card["section"] = "app"; card["href"] = "?dashboard"; cards.push(card); card.clear();
+	card["title"] = "Themes"; card["section"] = "app"; card["href"] = "?themes"; cards.push(card); card.clear();
+	card["title"] = "Docs"; card["section"] = "reference"; card["href"] = "../doc/index.uce"; cards.push(card);
+
+	DTree app_cards = dtree_filter(cards, [](DTree item, String key) { return(item["section"].to_string() == "app"); });
+	DTree titles = dtree_map(app_cards, [](DTree item, String key) { DTree out; out = item["title"].to_string(); return(out); });
+	DTree grouped = dtree_group_by(cards, [](DTree item, String key) { return(item["section"].to_string()); });
+
+	<><html>
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1"></meta>
+		<link rel="stylesheet" href='style.css?v=<?= time() ?>'></link>
+	</head>
+	<body>
+		<h1><a href="index.uce">UCE Test Suite</a><a class="docs-link" href="../doc/index.uce?p=map">Collection Docs &rarr;</a></h1>
+		<h2>Collection Helpers</h2>
+		<p>Small data-shaping helpers are useful for route lists, nav records, cards, and other render-adjacent structures.</p>
+		<div class="system-info"><h3>StringList route labels</h3><pre><?= join(labels, "\n") ?></pre></div>
+		<div class="system-info"><h3>DTree app card titles</h3><pre><?= json_encode(titles) ?></pre></div>
+		<div class="system-info"><h3>Grouped cards</h3><pre><?= json_encode(grouped) ?></pre></div>
+		<details>
+			<summary>Request Parameters</summary>
+			<pre><?= var_dump(p) ?></pre>
+		</details>
+	</body>
+	</html></>
+}

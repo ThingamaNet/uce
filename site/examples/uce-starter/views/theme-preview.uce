@@ -1,10 +1,11 @@
 #load "../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Theme Preview";
-	starter_register_css("views/themes.css", context);
+	DTree asset_props;
+	asset_props["css"]["0"] = "views/themes.css";
+	print(component("../components/theme/assets", asset_props, context));
+	context.call["app"]["page_title"] = "Theme Preview";
 	String current_theme_key = context.cfg.get_by_path("theme/key").to_string();
 	String theme_label = first(context.cfg.get_by_path("theme/label").to_string(), current_theme_key);
 	String theme_mode = context.cfg.get_by_path("theme/mode").to_string();
@@ -18,8 +19,8 @@ RENDER(Request& context)
 				<h1><?= theme_label ?></h1>
 				<p>This route renders the same neutral content inside each theme so downstream projects can compare layout, typography, color tokens, and chrome.</p>
 				<div class="theme-preview-actions">
-					<a class="btn" href="<?= starter_link("themes", theme_params, context) ?>">Back to Gallery</a>
-					<a class="btn btn-secondary" href="<?= starter_link("", theme_params, context) ?>">Open Home in This Theme</a>
+					<a class="btn" href="<?= app_link("themes", theme_params, context) ?>">Back to Gallery</a>
+					<a class="btn btn-secondary" href="<?= app_link("", theme_params, context) ?>">Open Home in This Theme</a>
 				</div>
 			</section>
 			<section class="theme-preview-grid">
@@ -59,7 +60,6 @@ RENDER(Request& context)
 						<tbody>
 							<tr><td>Navigation</td><td>Should remain readable when menus get long.</td><td>Verified</td></tr>
 							<tr><td>Cards</td><td>Should keep spacing and hierarchy on both desktop and mobile.</td><td>Verified</td></tr>
-							<tr><td>Embeds</td><td>Should render cleanly inside the gallery iframe.</td><td>Verified</td></tr>
 						</tbody>
 					</table>
 				</div>

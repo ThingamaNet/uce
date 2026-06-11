@@ -2,7 +2,6 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
 	String nav_class = context.props["nav_class"].to_string();
 	if(nav_class == "" && (context.cfg.get_by_path("theme/key").to_string() == "portal-dark" || context.cfg.get_by_path("theme/key").to_string() == "dark" || context.cfg.get_by_path("theme/key").to_string() == "retro-gaming"))
 		nav_class = "nav-shell";
@@ -18,11 +17,12 @@ COMPONENT(Request& context)
 	<>
 		<nav<?: nav_class != "" ? " class=\"" + html_escape(nav_class) + "\"" : "" ?>>
 			<div class="nav-menu">
-				<a href="<?= starter_link("", context) ?>"><?= context.cfg.get_by_path("site/name").to_string() ?></a>
+				<a href="<?= app_link("", context) ?>"><?= context.cfg.get_by_path("site/name").to_string() ?></a>
 				<? context.cfg.get_by_path("menu").each([&](DTree menu_item, String menu_key) {
 					if(menu_item["hidden"].to_string() == "1")
 						return;
-					?><a href="<?= starter_menu_href(menu_key, menu_item, context) ?>"><?= menu_item["title"].to_string() ?></a><?
+					String href = menu_item["external"].to_string() != "" ? "/" + menu_key : app_link(menu_key, context);
+					?><a href="<?= href ?>"><?= menu_item["title"].to_string() ?></a><?
 				}); ?>
 			</div>
 			<?: component("account_links", account_props, context) ?>

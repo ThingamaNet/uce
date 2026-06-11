@@ -2,13 +2,7 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
 	context.header["Content-Type"] = "application/json";
 	context.header["Cache-Control"] = "no-cache, no-store, must-revalidate";
-	if(context.props["json"].get_type_name() == "array")
-		print(json_encode(context.props["json"]));
-	else if(context.call["starter"]["json"].get_type_name() == "array")
-		print(json_encode(context.call["starter"]["json"]));
-	else
-		print(starter_page_main_html(context));
+	print(context.call["fragments"]["main"].to_string());
 }

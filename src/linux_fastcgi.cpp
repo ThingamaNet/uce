@@ -27,6 +27,7 @@ static String websocket_exec_write_buffer = "";
 
 void close_inherited_server_sockets();
 u64 request_seed_from_time(f64 time_value);
+void prepare_request_body_maps(Request& request);
 
 Request* set_active_request(Request& request)
 {
@@ -67,40 +68,34 @@ void render_request_failure(Request& request, String title, String details, Stri
 	Request* previous_context = set_active_request(request);
 	clear_request_output(request);
 
-	print("UCE runtime error\n");
-	print("Request: ", first(request.params["REQUEST_URI"], request.params["SCRIPT_FILENAME"]), "\n");
-	print("Script: ", request.params["SCRIPT_FILENAME"], "\n");
-	print("Error: ", title, "\n");
+	String body;
+	body += "UCE runtime error\n";
+	body += "Request: " + first(request.params["REQUEST_URI"], request.params["SCRIPT_FILENAME"]) + "\n";
+	body += "Script: " + request.params["SCRIPT_FILENAME"] + "\n";
+	body += "Error: " + title + "\n";
 	if(details != "")
-		print("Details: ", details, "\n");
+		body += "Details: " + details + "\n";
+	if(request.server && request.params["SCRIPT_FILENAME"] != "")
+	{
+		String generated = compiler_generated_cpp_path(&request, request.params["SCRIPT_FILENAME"]);
+		body += "Generated C++: " + generated + "\n";
+		body += "Hint: if this came from template code, inspect the generated C++ and the nearest .uce literal/code delimiter before changing runtime code.\n";
+	}
+	else
+		body += "Hint: inspect the requested .uce file, its generated C++, and any component/unit called immediately before this failure.\n";
 	if(request_fault_signal != 0)
 	{
 		String sig_label = signal_name((int)request_fault_signal);
-		print("Signal: ", (s64)request_fault_signal);
+		body += "Signal: " + std::to_string((int)request_fault_signal);
 		if(sig_label != "")
-			print(" (", sig_label, ")");
-		print("\n");
+			body += " (" + sig_label + ")";
+		body += "\n";
 	}
 	if(trace != "")
-		print("\nTrace:\n", trace);
+		body += "\nTrace:\n" + trace;
 
-	request.err += "UCE runtime error\n";
-	request.err += "Request: " + first(request.params["REQUEST_URI"], request.params["SCRIPT_FILENAME"]) + "\n";
-	request.err += "Script: " + request.params["SCRIPT_FILENAME"] + "\n";
-	request.err += "Error: " + title + "\n";
-	if(details != "")
-		request.err += "Details: " + details + "\n";
-	if(request_fault_signal != 0)
-	{
-		String sig_label = signal_name((int)request_fault_signal);
-		request.err += "Signal: " + std::to_string((int)request_fault_signal);
-		if(sig_label != "")
-			request.err += " (" + sig_label + ")";
-		request.err += "\n";
-	}
-	if(trace != "")
-		request.err += "\nTrace:\n" + trace;
-
+	print(body);
+	request.err = body;
 	request.flags.status = status_code;
 	restore_active_request(previous_context);
 }
@@ -108,9 +103,11 @@ void render_request_failure(Request& request, String title, String details, Stri
 void on_request_fault_signal(int sig)
 {
 	request_fault_signal = sig;
-	request_fault_trace = capture_backtrace_string(32, 1);
 	if(request_fault_active && request_fault_request)
+	{
+		request_fault_trace = capture_backtrace_string(32, 1);
 		siglongjmp(request_fault_jmp, 1);
+	}
 	on_segfault(sig);
 }
 
@@ -393,7 +390,7 @@ Request websocket_exec_build_event_request(DTree job, String message)
 	event_request.server = &server_state;
 	event_request.params = job["params"].to_stringmap();
 	event_request.params["REQUEST_METHOD"] = "WEBSOCKET";
-	event_request.get = parse_query(event_request.params["QUERY_STRING"]);
+	prepare_request_body_maps(event_request);
 	event_request.resources.is_websocket = true;
 	event_request.resources.websocket_connection_id = job["connection_id"].to_string();
 	event_request.resources.websocket_scope = job["scope"].to_string();
@@ -412,9 +409,6 @@ Request websocket_exec_build_event_request(DTree job, String message)
 	event_request.response_code = "WEBSOCKET";
 	event_request.header["Content-Type"] = server_state.config["CONTENT_TYPE"];
 	event_request.in = message;
-
-	if(event_request.params["HTTP_COOKIE"].length() > 0)
-		event_request.cookies = parse_cookies(event_request.params["HTTP_COOKIE"]);
 
 	event_request.params["WS_MESSAGE"] = message;
 	event_request.params["WS_CONNECTION_ID"] = event_request.resources.websocket_connection_id;
@@ -475,6 +469,7 @@ void websocket_exec_process_job_line(int fd, String line)
 	if(event_request.session_id.length() > 0)
 		save_session_data(event_request.session_id, event_request.session);
 	cleanup_mysql_connections();
+	cleanup_sqlite_connections();
 
 	DTree response;
 	response["type"] = "result";
@@ -750,7 +745,9 @@ u64 request_seed_from_time(f64 time_value)
 
 void prepare_request_body_maps(Request& request)
 {
-	request.get = parse_query(request.params["QUERY_STRING"]);
+	String route_path;
+	request.get = parse_query(request.params["QUERY_STRING"], &route_path);
+	request_populate_context_params_from_route(request, route_path);
 	if(request.params["HTTP_COOKIE"].length() > 0)
 		request.cookies = parse_cookies(request.params["HTTP_COOKIE"]);
 
@@ -782,7 +779,6 @@ int handle_cli_complete(FastCGIRequest& request)
 	request.random_index = 0;
 	request.random_seed = request_seed_from_time(request.stats.time_start);
 	request.ob_start();
-	prepare_request_body_maps(request);
 
 	String method = trim(request.params["REQUEST_METHOD"]);
 	String command = trim(first(request.params["DOCUMENT_URI"], request.params["REQUEST_URI"]));
@@ -827,6 +823,7 @@ int handle_cli_complete(FastCGIRequest& request)
 				{
 					request.params["DOCUMENT_ROOT"] = document_root;
 					request.params["SCRIPT_FILENAME"] = script_filename;
+					prepare_request_body_maps(request);
 					request.props = DTree();
 					compiler_invoke_cli(&request, script_filename);
 				}
@@ -850,6 +847,7 @@ int handle_cli_complete(FastCGIRequest& request)
 	for(auto &f : request.uploaded_files)
 		file_unlink(f.tmp_name);
 	cleanup_mysql_connections();
+	cleanup_sqlite_connections();
 	restore_active_request(previous_context);
 	return(request.flags.status);
 }
@@ -883,7 +881,6 @@ int handle_complete(FastCGIRequest& request) {
 	//request.stats.mem_alloc = 0;
 	//request.stats.mem_high = 0;
     request.header["Content-Type"] = (request.resources.is_cli ? "text/plain; charset=utf-8" : context->server->config["CONTENT_TYPE"]);
-    request.get = parse_query(request.params["QUERY_STRING"]);
 	request.random_index = 0;
 	request.random_seed = request_seed_from_time(request.stats.time_start);
 	request.ob_start();
@@ -945,6 +942,7 @@ int handle_complete(FastCGIRequest& request) {
 		save_session_data(request.session_id, request.session);
 
 	cleanup_mysql_connections();
+	cleanup_sqlite_connections();
 	restore_active_request(previous_context);
 
     return request.flags.status;
@@ -1305,14 +1303,27 @@ void run_proactive_compiler()
 	signal(SIGPIPE, SIG_IGN);
 	setpriority(PRIO_PROCESS, 0, 10);
 
-	auto known_units = compiler_list_known_units(&background_context);
-	auto site_units = compiler_scan_site_units(&background_context);
-	known_units.insert(known_units.end(), site_units.begin(), site_units.end());
-	compiler_set_known_units(&background_context, known_units);
+	try
+	{
+		auto known_units = compiler_list_known_units(&background_context);
+		auto site_units = compiler_scan_site_units(&background_context);
+		known_units.insert(known_units.end(), site_units.begin(), site_units.end());
+		compiler_set_known_units(&background_context, known_units);
+	}
+	catch(const std::exception& e)
+	{
+		printf("(!) proactive compiler initial scan failed: %s\n", e.what());
+	}
+	catch(...)
+	{
+		printf("(!) proactive compiler initial scan failed: unknown exception\n");
+	}
 	next_scan_at = time_precise();
 
 	for(;;)
 	{
+		try
+		{
 		if(compile_queue.size() == 0 && time_precise() >= next_scan_at)
 		{
 			auto tracked_units = compiler_list_known_units(&background_context);
@@ -1375,6 +1386,19 @@ void run_proactive_compiler()
 		}
 
 		usleep(250000);
+		}
+		catch(const std::exception& e)
+		{
+			printf("(!) proactive compiler scan failed: %s\n", e.what());
+			next_scan_at = time_precise() + check_interval;
+			usleep(250000);
+		}
+		catch(...)
+		{
+			printf("(!) proactive compiler scan failed: unknown exception\n");
+			next_scan_at = time_precise() + check_interval;
+			usleep(250000);
+		}
 	}
 }
 

@@ -1,16 +1,15 @@
 #load "../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Ajaxy";
+	context.call["app"]["page_title"] = "Ajaxy";
 	<>
 		<h1>Ajax Demo</h1>
 		<div id="page2-section1">
 			<p>This is the content of Page 2. You can add more information here.</p>
 			<p>Sed at dolor leo. Morbi a tellus sed nisl dictum ultricies sit amet at purus. Nam mattis metus sed nunc egestas convallis.</p>
 			<br/>
-			<button id="page2-load-button" data-load-url="<?= starter_link("page2-section1", context) ?>" type="button">Load new text</button>
+			<button id="page2-load-button" data-load-url="<?= app_link("page2-section1", context) ?>" type="button">Load new text</button>
 		</div>
 		<script>
 		(function () {

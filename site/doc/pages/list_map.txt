@@ -1,0 +1,19 @@
+:title
+list_map
+
+:sig
+Use map(StringList items, function<String (String)> f)
+
+:see
+map
+filter
+StringList
+
+:content
+`list_map()` was removed because `StringList` is `std::vector<String>` and the generic `map()` helper covers the same behavior without a second implementation to maintain.
+
+Use:
+
+```cpp
+auto upper = map(names, [](String s) { return(to_upper(s)); });
+```

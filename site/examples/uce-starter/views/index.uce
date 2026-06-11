@@ -1,10 +1,11 @@
 #load "../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Home";
-	starter_register_css("views/marketing.css", context);
+	DTree asset_props;
+	asset_props["css"]["0"] = "views/marketing.css";
+	print(component("../components/theme/assets", asset_props, context));
+	context.call["app"]["page_title"] = "Home";
 
 	DTree props;
 
@@ -79,13 +80,13 @@ RENDER(Request& context)
 					?><div class="component-card">
 						<h3><?= theme["label"].to_string() ?></h3>
 						<p><?= theme["description"].to_string() ?></p>
-						<a class="btn" href="<?= starter_link("themes", theme_params, context) ?>">Preview Theme</a>
+						<a class="btn" href="<?= app_link("themes", theme_params, context) ?>">Preview Theme</a>
 					</div><?
 				}); ?>
 				<div class="component-card">
 					<h3>Starter Themes</h3>
 					<p>The original light and dark starter skins remain available in the same gallery for side-by-side checks.</p>
-					<a class="btn btn-secondary" href="<?= starter_link("themes", context) ?>">Open Gallery</a>
+					<a class="btn btn-secondary" href="<?= app_link("themes", context) ?>">Open Gallery</a>
 				</div>
 			</div>
 		</div>
@@ -98,9 +99,16 @@ RENDER(Request& context)
 	props["secondary_text"] = "View GitHub";
 	print(component("../components/example/marketing_blocks:CTA_SECTION", props, context));
 
+	DTree island_props;
+	island_props["name"] = "StarterGuidelines";
+	island_props["id"] = "starter-guidelines-island";
+	island_props["props"]["route"] = context.call["route"]["l_path"].to_string();
+	island_props["props"]["enhancement"] = "progressive";
+
 	<>
 		<div class="card">
 			<h2>Component Development Guidelines</h2>
+			<?: component("../components/theme/web_affordances:island", island_props, context) ?>
 			<div class="guidelines-grid">
 				<div class="guideline-item" style="border-left-color: var(--primary);"><span class="guideline-icon">🏷️</span><span>Use semantic HTML5 elements</span></div>
 				<div class="guideline-item" style="border-left-color: var(--secondary);"><span class="guideline-icon">🎨</span><span>Implement CSS custom properties for theming</span></div>

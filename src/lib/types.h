@@ -208,6 +208,7 @@ struct Request {
 	struct Resources {
 		std::vector<u64> sockets;
 		std::vector<void*> mysql_connections;
+		std::vector<void*> sqlite_connections;
 		u64 client_socket = 0;
 		u64 server_socket = 0;
 		bool is_websocket = false;

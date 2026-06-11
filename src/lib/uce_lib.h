@@ -11,3 +11,4 @@
 #include "markdown.h"
 #include "zip.h"
 #include "mysql-connector.h"
+#include "sqlite-connector.h"

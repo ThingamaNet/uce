@@ -4,7 +4,7 @@ COMPONENT(Request& context)
 {
 	String title = first(context.props["title"].to_string(), "Sign in with OAuth");
 	String subtitle = first(context.props["subtitle"].to_string(), "Choose your preferred authentication method");
-	String callback_url = first(context.props["callback_url"].to_string(), starter_link("auth/callback", context));
+	String callback_url = first(context.props["callback_url"].to_string(), app_link("auth/callback", context));
 
 	DTree services = context.props["services"];
 	if(services.get_type_name() != "array" || services["google"]["name"].to_string() == "")
@@ -46,7 +46,7 @@ COMPONENT(Request& context)
 				String service_name = service["name"].to_string();
 				String scope = service["scope"].to_string();
 				String auth_url = service["auth_url"].to_string();
-				String store_url = starter_link("auth/store-oauth-session", context);
+				String store_url = app_link("auth/store-oauth-session", context);
 				?><div data-service="<?= service_key ?>">
 					<button type="button" class="btn" onclick='initiateOAuth_<?= handler_name ?>()'>
 						<i class="<?= service["icon"].to_string() ?>" style="color: <?= service["color"].to_string() ?>"></i>

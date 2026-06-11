@@ -19,7 +19,7 @@ struct DTree {
 	void*	_ptr;
 	std::map<String, DTree> _map;
 
-	void each(std::function <void (DTree t, String key)> f);
+	void each(std::function <void (const DTree& t, String key)> f);
 	bool is_array();
 	bool is_list() const;
 	String to_string();
@@ -56,7 +56,7 @@ struct DTree {
 	void operator = (DTree v);
 	void operator = (StringMap v);
 
-	void push(DTree& child);
+	void push(const DTree& child);
 	DTree pop();
 	void remove(String s);
 	void clear();

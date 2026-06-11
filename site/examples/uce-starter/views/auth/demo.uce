@@ -1,10 +1,11 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Auth";
-	starter_register_css("views/marketing.css", context);
+	DTree asset_props;
+	asset_props["css"]["0"] = "views/marketing.css";
+	print(component("../../components/theme/assets", asset_props, context));
+	context.call["app"]["page_title"] = "Auth";
 
 	DTree props;
 	props["title"] = "Sign In to Your Account";
@@ -13,7 +14,7 @@ RENDER(Request& context)
 	props["github_client_id"] = "YOUR_GITHUB_CLIENT_ID";
 	props["discord_client_id"] = "YOUR_DISCORD_CLIENT_ID";
 	props["twitch_client_id"] = "YOUR_TWITCH_CLIENT_ID";
-	props["callback_url"] = starter_link("auth/callback", context);
+	props["callback_url"] = app_link("auth/callback", context);
 
 	<>
 		<h1>Authentication Demo</h1>

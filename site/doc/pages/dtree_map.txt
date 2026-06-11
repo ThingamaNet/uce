@@ -1,0 +1,26 @@
+:title
+dtree_map
+
+:sig
+DTree dtree_map(DTree tree, function<DTree (DTree, String)> f)
+
+:see
+StringList
+0_DTree
+filter
+
+:content
+Transforms each child. List-like input stays list-like; map input keeps keys.
+
+These helpers are intentionally small data-shaping conveniences for render code, routers, and configuration trees. They are useful when porting habits from React/Next/Remix code where lists of routes, navigation items, cards, or records are transformed close to the rendering boundary.
+
+```cpp
+DTree titles = dtree_map(items, [](DTree item, String key) { DTree out; out = item["title"].to_string(); return(out); });
+```
+
+Prefer these helpers over open-coded loops when the transformation itself is the important part of the code. Use an explicit loop when mutation, error handling, or side effects are the main concern.
+
+## Related Concepts
+
+- JavaScript / React: `Array.map`, `Array.filter`, `Array.find`, object `pick`/`omit`, and grouping route or navigation records before rendering.
+- PHP: `array_map`, `array_filter`, `array_unique`, and associative array projection.

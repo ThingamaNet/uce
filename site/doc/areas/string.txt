@@ -7,6 +7,12 @@ filter
 first
 join
 json_encode
+list_every
+list_find
+map
+list_some
+list_sort
+list_unique
 nibble
 print
 strpos

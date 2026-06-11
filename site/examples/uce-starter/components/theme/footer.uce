@@ -2,11 +2,6 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
-	bool embed_mode = starter_page_embed_mode(context);
-	if(embed_mode)
-		return;
-
 	String text = first(context.cfg.get_by_path("theme/footer_text").to_string(), context.cfg.get_by_path("site/name").to_string());
 	String inner_class = first(context.props["inner_class"].to_string(), context.cfg.get_by_path("theme/key").to_string() == "portal-light" ? "footer-inner" : "");
 

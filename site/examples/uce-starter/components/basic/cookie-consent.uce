@@ -2,7 +2,6 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
 
 	<>
 		<div id="cookie-consent" style="

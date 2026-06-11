@@ -1,10 +1,13 @@
 #load "../lib/app.uce"
 
-RENDER(Request& context)
+ONCE(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Dashboard";
-	starter_register_css("views/dashboard.css", context);
+	?><link rel="stylesheet" href="<?= app_asset_url("views/dashboard.css", context) ?>" /><?
+}
+
+COMPONENT(Request& context)
+{
+	context.call["app"]["page_title"] = "Dashboard";
 
 	DTree props;
 	DTree item;

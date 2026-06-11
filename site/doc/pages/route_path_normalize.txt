@@ -1,0 +1,20 @@
+:title
+route_path_normalize
+
+:sig
+String route_path_normalize(String path)
+
+:see
+route_path_sanitize
+route_path_is_safe
+request_query_path
+request_query_route
+
+:content
+Trims whitespace and removes leading/trailing `/` from a route path without deciding whether the path is safe.
+
+```cpp
+route_path_normalize(" /workspace/projects/ "); // "workspace/projects"
+```
+
+For route data that may be used to compose file paths, prefer `route_path_sanitize()` or runtime-populated `context.params["ROUTE_PATH"]`.

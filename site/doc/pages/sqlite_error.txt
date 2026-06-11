@@ -1,0 +1,15 @@
+:sig
+String sqlite_error(SQLite* db)
+
+:params
+db : pointer to an SQLite connection
+return value : latest connector/SQLite status message
+
+:see
+>sqlite
+sqlite_query
+
+:content
+Returns the latest SQLite connector status or error message.
+
+Successful calls usually set the message to `ok` or `connected`. Failed prepare, bind, step, pragma, or open operations include connector context plus SQLite's own error text.

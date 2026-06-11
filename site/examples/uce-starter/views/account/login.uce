@@ -1,9 +1,8 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Login";
+	context.call["app"]["page_title"] = "Login";
 	StarterUser users(context);
 	DTree result;
 	if(context.params["REQUEST_METHOD"] == "POST")
@@ -11,7 +10,7 @@ RENDER(Request& context)
 		result = users.sign_in(context.post["email"], context.post["password"]);
 		if(result["result"].to_string() != "")
 		{
-			starter_redirect("account/profile", context);
+			redirect(app_link("account/profile", context));
 			return;
 		}
 	}
@@ -23,6 +22,6 @@ RENDER(Request& context)
 			<label>Password: <input type="password" name="password" required></label><br>
 			<button type="submit">Login</button>
 		</form>
-		<p><a href="<?= starter_link("account/register", context) ?>">Register</a></p>
+		<p><a href="<?= app_link("account/register", context) ?>">Register</a></p>
 	</>
 }

@@ -25,7 +25,7 @@ RENDER(Request& context)
 	set_cookie("site-tests-cookie", "cookie-value", time() + 300);
 	context.header["X-Site-Tests"] = "http-suite";
 
-	String query_src = "alpha=1&beta=two%20words&gamma=ok";
+	String query_src = "alpha=1&beta=two%20words&gamma=ok&token=a%3Db&keyless&empty=&trailing=ok&";
 	StringMap query = parse_query(query_src);
 	String uri_input = "alpha beta/?x=1&y=2";
 	String encoded = uri_encode(uri_input);
@@ -43,7 +43,7 @@ RENDER(Request& context)
 	check("uri_encode() / uri_decode()", decoded == uri_input, encoded + " => " + decoded);
 	check("uri_decode() malformed percent literals", malformed_percent == "% %A %GG ok done", malformed_percent);
 	check("parse_uri() empty input", empty_uri.parts["raw"] == "", var_dump(empty_uri));
-	check("parse_query()", query["alpha"] == "1" && query["beta"] == "two words", query_dump);
+	check("parse_query()", query["alpha"] == "1" && query["beta"] == "two words" && query["token"] == "a=b" && query["keyless"] == "" && query["empty"] == "" && query["trailing"] == "ok" && query.count("") == 0, query_dump);
 	check("set_cookie()", set_cookie_dump.find("site-tests-cookie") != String::npos && set_cookie_dump.find("cookie-value") != String::npos && set_cookie_dump.find("HttpOnly") != String::npos && set_cookie_dump.find("SameSite=Lax") != String::npos, set_cookie_dump);
 	check("response header mutation", context.header["X-Site-Tests"] == "http-suite", header_dump);
 	check("session_start()", session_id != "", "session_id=" + session_id);

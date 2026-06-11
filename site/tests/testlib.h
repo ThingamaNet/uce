@@ -64,6 +64,29 @@ void site_tests_card(String href, String title, String description, String tags 
 	print("</a>");
 }
 
+DTree site_tests_manifest(String manifest_path = "manifest.txt")
+{
+	DTree manifest;
+	for(String line : split(file_get_contents(manifest_path), "\n"))
+	{
+		line = trim(line);
+		if(line == "" || line[0] == '#')
+			continue;
+		StringList parts = split(line, "|");
+		if(parts.size() < 7)
+			continue;
+		String file = trim(parts[0]);
+		manifest[file]["file"] = file;
+		manifest[file]["title"] = trim(parts[1]);
+		manifest[file]["description"] = trim(parts[2]);
+		manifest[file]["tags"] = trim(parts[3]);
+		manifest[file]["expected"] = trim(parts[4]);
+		manifest[file]["suite"] = trim(parts[5]);
+		manifest[file]["index"] = trim(parts[6]);
+	}
+	return(manifest);
+}
+
 void site_tests_summary(u64 passed, u64 failed, u64 skipped, String note = "")
 {
 	print("<div class=\"tests-summary\">");

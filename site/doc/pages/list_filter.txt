@@ -1,0 +1,18 @@
+:title
+list_filter
+
+:sig
+Use filter(StringList items, function<bool (String)> f)
+
+:see
+filter
+StringList
+
+:content
+`list_filter()` was removed because `StringList` is `std::vector<String>` and the generic `filter()` helper covers the same behavior without a second implementation to maintain.
+
+Use:
+
+```cpp
+auto visible = filter(routes, [](String s) { return(s != "admin"); });
+```

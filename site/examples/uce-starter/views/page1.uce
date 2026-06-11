@@ -1,10 +1,11 @@
 #load "../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
-	context.call["starter"]["page_title"] = "Components";
-	starter_register_css("views/marketing.css", context);
+	DTree asset_props;
+	asset_props["css"]["0"] = "views/marketing.css";
+	print(component("../components/theme/assets", asset_props, context));
+	context.call["app"]["page_title"] = "Components";
 
 	<>
 		<h1>Component System</h1>

@@ -1,9 +1,13 @@
 #load "../../lib/app.uce"
 
+ONCE(Request& context)
+{
+	?><link rel="stylesheet" href="<?= app_asset_url("themes/common/css/workspace.css", context) ?>" />
+	<script src="<?= app_asset_url("js/u-workspace-shell.js", context) ?>"></script><?
+}
+
 COMPONENT:APP_FRAME(Request& context)
 {
-	starter_register_css("themes/common/css/workspace.css", context);
-	starter_register_js("js/u-workspace-shell.js", context);
 	String id = context.props["id"].to_string();
 	String overlay_id = context.props["overlay_id"].to_string();
 	String class_name = context.props["class"].to_string();

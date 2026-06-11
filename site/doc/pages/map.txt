@@ -1,0 +1,31 @@
+:title
+map
+
+:sig
+StringList map(StringList items, function<String (String)> f)
+vector<R> map(vector<T> items, function<R (T)> f)
+
+:params
+items : list of items to transform
+f : a function that returns the transformed value for each item
+return value : a new list containing the transformed values
+
+:see
+>string
+filter
+StringList
+0_DTree
+
+:content
+Returns a new list by calling `f` for each item in `items`.
+
+```cpp
+auto upper = map(names, [](String s) { return(to_upper(s)); });
+```
+
+Use `filter()` when you want to keep only matching items, and `map()` when you want to transform each item.
+
+## Related Concepts
+
+- JavaScript / React: `Array.prototype.map()`
+- PHP: `array_map()`

@@ -2,6 +2,5 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
-	print(starter_page_main_html(context));
+	print(context.call["fragments"]["main"].to_string());
 }

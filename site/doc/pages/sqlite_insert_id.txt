@@ -1,0 +1,19 @@
+:sig
+u64 sqlite_insert_id(SQLite* db)
+
+:params
+db : pointer to an active SQLite connection
+return value : last inserted rowid
+
+:see
+>sqlite
+sqlite_query
+sqlite_affected_rows
+
+:content
+Returns SQLite's last inserted rowid for the connection after an insert statement.
+
+```cpp
+sqlite_query(db, "insert into notes(body) values(:body)", params);
+u64 id = sqlite_insert_id(db);
+```

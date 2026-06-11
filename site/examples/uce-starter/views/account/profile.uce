@@ -1,15 +1,14 @@
 #load "../../lib/app.uce"
 
-RENDER(Request& context)
+COMPONENT(Request& context)
 {
-	starter_boot(context);
 	StarterUser users(context);
 	if(!users.is_signed_in())
 	{
-		starter_redirect("account/login", context);
+		redirect(app_link("account/login", context));
 		return;
 	}
-	context.call["starter"]["page_title"] = "Profile";
+	context.call["app"]["page_title"] = "Profile";
 	DTree user = users.current();
 	String roles = "";
 	user["roles"].each([&](DTree role, String key) {
@@ -22,6 +21,6 @@ RENDER(Request& context)
 		<p>Email: <?= user["email"].to_string() ?></p>
 		<p>Roles: <?= roles ?></p>
 		<p>Created: <?= time_format_local("%Y-%m-%dT%H:%M:%S", int_val(user["created"].to_string())) ?></p>
-		<p><a href="<?= starter_link("account/logout", context) ?>">Logout</a></p>
+		<p><a href="<?= app_link("account/logout", context) ?>">Logout</a></p>
 	</>
 }

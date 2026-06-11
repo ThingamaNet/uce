@@ -65,8 +65,8 @@ String to_hex(ITYPE w, size_t hex_len = sizeof(ITYPE)<<1)
     return(rc);
 }
 
-template<typename T>
-std::vector<T> filter(std::vector<T> items, std::function<bool (T)> f)
+template<typename T, typename F>
+std::vector<T> filter(std::vector<T> items, F f)
 {
 	std::vector<T> new_items;
 	for(auto item : items)
@@ -76,6 +76,29 @@ std::vector<T> filter(std::vector<T> items, std::function<bool (T)> f)
 	}
 	return(new_items);
 }
+
+template<typename T, typename F>
+auto map(std::vector<T> items, F f)
+{
+	using ResultType = decltype(f(items[0]));
+	std::vector<ResultType> new_items;
+	for(auto item : items)
+		new_items.push_back(f(item));
+	return(new_items);
+}
+
+StringList list_unique(StringList items);
+StringList list_sort(StringList items);
+bool list_some(StringList items, std::function<bool (String)> f);
+bool list_every(StringList items, std::function<bool (String)> f);
+String list_find(StringList items, std::function<bool (String)> f, String fallback = "");
+StringList dtree_keys(DTree tree);
+DTree dtree_values(DTree tree);
+DTree dtree_pick(DTree tree, StringList keys);
+DTree dtree_omit(DTree tree, StringList keys);
+DTree dtree_map(DTree tree, std::function<DTree (const DTree&, String)> f);
+DTree dtree_filter(DTree tree, std::function<bool (const DTree&, String)> f);
+DTree dtree_group_by(DTree tree, std::function<String (const DTree&, String)> f);
 
 template <class ...Args>
 String first(Args... args)

@@ -1,0 +1,16 @@
+:title
+request_base_url
+
+:sig
+String request_base_url(Request& context)
+
+:see
+request_script_url
+request_query_route
+
+:content
+Returns the canonical directory base URL for the current script. This is useful for front-controller apps that generate links to sibling assets or query-routed pages.
+
+```cpp
+String base_url = request_base_url(context);
+```

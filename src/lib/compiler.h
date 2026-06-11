@@ -10,6 +10,8 @@
 #define EXPORT extern "C"
 
 String preprocess_shared_unit(Request* context, SharedUnit* su);
+String compiler_generated_cpp_path(Request* context, String source_file);
+String compiler_generated_cpp_path(SharedUnit* su);
 void setup_unit_paths(Request* context, SharedUnit* su, String file_name);
 void load_shared_unit(Request* context, SharedUnit* su);
 void compile_shared_unit(Request* context, SharedUnit* su);

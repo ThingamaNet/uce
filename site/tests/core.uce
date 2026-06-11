@@ -18,13 +18,19 @@ RENDER(Request& context)
 	site_tests_page_start("Core APIs", "Pure helper coverage for strings, UTF-8 splitting, DTree, and JSON encoding/decoding.");
 
 	auto comma_parts = split("alpha,beta,gamma", ",");
-	check("split()", comma_parts.size() == 3 && comma_parts[1] == "beta", join(comma_parts, " | "));
+	auto empty_delim_parts = split("alpha", "");
+	check("split()", comma_parts.size() == 3 && comma_parts[1] == "beta" && empty_delim_parts.size() == 1 && empty_delim_parts[0] == "alpha", join(comma_parts, " | "));
 
 	auto spaced_parts = split_space("  one   two  three  ");
 	check("split_space()", spaced_parts.size() == 3 && spaced_parts[2] == "three", join(spaced_parts, " / "));
 
-	check("trim()", trim("  padded value  ") == "padded value", trim("  padded value  "));
+	StringMap kv = split_kv("\n#comment\nalpha = one\nempty=\n", '=', true, false);
+	StringMap http_headers = split_http_headers("GET /demo.uce?x=1 HTTP/1.1\r\nHost: example.test\r\nX-Empty:\r\n");
+	StringMap leading_crlf_headers = split_http_headers("\r\nGET /lead.uce HTTP/1.1\r\nHost: lead.example\r\n");
+	StringMap header_only = split_http_headers("Host: example.test\nX-Token: abc\n");
+	check("trim() / split_kv() / split_http_headers()", trim("  padded value  ") == "padded value" && kv["alpha"] == "one" && kv["empty"] == "" && http_headers["REQUEST_METHOD"] == "GET" && http_headers["DOCUMENT_URI"] == "/demo.uce" && http_headers["QUERY_STRING"] == "x=1" && http_headers["HTTP_X_EMPTY"] == "" && leading_crlf_headers["REQUEST_METHOD"] == "GET" && leading_crlf_headers["DOCUMENT_URI"] == "/lead.uce" && leading_crlf_headers["HTTP_HOST"] == "lead.example" && header_only["REQUEST_METHOD"] == "" && header_only["HTTP_HOST"] == "example.test" && header_only["HTTP_X_TOKEN"] == "abc", trim("  padded value  ") + " / " + var_dump(kv) + " / " + var_dump(http_headers) + " / " + var_dump(leading_crlf_headers) + " / " + var_dump(header_only));
 	check("replace()", replace("alpha-beta-beta", "beta", "done") == "alpha-done-done", replace("alpha-beta-beta", "beta", "done"));
+	check("html_escape() attribute-safe quotes", html_escape("<&>\"Don't") == "&lt;&amp;&gt;&quot;Don&#39;t", html_escape("<&>\"Don't"));
 	check("regex_match()", regex_match("[A-Z][a-z]+", "Alice") && !regex_match("[A-Z][a-z]+", "Alice!"), "full-string validation");
 
 	DTree regex_email = regex_search("(?<user>[A-Za-z0-9._%+-]+)@(?<host>[A-Za-z0-9.-]+)", "Contact ops@example.test");
@@ -42,6 +48,41 @@ RENDER(Request& context)
 	check("str_starts_with()", str_starts_with("websocket-suite", "websocket"), "websocket-suite starts with websocket");
 	check("str_ends_with()", str_ends_with("component.uce", ".uce"), "component.uce ends with .uce");
 	check("to_lower() / to_upper()", to_lower("MiXeD") == "mixed" && to_upper("MiXeD") == "MIXED", to_lower("MiXeD") + " / " + to_upper("MiXeD"));
+	check("request context params", context.params["SCRIPT_URL"] != "" && context.params["BASE_URL"] != "" && context.params["ROUTE_PATH"] != "" && context.params["ROUTE_PAGE"] != "" && context.params["ROUTE_VALID"] == "1", "script=" + context.params["SCRIPT_URL"] + " base=" + context.params["BASE_URL"] + " route=" + context.params["ROUTE_PATH"] + " page=" + context.params["ROUTE_PAGE"] + " valid=" + context.params["ROUTE_VALID"]);
+	String saved_query_string = context.params["QUERY_STRING"];
+	context.params["QUERY_STRING"] = "workspace/projects&theme=dark";
+	check("request_query_path() delegates to request_query_route()", request_query_path(context) == request_query_route(context)["l_path"].to_string() && request_query_path(context) == "workspace/projects", request_query_path(context) + " / " + json_encode(request_query_route(context)));
+	context.params["QUERY_STRING"] = saved_query_string;
+	check("route path sanitizers", route_path_normalize("/workspace/projects/") == "workspace/projects" && route_path_is_safe("workspace/projects") && !route_path_is_safe("../demo") && !route_path_is_safe("workspace/../demo") && !route_path_is_safe("workspace/file.uce") && route_path_sanitize("../demo") == "" && route_path_sanitize("") == "index", route_path_sanitize("/workspace/projects/"));
+
+	StringList route_parts = {"dashboard", "index", "dashboard", "themes"};
+	auto unique_routes = list_unique(route_parts);
+	auto sorted_routes = list_sort(unique_routes);
+	auto upper_routes = map(sorted_routes, [](String item) { return(to_upper(item)); });
+	auto dashboard_routes = filter(route_parts, [](String item) { return(item == "dashboard"); });
+	check("map/filter/list_unique/sort/find/some/every", unique_routes.size() == 3 && sorted_routes[0] == "dashboard" && upper_routes[2] == "THEMES" && dashboard_routes.size() == 2 && list_find(route_parts, [](String item) { return(str_starts_with(item, "them")); }, "missing") == "themes" && list_some(route_parts, [](String item) { return(item == "index"); }) && list_every(unique_routes, [](String item) { return(item != ""); }), join(upper_routes, ","));
+
+	DTree nav;
+	DTree nav_home;
+	nav_home["title"] = "Home";
+	nav_home["section"] = "main";
+	nav.push(nav_home);
+	DTree nav_dash;
+	nav_dash["title"] = "Dashboard";
+	nav_dash["section"] = "app";
+	nav.push(nav_dash);
+	DTree nav_themes;
+	nav_themes["title"] = "Themes";
+	nav_themes["section"] = "app";
+	nav.push(nav_themes);
+	DTree empty_tree;
+	DTree empty_pop = empty_tree.pop();
+	DTree app_nav = dtree_filter(nav, [](DTree item, String key) { return(item["section"].to_string() == "app"); });
+	DTree nav_titles = dtree_map(app_nav, [](DTree item, String key) { DTree title; title = item["title"].to_string(); return(title); });
+	DTree grouped_nav = dtree_group_by(nav, [](DTree item, String key) { return(item["section"].to_string()); });
+	DTree nav_dash_summary = dtree_pick(nav_dash, {"title"});
+	DTree nav_dash_public = dtree_omit(nav_dash, {"section"});
+	check("DTree collection helpers", empty_pop.to_string() == "" && app_nav.is_list() && nav_titles["0"].to_string() == "Dashboard" && grouped_nav["app"]["1"]["title"].to_string() == "Themes" && join(dtree_keys(nav_dash_summary), ",") == "title" && dtree_values(nav_dash_public)["0"].to_string() == "Dashboard", json_encode(grouped_nav));
 
 	String binary_payload = "core";
 	binary_payload.push_back((char)0x00);

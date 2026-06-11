@@ -3,6 +3,7 @@
 #include "hash.h"
 #include <algorithm>
 #include <cstdlib>
+#include <cctype>
 #include <filesystem>
 #include <sys/file.h>
 #include <unistd.h>
@@ -17,7 +18,7 @@ const char* UCE_CLI_SYMBOL = "__uce_cli";
 const char* UCE_SERVE_HTTP_SYMBOL = "__uce_serve_http";
 const char* UCE_ONCE_SYMBOL = "__uce_once";
 const char* UCE_INIT_SYMBOL = "__uce_init";
-const u64 UCE_UNIT_ABI_VERSION = 1;
+const u64 UCE_UNIT_ABI_VERSION = 2;
 
 struct SharedUnitFilesystemState
 {
@@ -282,9 +283,19 @@ auto compiler_with_registry_lock(Request* context, TCallback callback) -> declty
 {
 	auto lock_file_name = compiler_registry_lock_file_name(context);
 	int fdlock = compiler_open_lock_file(lock_file_name, "compiler-registry");
-	auto result = callback();
-	compiler_close_lock_file(fdlock);
-	return(result);
+	if(fdlock == -1)
+		throw std::runtime_error("could not open compiler registry lock: " + lock_file_name);
+	try
+	{
+		auto result = callback();
+		compiler_close_lock_file(fdlock);
+		return(result);
+	}
+	catch(...)
+	{
+		compiler_close_lock_file(fdlock);
+		throw;
+	}
 }
 
 bool compiler_has_known_unit_cached(Request* context, String file_name)
@@ -609,6 +620,20 @@ String preprocess_shared_unit(Request* context, SharedUnit* su)
 	return(compiler_preprocess_source(context, su, content));
 }
 
+String compiler_generated_cpp_path(Request* context, String source_file)
+{
+	if(!context || !context->server || source_file == "")
+		return("");
+	return(context->server->config["BIN_DIRECTORY"] + dirname(source_file) + "/" + basename(source_file) + ".cpp");
+}
+
+String compiler_generated_cpp_path(SharedUnit* su)
+{
+	if(!su)
+		return("");
+	return(su->pre_path + "/" + su->pre_file_name);
+}
+
 void setup_unit_paths(Request* context, SharedUnit* su, String file_name)
 {
 	su->file_name = file_name;
@@ -722,6 +747,72 @@ void load_shared_unit(Request* context, SharedUnit* su)
 	return(result);
 }*/
 
+s64 compiler_first_error_line_for_path(String messages, String path)
+{
+	if(path == "")
+		return(-1);
+	String needle = path + ":";
+	auto pos = messages.find(needle);
+	if(pos == String::npos)
+		return(-1);
+	pos += needle.length();
+	String digits;
+	while(pos < messages.length() && isdigit((unsigned char)messages[pos]))
+	{
+		digits.append(1, messages[pos]);
+		pos += 1;
+	}
+	if(digits == "")
+		return(-1);
+	return(int_val(digits));
+}
+
+String compiler_source_excerpt(String file_name, s64 line_number, u64 radius = 3)
+{
+	if(file_name == "" || line_number <= 0 || !file_exists(file_name))
+		return("");
+	auto lines = split(file_get_contents(file_name), "\n");
+	if(lines.size() == 0)
+		return("");
+	s64 start = line_number - (s64)radius;
+	if(start < 1)
+		start = 1;
+	s64 end = line_number + (s64)radius;
+	if(end > (s64)lines.size())
+		end = lines.size();
+	String result;
+	for(s64 i = start; i <= end; i++)
+	{
+		String marker = (i == line_number ? "> " : "  ");
+		result += marker + std::to_string((u64)i) + " | " + lines[i - 1] + "\n";
+	}
+	return(result);
+}
+
+String compiler_format_compile_failure(SharedUnit* su, String raw_messages)
+{
+	String generated_file = compiler_generated_cpp_path(su);
+	String result = "UCE compile error\n";
+	result += "Source: " + su->file_name + "\n";
+	result += "Generated C++: " + generated_file + "\n";
+	result += "Compile output: " + su->compile_output_file_name + "\n";
+
+	s64 source_line = compiler_first_error_line_for_path(raw_messages, su->file_name);
+	String excerpt = compiler_source_excerpt(su->file_name, source_line);
+	if(excerpt != "")
+		result += "\nSource excerpt:\n" + excerpt;
+	else
+	{
+		s64 generated_line = compiler_first_error_line_for_path(raw_messages, generated_file);
+		String generated_excerpt = compiler_source_excerpt(generated_file, generated_line);
+		if(generated_excerpt != "")
+			result += "\nGenerated C++ excerpt:\n" + generated_excerpt;
+	}
+
+	result += "\nCompiler output:\n" + trim(raw_messages) + "\n";
+	return(result);
+}
+
 void compile_shared_unit(Request* context, SharedUnit* su)
 {
 	f64 comp_start = time_precise();
@@ -737,11 +828,10 @@ void compile_shared_unit(Request* context, SharedUnit* su)
 
 	shell_exec("mkdir -p " + shell_escape(su->pre_path));
 	file_put_contents(su->pre_path + "/" + su->pre_file_name, preprocess_shared_unit(context, su));
-	//file_put_contents(su->setup_file_name, compile_setup_file(context, su));
 	file_put_contents(su->api_file_name, join(su->api_declarations, "\n"));
 
 	if(!su->opt_so_optional)
-		su->compiler_messages = trim(shell_exec(context->server->config["COMPILE_SCRIPT"]+" "+
+		su->compiler_messages = trim(shell_exec(shell_escape(context->server->config["COMPILE_SCRIPT"])+" "+
 			shell_escape(su->src_path)+" "+
 			shell_escape(su->bin_path)+" "+
 			shell_escape(su->file_name)+" "+
@@ -751,9 +841,10 @@ void compile_shared_unit(Request* context, SharedUnit* su)
 
 	if(su->compiler_messages.length() > 0)
 	{
-		file_put_contents(su->compile_output_file_name, su->compiler_messages + "\n");
-		compiler_record_compile_result(su, time_precise() - comp_start, false, "compile_error", su->compiler_messages);
-		printf("%s \n", su->compiler_messages.c_str());
+		String raw_messages = su->compiler_messages;
+		file_put_contents(su->compile_output_file_name, raw_messages + "\n");
+		compiler_record_compile_result(su, time_precise() - comp_start, false, "compile_error", raw_messages);
+		printf("%s \n", compiler_format_compile_failure(su, raw_messages).c_str());
 	}
 	else
 	{
@@ -898,11 +989,17 @@ SharedUnit* compiler_load_shared_unit(Request* context, String file_name, String
 	}
 	else if(su->compiler_messages.length() > 0)
 	{
-		printf("%s\n", su->compiler_messages.c_str());
+		String display_messages = su->compiler_messages;
+		if(su->compile_status == "compile_error")
+			display_messages = compiler_format_compile_failure(su, su->compiler_messages);
+		printf("%s\n", display_messages.c_str());
 		if(compiler_can_write_response(context) && context->stats.invoke_count == 1)
-			context->header["Content-Type"] = "text/plain";
+		{
+			context->set_status(500, "UCE Unit Compile Error");
+			context->header["Content-Type"] = "text/plain; charset=utf-8";
+		}
 		if(compiler_can_write_response(context))
-			print(su->compiler_messages);
+			print(display_messages);
 		return(0);
 	}
 	else

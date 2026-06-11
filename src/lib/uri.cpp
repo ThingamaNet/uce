@@ -220,38 +220,31 @@ String uri_encode(String q)
 
 StringMap parse_query(String q)
 {
-	StringMap result;
-	if(q.length() == 0)
-		return(result);
+	return(parse_query(q, 0));
+}
 
-	bool is_key = true;
-	String key = "";
-	String value = "";
-	for (char &c: q)
+StringMap parse_query(String q, String* first_keyless_path)
+{
+	StringMap result;
+	if(first_keyless_path)
+		*first_keyless_path = "";
+	for(String part : split(q, "&"))
 	{
-		if(c == '=')
+		if(part == "")
+			continue;
+		size_t equals = part.find('=');
+		if(equals == String::npos)
 		{
-			is_key = !is_key;
-		}
-		else if(c == '&')
-		{
-			result[uri_decode(key)] = uri_decode(value);
-			key = "";
-			value = "";
-			is_key = true;
-		}
-		else if(is_key)
-		{
-			key.append(1, c);
+			String key = uri_decode(part);
+			if(first_keyless_path && *first_keyless_path == "")
+				*first_keyless_path = key;
+			result[key] = "";
 		}
 		else
 		{
-			value.append(1, c);
+			result[uri_decode(part.substr(0, equals))] = uri_decode(part.substr(equals + 1));
 		}
 	}
-
-	result[uri_decode(key)] = uri_decode(value);
-
 	return(result);
 }
 
@@ -267,6 +260,132 @@ String encode_query(StringMap map)
 	}
 
 	return(result);
+}
+
+String route_path_normalize(String path)
+{
+	path = trim(path);
+	size_t start = path.find_first_not_of('/');
+	if(start == String::npos)
+		return("");
+	size_t end = path.find_last_not_of('/');
+	return(path.substr(start, end - start + 1));
+}
+
+bool route_path_normalized_is_safe(String path)
+{
+	if(path == "")
+		return(true);
+	for(String part : split(path, "/"))
+	{
+		if(part == "" || part == "." || part == "..")
+			return(false);
+		for(unsigned char c : part)
+		{
+			if(!(std::isalnum(c) || c == '-' || c == '_'))
+				return(false);
+		}
+	}
+	return(true);
+}
+
+bool route_path_is_safe(String path)
+{
+	return(route_path_normalized_is_safe(route_path_normalize(path)));
+}
+
+String route_path_sanitize(String path, String default_path)
+{
+	path = route_path_normalize(path);
+	if(path == "")
+		path = route_path_normalize(default_path);
+	if(!route_path_normalized_is_safe(path))
+		return("");
+	return(path);
+}
+
+String route_path_sanitize_normalized(String path, String default_path)
+{
+	if(path == "")
+		path = route_path_normalize(default_path);
+	if(!route_path_normalized_is_safe(path))
+		return("");
+	return(path);
+}
+
+String request_script_url(Request& context)
+{
+	String url = first(context.params["DOCUMENT_URI"], context.params["SCRIPT_NAME"]);
+	if(str_ends_with(url, "/index.uce"))
+		url = url.substr(0, url.length() - String("index.uce").length());
+	return(url);
+}
+
+String request_base_url_from_script_url(String script_url)
+{
+	String base = dirname(script_url);
+	if(base == "")
+		base = "/";
+	if(base[base.length() - 1] != '/')
+		base.append(1, '/');
+	return(base);
+}
+
+String request_base_url(Request& context)
+{
+	return(request_base_url_from_script_url(request_script_url(context)));
+}
+
+String request_query_path(Request& context, String default_path)
+{
+	return(request_query_route(context, default_path)["l_path"].to_string());
+}
+
+DTree request_query_route(Request& context, String default_path)
+{
+	String raw_path = "";
+	parse_query(context.params["QUERY_STRING"], &raw_path);
+	return(request_route_from_raw_path(raw_path, default_path));
+}
+
+DTree request_route_from_raw_path(String raw_path, String default_path)
+{
+	DTree route;
+	String normalized_path = route_path_normalize(raw_path);
+	String route_path = route_path_sanitize_normalized(normalized_path, default_path);
+	bool valid = route_path != "";
+	route["raw_path"] = normalized_path;
+	route["l_path"] = route_path;
+	String page = route_path;
+	route["page"] = valid ? nibble(page, "/") : "";
+	if(valid && route["page"].to_string() == "")
+		route["page"] = default_path;
+	route["valid"].set_bool(valid);
+	return(route);
+}
+
+void request_populate_context_params(Request& context, String default_path)
+{
+	DTree route = request_query_route(context, default_path);
+	String script_url = request_script_url(context);
+	context.params["SCRIPT_URL"] = script_url;
+	context.params["BASE_URL"] = request_base_url_from_script_url(script_url);
+	context.params["ROUTE_PATH"] = route["l_path"].to_string();
+	context.params["ROUTE_PAGE"] = route["page"].to_string();
+	context.params["ROUTE_PATH_RAW"] = route["raw_path"].to_string();
+	context.params["ROUTE_VALID"] = route["valid"].to_bool() ? "1" : "0";
+}
+
+void request_populate_context_params_from_route(Request& context, String raw_path, String default_path)
+{
+	DTree route = request_route_from_raw_path(raw_path, default_path);
+	String script_url = request_script_url(context);
+	context.params["SCRIPT_URL"] = script_url;
+	context.params["BASE_URL"] = request_base_url_from_script_url(script_url);
+	context.params["ROUTE_PATH"] = route["l_path"].to_string();
+	context.params["ROUTE_PAGE"] = route["page"].to_string();
+	context.params["ROUTE_PATH_RAW"] = route["raw_path"].to_string();
+	context.params["ROUTE_VALID"] = route["valid"].to_bool() ? "1" : "0";
 }
 
 bool http_header_name_valid(String name)

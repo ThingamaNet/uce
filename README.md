@@ -46,6 +46,8 @@ The current build expects:
 - PCRE2 development headers and library (`libpcre2-dev` on Debian / Ubuntu)
 - standard Linux development headers for `dl`, `pthread`, sockets, and backtrace support
 
+SQLite is vendored under `src/3rdparty/sqlite/` and compiled by `scripts/build_linux.sh`; no system SQLite package is required.
+
 The binary is written to:
 
 ```bash
@@ -80,9 +82,11 @@ Useful helpers for that data model include:
 - `json_encode(String)` for emitting JavaScript-safe string literals directly
 - `ascii_safe_name(String)` for conservative ASCII identifier normalization
 - `path_join(base, child)` for filesystem-style path assembly
+- `sqlite_connect()`, `sqlite_query()`, and related helpers for embedded SQLite storage with named prepared parameters
 - `zip_create()`, `zip_list()`, `zip_read()`, and `zip_extract()` for minimal ZIP archive workflows
 - `gz_compress()` and `gz_uncompress()` for gzip-format byte strings
 - `server_start_http()` / `server_stop()` for runtime-managed custom HTTP listeners backed by `SERVE_HTTP` handlers
+- `map()`, `filter()`, `list_unique()`, `dtree_filter()`, `dtree_map()`, `dtree_pick()`, and related helpers for route/menu/card data shaping near render code
 
 Named component handlers are also supported:
 
@@ -206,15 +210,19 @@ The current error page includes:
 
 - request URI
 - resolved script path
+- generated C++ path when available
 - high-level error summary
+- source/generated excerpts and raw compiler output paths for template/component/unit failure modes
 - signal number and name when applicable
 - a native backtrace
+
+Compile failures are also formatted with the source path, generated C++ path, compile-output artifact path, a nearby source/generated excerpt when a line can be identified, and the raw compiler output.
 
 This recovery path currently covers normal request handling. It is not yet the universal recovery path for every runtime subsystem.
 
 ## Docs And Tests
 
-The most current user-facing reference lives under `site/doc/`, and the demo pages live under `site/test/`.
+The most current user-facing reference lives under `site/doc/`, and the demo pages live under `site/test/`. Developers coming from React, Next, or Remix should start with `site/doc/pages/coming_from_react.txt` / `/doc/index.uce?p=coming_from_react` for the concept map and starter-router notes.
 
 Useful entry points:
 

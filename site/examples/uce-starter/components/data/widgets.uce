@@ -1,5 +1,15 @@
 #load "../../lib/app.uce"
 
+ONCE(Request& context)
+{
+	?><link rel="stylesheet" href="<?= app_asset_url("js/ag-grid/ag-grid.css", context) ?>" />
+	<link rel="stylesheet" href="<?= app_asset_url("js/ag-grid/ag-theme-alpine.css", context) ?>" />
+	<script src="<?= app_asset_url("js/u-format.js", context) ?>"></script>
+	<script src="<?= app_asset_url("js/u-timeseries-chart.js", context) ?>"></script>
+	<script src="<?= app_asset_url("js/u-sortable-table.js", context) ?>"></script>
+	<script src="<?= app_asset_url("js/ag-grid/ag-grid-community.min.js", context) ?>"></script><?
+}
+
 String data_format_bytes(String raw, bool disk = false)
 {
 	if(trim(raw) == "")
@@ -105,8 +115,6 @@ COMPONENT:SUMMARY_METRICS(Request& context)
 
 COMPONENT:TIMESERIES_CHART(Request& context)
 {
-	starter_register_js("js/u-format.js", context);
-	starter_register_js("js/u-timeseries-chart.js", context);
 
 	String chart_id = first(context.props["id"].to_string(), "ts-chart-" + std::to_string((u64)time()));
 	String canvas_id = chart_id + "-canvas";
@@ -148,8 +156,6 @@ COMPONENT:TIMESERIES_CHART(Request& context)
 
 COMPONENT:SORTABLE_TABLE(Request& context)
 {
-	starter_register_js("js/u-format.js", context);
-	starter_register_js("js/u-sortable-table.js", context);
 
 	String table_id = first(context.props["id"].to_string(), "sortable-table-" + std::to_string((u64)time()));
 	String title = context.props["title"].to_string();
@@ -214,9 +220,6 @@ COMPONENT:SORTABLE_TABLE(Request& context)
 COMPONENT:DATA_TABLE(Request& context)
 {
 	String table_id = first(context.props["id"].to_string(), "data-grid-" + std::to_string((u64)time()));
-	starter_register_js("js/ag-grid/ag-grid-community.min.js", context);
-	starter_register_css("js/ag-grid/ag-grid.css", context);
-	starter_register_css("js/ag-grid/ag-theme-alpine.css", context);
 
 	DTree columns = context.props["columns"];
 	if(columns.get_type_name() != "array")

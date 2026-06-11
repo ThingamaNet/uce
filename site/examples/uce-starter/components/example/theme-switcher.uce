@@ -2,10 +2,9 @@
 
 COMPONENT(Request& context)
 {
-	starter_boot(context);
 	String current_theme = context.cfg.get_by_path("theme/key").to_string();
 	String current_label = first(context.cfg.get_by_path("theme/label").to_string(), current_theme);
-	String route_path = context.call["starter"]["route"]["l_path"].to_string();
+	String route_path = context.call["route"]["l_path"].to_string();
 
 	<>
 		<div id="theme-switcher" style="position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 9999; font-family: inherit;">
@@ -111,7 +110,7 @@ COMPONENT(Request& context)
 					<? context.cfg.get_by_path("theme/options").each([&](DTree theme_info, String theme_key) {
 						StringMap params;
 						params["theme"] = theme_key;
-						String href = starter_link(route_path == "index" ? "" : route_path, params, context);
+						String href = app_link(route_path == "index" ? "" : route_path, params, context);
 						?><a class="theme-option<?= theme_key == current_theme ? " is-active" : "" ?>" href="<?= href ?>">
 							<span><?= theme_info["label"].to_string() ?></span>
 							<? if(theme_key == current_theme) { ?><small>Active</small><? } ?>

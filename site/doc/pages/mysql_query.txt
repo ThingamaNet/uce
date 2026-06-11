@@ -13,7 +13,16 @@ return value : a list of rows returned from executing the query
 :content
 Executes a MySQL query and returns the resulting data, if any.
 
-`params` provides the query parameter values used by the statement.
+`params` provides the query parameter values used by the statement. Use named `:name` placeholders only; positional `?` placeholders are rejected.
+
+```cpp
+StringMap params;
+params["email"] = "ada@example.test";
+DTree rows = mysql_query(m,
+    "select id, email from users where email = :email",
+    params
+);
+```
 
 The result is returned as a `DTree`, which makes it easy to iterate through rows and read fields with the usual `DTree` accessors.
 

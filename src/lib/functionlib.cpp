@@ -4,6 +4,7 @@
 #include <pcre2.h>
 #include <cctype>
 #include <stdexcept>
+#include <algorithm>
 
 String var_dump(StringMap map, String prefix, String postfix)
 {
@@ -56,6 +57,145 @@ String to_upper(String s)
 {
 	String result = s;
 	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return((char)std::toupper(c)); });
+	return(result);
+}
+
+StringList list_unique(StringList items)
+{
+	StringList result;
+	std::set<String> seen;
+	for(auto item : items)
+	{
+		if(seen.find(item) != seen.end())
+			continue;
+		seen.insert(item);
+		result.push_back(item);
+	}
+	return(result);
+}
+
+StringList list_sort(StringList items)
+{
+	std::sort(items.begin(), items.end());
+	return(items);
+}
+
+bool list_some(StringList items, std::function<bool (String)> f)
+{
+	for(auto item : items)
+	{
+		if(f(item))
+			return(true);
+	}
+	return(false);
+}
+
+bool list_every(StringList items, std::function<bool (String)> f)
+{
+	for(auto item : items)
+	{
+		if(!f(item))
+			return(false);
+	}
+	return(true);
+}
+
+String list_find(StringList items, std::function<bool (String)> f, String fallback)
+{
+	for(auto item : items)
+	{
+		if(f(item))
+			return(item);
+	}
+	return(fallback);
+}
+
+StringList dtree_keys(DTree tree)
+{
+	StringList result;
+	tree.each([&](const DTree& item, String key) {
+		if(key != "")
+			result.push_back(key);
+	});
+	return(result);
+}
+
+DTree dtree_values(DTree tree)
+{
+	DTree result;
+	result.set_array();
+	tree.each([&](const DTree& item, String key) {
+		result.push(item);
+	});
+	return(result);
+}
+
+DTree dtree_pick(DTree tree, StringList keys)
+{
+	DTree result;
+	for(auto key : keys)
+	{
+		DTree* item = tree.key(key);
+		if(item)
+			result[key] = *item;
+	}
+	return(result);
+}
+
+DTree dtree_omit(DTree tree, StringList keys)
+{
+	DTree result;
+	std::set<String> omitted(keys.begin(), keys.end());
+	tree.each([&](const DTree& item, String key) {
+		if(key != "" && omitted.find(key) == omitted.end())
+			result[key] = item;
+	});
+	return(result);
+}
+
+DTree dtree_map(DTree tree, std::function<DTree (const DTree&, String)> f)
+{
+	DTree result;
+	bool input_is_list = tree.is_list();
+	if(input_is_list)
+		result.set_array();
+	tree.each([&](const DTree& item, String key) {
+		DTree mapped = f(item, key);
+		if(key != "" && !input_is_list)
+			result[key] = mapped;
+		else
+			result.push(mapped);
+	});
+	return(result);
+}
+
+DTree dtree_filter(DTree tree, std::function<bool (const DTree&, String)> f)
+{
+	DTree result;
+	bool input_is_list = tree.is_list();
+	if(input_is_list)
+		result.set_array();
+	tree.each([&](const DTree& item, String key) {
+		if(!f(item, key))
+			return;
+		if(key != "" && !input_is_list)
+			result[key] = item;
+		else
+			result.push(item);
+	});
+	return(result);
+}
+
+DTree dtree_group_by(DTree tree, std::function<String (const DTree&, String)> f)
+{
+	DTree result;
+	tree.each([&](const DTree& item, String key) {
+		String group = f(item, key);
+		DTree* group_items = result.get_or_create(group);
+		if(!group_items->is_array())
+			group_items->set_array();
+		group_items->push(item);
+	});
 	return(result);
 }
 
@@ -502,11 +642,11 @@ String trim(String raw)
 	s64 len = raw.length();
 	s64 start_pos = 0;
 	s64 end_pos = len - 1;
-	if(len == 0 || (len == 1 && isspace(raw[0])))
+	if(len == 0 || (len == 1 && isspace((unsigned char)raw[0])))
 		return("");
-	while(start_pos < len && isspace(raw[start_pos]))
+	while(start_pos < len && isspace((unsigned char)raw[start_pos]))
 		start_pos++;
-	while(end_pos >= 0 && isspace(raw[end_pos]))
+	while(end_pos >= 0 && isspace((unsigned char)raw[end_pos]))
 		end_pos--;
 	if(end_pos < start_pos)
 		return("");
@@ -519,7 +659,7 @@ StringList split_space(String str)
 	String current_token = "";
 	for(auto c : str)
 	{
-		if(isspace(c))
+		if(isspace((unsigned char)c))
 		{
 			if(current_token != "")
 			{
@@ -540,6 +680,11 @@ StringList split_space(String str)
 StringList split(String str, String delim)
 {
 	StringList result;
+	if(delim == "")
+	{
+		result.push_back(str);
+		return(result);
+	}
 	int start = 0;
     int end = str.find(delim);
     while (end != String::npos)
@@ -562,14 +707,16 @@ StringMap split_kv(String s, char separator, bool trim_whitespace, bool uppercas
 		u8 mode = 0;
 		k = "";
 		v = "";
-		if(s[0] != '#') for(auto c : s)
+		if(s == "" || s[0] == '#')
+			continue;
+		for(auto c : s)
 		{
 			if(mode == 0)
 			{
 				if(c == separator)
 					mode = 1;
 				else
-					k.append(1, uppercase_keys ? toupper(c) : c);
+					k.append(1, uppercase_keys ? toupper((unsigned char)c) : c);
 			}
 			else
 			{
@@ -590,62 +737,43 @@ StringMap split_kv(String s, char separator, bool trim_whitespace, bool uppercas
 StringMap split_http_headers(String s)
 {
 	StringMap result;
-	String k;
-	String v;
-	String query_string;
-	String base_uri;
-	for(auto s : split(s, "\n"))
+	StringList lines = split(s, "\n");
+	if(lines.size() == 0)
+		return(result);
+
+	u64 header_start = 0;
+	while(header_start < lines.size() && trim(lines[header_start]) == "")
+		header_start++;
+
+	if(header_start < lines.size() && lines[header_start].find(':') == String::npos)
 	{
-		u8 mode = 0;
-		k = "";
-		v = "";
-		for(auto c : s)
-		{
-			if(mode == 0)
-			{
-				if(c == ':')
-					mode = 1;
-				else
-					k.append(1, c);
-			}
-			else
-			{
-				v.append(1, c);
-			}
-		}
-		if(k != "")
-		{
-			k = trim(k);
-			v = trim(v);
-			if(v == "")
-			{
-				if(result["REQUEST_METHOD"] == "")
-				{
-					result["REQUEST_METHOD"] = nibble(k, " ");
-					result["REQUEST_URI"] = nibble(k, " ");
-					String query_string = result["REQUEST_URI"];
-					String base_uri = nibble(query_string, "?");
-					result["SERVER_PROTOCOL"] = k;
-					result["SCRIPT_NAME"] = base_uri;
-					result["DOCUMENT_URI"] = base_uri;
-					result["QUERY_STRING"] = query_string;
-				}
-				else
-				{
-					if(k != "")
-						result["_"] = k;
-				}
-				}
-				else
-				{
-					String header_key = to_upper(k);
-					std::replace(header_key.begin(), header_key.end(), '-', '_');
-					result["HTTP_"+header_key] = v;
-					if(header_key == "CONTENT_TYPE" || header_key == "CONTENT_LENGTH")
-						result[header_key] = v;
-				}
-			}
-		}
+		String request_line = trim(lines[header_start]);
+		result["REQUEST_METHOD"] = nibble(request_line, " ");
+		result["REQUEST_URI"] = nibble(request_line, " ");
+		String query_string = result["REQUEST_URI"];
+		String base_uri = nibble(query_string, "?");
+		result["SERVER_PROTOCOL"] = trim(request_line);
+		result["SCRIPT_NAME"] = base_uri;
+		result["DOCUMENT_URI"] = base_uri;
+		result["QUERY_STRING"] = query_string;
+		header_start++;
+	}
+
+	for(u64 i = header_start; i < lines.size(); i++)
+	{
+		String line = lines[i];
+		size_t colon = line.find(':');
+		if(colon == String::npos)
+			continue;
+		String header_key = to_upper(trim(line.substr(0, colon)));
+		String value = trim(line.substr(colon + 1));
+		if(header_key == "")
+			continue;
+		std::replace(header_key.begin(), header_key.end(), '-', '_');
+		result["HTTP_" + header_key] = value;
+		if(header_key == "CONTENT_TYPE" || header_key == "CONTENT_LENGTH")
+			result[header_key] = value;
+	}
 	return(result);
 }
 
@@ -813,6 +941,9 @@ String html_escape(String s)
 				break;
 			case('"'):
 				result.append("&quot;");
+				break;
+			case('\''):
+				result.append("&#39;");
 				break;
 			default:
 				result.append(1, c);

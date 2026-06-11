@@ -1,0 +1,26 @@
+:title
+list_unique
+
+:sig
+StringList list_unique(StringList items)
+
+:see
+StringList
+0_DTree
+filter
+
+:content
+Returns the first occurrence of each string, preserving input order.
+
+These helpers are intentionally small data-shaping conveniences for render code, routers, and configuration trees. They are useful when porting habits from React/Next/Remix code where lists of routes, navigation items, cards, or records are transformed close to the rendering boundary.
+
+```cpp
+auto tags = list_unique({"uce", "docs", "uce"});
+```
+
+Prefer these helpers over open-coded loops when the transformation itself is the important part of the code. Use an explicit loop when mutation, error handling, or side effects are the main concern.
+
+## Related Concepts
+
+- JavaScript / React: `Array.map`, `Array.filter`, `Array.find`, object `pick`/`omit`, and grouping route or navigation records before rendering.
+- PHP: `array_map`, `array_filter`, `array_unique`, and associative array projection.

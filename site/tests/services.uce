@@ -86,6 +86,17 @@ RENDER(Request& context)
 		);
 	}
 
+	MySQL placeholder_guard;
+	StringMap mysql_params;
+	mysql_params["id"] = "1";
+	placeholder_guard.query("select ?", mysql_params);
+	String mysql_placeholder_error = placeholder_guard.error();
+	mark(
+		"mysql_query() rejects positional placeholders",
+		mysql_placeholder_error.find("positional ? placeholders are not supported") != String::npos ? "pass" : "fail",
+		mysql_placeholder_error
+	);
+
 	MySQL mysql;
 	mysql.connect("127.0.0.1", "root", "");
 	String mysql_error_text = trim(mysql.error());
